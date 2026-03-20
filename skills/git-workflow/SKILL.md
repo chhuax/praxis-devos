@@ -177,7 +177,9 @@ git add path/to/file
 
 ### 技术栈特定命令
 
-> 以下命令取决于项目使用的技术栈。请参考 `stacks/{当前栈}/stack.md` 中的 `commands` 定义。
+> 以下命令取决于项目使用的技术栈。
+> 当前栈通过 `openspec/project.md` 中的 `<!-- praxis-devos:stack = {栈名} -->` 标记识别。
+> 请参考 `stacks/{当前栈}/stack.md` 中的 `commands` 定义。
 
 | 操作 | 说明 |
 |------|------|
@@ -281,6 +283,7 @@ git push origin --delete feature/20260106/STORY-123
 
 - `.gitignore` — Git 忽略规则
 - `.pre-commit-config.yaml` — 预提交钩子配置（如已配置）
+- `openspec/project.md` — 技术栈声明（`<!-- praxis-devos:stack = {栈名} -->` 标记）
 - `stacks/{当前栈}/stack.md` — 技术栈特定的构建/测试/lint 命令
 
 ---

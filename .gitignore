@@ -121,3 +121,4 @@ buildNumber.properties
 /.idea/*
 /.vscode/*
 .flattened-pom.xml
+.DS_Store

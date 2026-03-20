@@ -46,7 +46,7 @@
 
 ### 0.2 技术栈规范 (门控)
 
-本项目采用**可插拔技术栈**架构。技术栈声明和编码规范存放在 `stacks/{栈名}/` 下，所有 skills 统一存放在 `.claude/skills/` 下（OpenCode 和 Claude Code 均兼容此路径）。
+本项目采用**可插拔技术栈**架构。技术栈声明和编码规范存放在 `stacks/{栈名}/` 下，所有 skills 存放在 `.claude/skills/` 下（OpenCode 和 Claude Code 均兼容此路径）。
 
 #### 技术栈识别（优先级从高到低）
 

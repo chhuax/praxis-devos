@@ -89,6 +89,7 @@ do_check_env() {
     echo ""
     local all_ok=true
 
+    # Node.js — OpenSpec CLI 运行时，硬依赖
     if check_command node; then
         local node_ver
         node_ver=$(node --version 2>/dev/null)
@@ -99,33 +100,38 @@ do_check_env() {
         all_ok=false
     fi
 
-    if check_command npm; then
-        local npm_ver
-        npm_ver=$(npm --version 2>/dev/null)
-        log_ok "npm $npm_ver"
+    # 包管理器 — 仅展示检测到的，不阻断
+    local pkg_mgr=""
+    if check_command pnpm; then
+        pkg_mgr="pnpm $(pnpm --version 2>/dev/null)"
+    elif check_command yarn; then
+        pkg_mgr="yarn $(yarn --version 2>/dev/null)"
+    elif check_command npm; then
+        pkg_mgr="npm $(npm --version 2>/dev/null)"
+    fi
+    if [ -n "$pkg_mgr" ]; then
+        log_ok "包管理器: $pkg_mgr"
     else
-        log_error "npm 未安装（通常随 Node.js 一起安装）"
-        echo "       安装: https://nodejs.org/"
-        all_ok=false
+        log_warn "未检测到包管理器（npm/pnpm/yarn），安装 OpenSpec CLI 时需要"
     fi
 
+    # Git — SuperPowers 克隆需要
     if check_command git; then
         local git_ver
         git_ver=$(git --version 2>/dev/null)
         log_ok "$git_ver"
     else
-        log_error "Git 未安装"
+        log_warn "Git 未安装（SuperPowers 插件安装时需要）"
         echo "       安装: https://git-scm.com/ 或 brew install git"
-        all_ok=false
     fi
 
+    # OpenSpec CLI — 安装脚本会自动安装
     if check_command openspec; then
         local os_ver
         os_ver=$(openspec --version 2>/dev/null || echo "unknown")
         log_ok "OpenSpec CLI $os_ver"
     else
         log_warn "OpenSpec CLI 未安装（安装脚本会自动安装）"
-        echo "       手动安装: npm install -g @fission-ai/openspec@latest"
     fi
 
     echo ""
@@ -164,13 +170,18 @@ install_openspec_cli() {
 
     log_info "安装 OpenSpec CLI..."
 
-    if ! check_command npm; then
-        log_error "未找到 npm。请先安装 Node.js (>= 20.19.0)"
-        echo "       安装: https://nodejs.org/ 或 brew install node"
+    if check_command pnpm; then
+        pnpm add -g @fission-ai/openspec@latest
+    elif check_command yarn; then
+        yarn global add @fission-ai/openspec@latest
+    elif check_command npm; then
+        npm install -g @fission-ai/openspec@latest
+    else
+        log_error "未找到包管理器（npm/pnpm/yarn）。请先安装 Node.js (>= 20.19.0)"
         exit 1
     fi
 
-    if npm install -g @fission-ai/openspec@latest; then
+    if check_command openspec; then
         log_ok "OpenSpec CLI 安装成功"
     else
         log_error "OpenSpec CLI 安装失败"
@@ -344,7 +355,7 @@ install_stack() {
 }
 
 install_skills() {
-    local skills_src="$SCRIPT_DIR/.claude/skills"
+    local skills_src="$SCRIPT_DIR/skills"
 
     if [ ! -d "$skills_src" ]; then
         log_warn "未找到 skills 目录: $skills_src"

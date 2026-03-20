@@ -15,6 +15,7 @@
 | 依赖 | 版本要求 | 说明 |
 |------|---------|------|
 | Node.js | >= 20.19.0 | OpenSpec CLI 运行时 |
+| npm / pnpm / yarn | 任意 | 包管理器（三选一即可） |
 | Git | 任意 | SuperPowers 克隆 |
 | OpenCode 或 Claude Code | 最新版 | AI 编码助手 |
 
@@ -65,17 +66,18 @@
 ## 项目结构
 
 ```
-项目根/
+框架源码/
 ├── AGENTS.md                      # 全局调度中心（AI 代理入口）
 ├── CLAUDE.md                      # Claude Code 入口
-├── install.sh                     # 一键安装脚本
+├── install.sh                     # 一键安装脚本（bash）
+├── install.ps1                    # 一键安装脚本（PowerShell）
 ├── openspec/                      # OpenSpec 规范系统
 │   ├── AGENTS.md                  # OpenSpec 工作流指令
 │   ├── project.md                 # 项目上下文（使用者填写）
 │   ├── specs/                     # 当前规范
 │   ├── changes/                   # 活跃变更提案
 │   └── templates/                 # 提案/任务模板
-├── .claude/skills/                # Skills（OpenCode + Claude Code 共用）
+├── skills/                        # Skills 源码（可见目录）
 │   ├── openspec-workflow/         # OpenSpec 工作流
 │   ├── git-workflow/              # Git 工作流
 │   ├── database-guidelines/       # 数据库设计规范
@@ -87,6 +89,8 @@
         ├── stack.md               # 技术栈声明
         └── rules.md               # 编码规范
 ```
+
+> **安装后**，`skills/` 的内容会被复制到目标项目的 `.claude/skills/` 下（Claude Code 和 OpenCode 共用路径）。
 
 ## Skills
 
@@ -195,7 +199,7 @@ stacks/{栈名}/
 
 ### 安装失败
 - **Node.js 版本过低**：请确保 Node.js >= 20.19.0。
-- **npm 权限问题**：尝试使用 `sudo` 或检查目录所有权。
+- **包管理器权限问题**：尝试使用 `sudo` 或检查目录所有权。安装脚本会自动检测 pnpm/yarn/npm。
 
 ### OpenSpec CLI 报错
 - **init 失败**：检查当前目录是否已有 `openspec` 目录或权限不足。

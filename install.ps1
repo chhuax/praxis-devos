@@ -165,7 +165,7 @@ function Install-Stack {
 }
 
 function Install-Skills {
-    $skillsSrc = Join-Path $ScriptDir ".claude\skills"
+    $skillsSrc = Join-Path $ScriptDir "skills"
 
     if (-not (Test-Path $skillsSrc)) {
         Write-Warn "未找到 skills 目录: $skillsSrc"
@@ -197,16 +197,21 @@ function Install-OpenSpecCli {
 
     Write-Info "安装 OpenSpec CLI..."
 
-    if (-not (Test-Command "npm")) {
-        Write-Err "未找到 npm。请先安装 Node.js (>= 20.19.0)"
+    if (Test-Command "pnpm") {
+        & pnpm add -g "@fission-ai/openspec@latest" 2>&1 | Out-Null
+    } elseif (Test-Command "yarn") {
+        & yarn global add "@fission-ai/openspec@latest" 2>&1 | Out-Null
+    } elseif (Test-Command "npm") {
+        & npm install -g "@fission-ai/openspec@latest" 2>&1 | Out-Null
+    } else {
+        Write-Err "未找到包管理器（npm/pnpm/yarn）。请先安装 Node.js (>= 20.19.0)"
         exit 1
     }
 
-    try {
-        & npm install -g "@fission-ai/openspec@latest" 2>&1 | Out-Null
+    if (Test-Command "openspec") {
         Write-Ok "OpenSpec CLI 安装成功"
-    } catch {
-        Write-Err "OpenSpec CLI 安装失败: $_"
+    } else {
+        Write-Err "OpenSpec CLI 安装失败"
         exit 1
     }
 }
