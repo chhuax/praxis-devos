@@ -3,7 +3,7 @@
 # 将 praxis-devos 框架安装到目标项目（Windows PowerShell）
 #
 # 用法:
-#   .\install.ps1 -Stack yonbip-java [-Target opencode|claude|all] [-WithExample]
+#   .\install.ps1 [-Stack yonbip-java] [-Target opencode|claude|all] [-WithExample]
 #   .\install.ps1 -ListStacks
 #   .\install.ps1 -Uninstall
 # ============================================================================
@@ -33,10 +33,10 @@ function Show-Usage {
 praxis-devos 安装脚本 (Windows)
 
 用法:
-  .\install.ps1 -Stack <stack-name> [选项]
+  .\install.ps1 [-Stack <stack-name>] [选项]
 
-必选参数:
-  -Stack <name>       技术栈名称（如 yonbip-java）
+可选参数:
+  -Stack <name>       技术栈名称（如 yonbip-java）。不指定则不安装技术栈规则。
 
 可选参数:
   -Target <target>    AI 工具目标: opencode | claude | all (默认: all)
@@ -116,12 +116,32 @@ function Install-Framework {
     Write-Ok "openspec/ 目录"
 }
 
+function Stamp-StackInProjectMd {
+    $projectMd = Join-Path $TargetDir "openspec\project.md"
+    if (-not (Test-Path $projectMd)) { return }
+    $content = Get-Content $projectMd -Raw
+    if ($content -match '<!-- praxis-devos:stack = .* -->') {
+        $content = $content -replace '<!-- praxis-devos:stack = .* -->', "<!-- praxis-devos:stack = $Stack -->"
+        Set-Content -Path $projectMd -Value $content -NoNewline
+        Write-Ok "技术栈标记已写入 openspec/project.md"
+    } else {
+        Write-Warn "openspec/project.md 中未找到技术栈标记，跳过"
+    }
+}
+
 function Install-Stack {
+    if ([string]::IsNullOrEmpty($Stack)) {
+        Write-Info "未指定技术栈，跳过技术栈安装"
+        Write-Info "后续可在 openspec/project.md 中声明技术栈"
+        return
+    }
+
     $stackDir = Join-Path $ScriptDir "stacks\$Stack"
 
     if (-not (Test-Path $stackDir)) {
-        Write-Err "技术栈 '$Stack' 不存在。使用 -ListStacks 查看可用技术栈。"
-        exit 1
+        Write-Warn "技术栈 '$Stack' 不存在（可用技术栈请查看 -ListStacks）"
+        Write-Info "跳过技术栈安装，后续可在 openspec/project.md 中声明技术栈"
+        return
     }
 
     Write-Info "安装技术栈: $Stack"
@@ -140,6 +160,8 @@ function Install-Stack {
             Write-Ok "project_example.md → openspec/project.md"
         }
     }
+
+    Stamp-StackInProjectMd
 }
 
 function Install-Skills {
@@ -284,15 +306,14 @@ if ($Help) { Show-Usage }
 if ($ListStacks) { Show-ListStacks }
 if ($Uninstall) { Invoke-Uninstall }
 
-if ([string]::IsNullOrEmpty($Stack)) {
-    Write-Err "必须指定 -Stack 参数"
-    Show-Usage
-}
-
 Write-Host ""
 Write-Host "praxis-devos 安装" -ForegroundColor Blue
 Write-Host "  目标项目: $TargetDir" -ForegroundColor Green
-Write-Host "  技术栈:   $Stack" -ForegroundColor Green
+if (-not [string]::IsNullOrEmpty($Stack)) {
+    Write-Host "  技术栈:   $Stack" -ForegroundColor Green
+} else {
+    Write-Host "  技术栈:   未指定" -ForegroundColor Yellow
+}
 Write-Host "  AI 工具:  $Target" -ForegroundColor Green
 Write-Host ""
 
@@ -325,7 +346,11 @@ Write-Ok "安装完成！"
 Write-Host ""
 Write-Host "下一步："
 Write-Host "  1. 编辑 openspec/project.md 填写项目信息"
-Write-Host "  2. 检查 stacks/$Stack/stack.md 确认技术栈配置"
+if (-not [string]::IsNullOrEmpty($Stack) -and (Test-Path (Join-Path $TargetDir "stacks\$Stack"))) {
+    Write-Host "  2. 检查 stacks/$Stack/stack.md 确认技术栈配置"
+} else {
+    Write-Host "  2. 配置技术栈（可选）：使用 -Stack 参数重新安装，或编辑 openspec/project.md 中的技术栈标记"
+}
 if ($Target -eq "opencode" -or $Target -eq "all") {
     Write-Host "  3. 重启 OpenCode 以加载 SuperPowers 插件"
     Write-Host "  4. 开始使用 AI 编码助手"

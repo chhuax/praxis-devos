@@ -48,22 +48,52 @@
 
 本项目采用**可插拔技术栈**架构。技术栈声明和编码规范存放在 `stacks/{栈名}/` 下，所有 skills 统一存放在 `.claude/skills/` 下（OpenCode 和 Claude Code 均兼容此路径）。
 
-**加载流程：**
-1. **感知技术栈**：检查项目根目录特征文件自动识别（见下方识别规则），或由用户在 `openspec/project.md` 中显式声明。
-2. 读取 `stacks/{当前栈}/stack.md` 了解技术栈元信息（运行时版本、构建工具、命令等）。
-3. 加载 `stacks/{当前栈}/rules.md` 作为编码规范。
-4. 按需加载 `.claude/skills/` 下的领域技能。
+#### 技术栈识别（优先级从高到低）
 
-**技术栈自动识别规则：**
+AI 代理按以下顺序识别当前技术栈，**命中即停**：
 
-| 特征文件 | 识别为 |
-|----------|--------|
-| `pom.xml` + Maven + Spring Boot 依赖 | `yonbip-java` |
-| `package.json` + NestJS 依赖 | `ts-nestjs`（待扩展） |
-| `go.mod` | `go`（待扩展） |
-| `requirements.txt` 或 `pyproject.toml` | `python`（待扩展） |
+```
+1. 显式声明（唯一真相源）
+   └─ 读取 openspec/project.md 中的 <!-- praxis-devos:stack = {栈名} --> 标记
+   └─ 值不为 none 且 stacks/{栈名}/ 存在 → ✅ 使用该栈
 
-> 如果自动识别失败，AI 代理应**主动询问**用户当前使用的技术栈。
+2. 目录扫描（回退）
+   └─ 扫描项目根目录 stacks/ 下的子目录
+   └─ 仅有一个栈 → 建议用户确认并写入 project.md
+   └─ 有多个栈 → 列出选项，请用户选择
+
+3. 特征文件推断（最后手段）
+   └─ pom.xml + Spring Boot 依赖 → 建议 yonbip-java
+   └─ package.json + NestJS 依赖 → 建议 ts-nestjs（待扩展）
+   └─ go.mod → 建议 go（待扩展）
+   └─ requirements.txt / pyproject.toml → 建议 python（待扩展）
+
+4. 无法识别
+   └─ 告知用户：「未检测到技术栈配置。技术栈为可选项，不影响框架核心功能。
+      如需启用技术栈规则，请在 openspec/project.md 顶部将
+      <!-- praxis-devos:stack = none --> 改为对应栈名（如 yonbip-java）。
+      可用技术栈见 stacks/ 目录。」
+```
+
+> **关键**：步骤 2-4 中，AI 代理在推断出栈名后，应**主动询问用户确认**，确认后将值写入 `openspec/project.md` 的 `<!-- praxis-devos:stack = ... -->` 标记中，使后续识别直接命中步骤 1。
+
+#### 切换技术栈
+
+用户只需修改 **一个地方**：`openspec/project.md` 中的 `<!-- praxis-devos:stack = {栈名} -->` 注释。
+
+例如，从 `yonbip-java` 切换到另一个栈：
+```markdown
+<!-- praxis-devos:stack = new-stack-name -->
+```
+
+确保 `stacks/{新栈名}/` 目录存在且包含 `stack.md` 和 `rules.md`。
+
+#### 加载流程
+
+识别到技术栈后，AI 代理按以下步骤加载：
+1. 读取 `stacks/{当前栈}/stack.md` 了解技术栈元信息（运行时版本、构建工具、命令等）。
+2. 加载 `stacks/{当前栈}/rules.md` 作为编码规范。
+3. 按需加载 `.claude/skills/` 下的领域技能。
 
 **当前可用技术栈：**
 

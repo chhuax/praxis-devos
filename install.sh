@@ -6,7 +6,7 @@ set -euo pipefail
 # 将 praxis-devos 框架安装到目标项目
 #
 # 用法:
-#   install.sh --stack yonbip-java [--dir /path/to/project] [--target opencode|claude|all] [--with-example] [--clean-examples]
+#   install.sh [--stack yonbip-java] [--dir /path/to/project] [--target opencode|claude|all] [--with-example] [--clean-examples]
 #   install.sh --list-stacks
 #   install.sh --check
 #   install.sh --uninstall [--dir /path/to/project]
@@ -43,12 +43,10 @@ usage() {
 praxis-devos 安装脚本
 
 用法:
-  install.sh --stack <stack-name> [选项]
-
-必选参数:
-  --stack <name>       技术栈名称（如 yonbip-java）
+  install.sh [--stack <stack-name>] [选项]
 
 可选参数:
+  --stack <name>       技术栈名称（如 yonbip-java）。不指定则不安装技术栈规则。
   --dir <path>         目标项目目录（默认: 当前目录）
   --target <target>    AI 工具目标: opencode | claude | all (默认: all)
   --with-example       复制 project_example.md 到 openspec/project.md
@@ -302,12 +300,32 @@ install_framework() {
     log_ok "openspec/ 目录"
 }
 
+stamp_stack_in_project_md() {
+    local project_md="$TARGET_DIR/openspec/project.md"
+    if [ ! -f "$project_md" ]; then
+        return
+    fi
+    if grep -q '<!-- praxis-devos:stack = ' "$project_md"; then
+        sed -i '' "s/<!-- praxis-devos:stack = .* -->/<!-- praxis-devos:stack = $STACK -->/" "$project_md"
+        log_ok "技术栈标记已写入 openspec/project.md"
+    else
+        log_warn "openspec/project.md 中未找到技术栈标记，跳过"
+    fi
+}
+
 install_stack() {
+    if [ -z "$STACK" ]; then
+        log_info "未指定技术栈，跳过技术栈安装"
+        log_info "后续可在 openspec/project.md 中声明技术栈"
+        return
+    fi
+
     local stack_dir="$SCRIPT_DIR/stacks/$STACK"
 
     if [ ! -d "$stack_dir" ]; then
-        log_error "技术栈 '$STACK' 不存在。使用 --list-stacks 查看可用技术栈。"
-        exit 1
+        log_warn "技术栈 '$STACK' 不存在（可用技术栈请查看 --list-stacks）"
+        log_info "跳过技术栈安装，后续可在 openspec/project.md 中声明技术栈"
+        return
     fi
 
     log_info "安装技术栈: $STACK"
@@ -321,6 +339,8 @@ install_stack() {
         copy_file "$stack_dir/project_example.md" "$TARGET_DIR/openspec/project.md"
         log_ok "project_example.md → openspec/project.md"
     fi
+
+    stamp_stack_in_project_md
 }
 
 install_skills() {
@@ -459,11 +479,6 @@ if [ "$UNINSTALL" = true ]; then
     do_uninstall
 fi
 
-if [ -z "$STACK" ]; then
-    log_error "必须指定 --stack 参数"
-    usage
-fi
-
 case "$TARGET" in
     opencode|claude|all) ;;
     *) log_error "无效的 --target: $TARGET（可选: opencode | claude | all）"; exit 1 ;;
@@ -472,7 +487,11 @@ esac
 echo ""
 echo -e "${BLUE}praxis-devos 安装${NC}"
 echo -e "  目标项目: ${GREEN}$TARGET_DIR${NC}"
-echo -e "  技术栈:   ${GREEN}$STACK${NC}"
+if [ -n "$STACK" ]; then
+    echo -e "  技术栈:   ${GREEN}$STACK${NC}"
+else
+    echo -e "  技术栈:   ${YELLOW}未指定${NC}"
+fi
 echo -e "  AI 工具:  ${GREEN}$TARGET${NC}"
 if [ "$SAME_DIR" = true ]; then
     echo -e "  模式:     ${YELLOW}原地安装（跳过文件拷贝）${NC}"
@@ -485,7 +504,7 @@ fi
 log_step "安装框架核心文件..."
 install_framework
 
-log_step "安装技术栈: $STACK"
+log_step "安装技术栈..."
 install_stack
 
 log_step "安装 Skills..."
@@ -519,12 +538,17 @@ echo "快速开始："
 echo ""
 echo "  1. 填写项目信息："
 echo "     编辑 openspec/project.md，描述你的项目上下文"
-if [ -f "$SCRIPT_DIR/stacks/$STACK/project_example.md" ] && [ "$WITH_EXAMPLE" = false ]; then
+if [ -n "$STACK" ] && [ -f "$SCRIPT_DIR/stacks/$STACK/project_example.md" ] && [ "$WITH_EXAMPLE" = false ]; then
     echo "     (参考示例: stacks/$STACK/project_example.md)"
 fi
 echo ""
-echo "  2. 检查技术栈配置："
-echo "     查看 stacks/$STACK/stack.md 确认构建命令等配置"
+if [ -n "$STACK" ] && [ -d "$TARGET_DIR/stacks/$STACK" ]; then
+    echo "  2. 检查技术栈配置："
+    echo "     查看 stacks/$STACK/stack.md 确认构建命令等配置"
+else
+    echo "  2. 配置技术栈（可选）："
+    echo "     编辑 openspec/project.md 中的技术栈标记，或使用 --stack 参数重新安装"
+fi
 echo ""
 echo "  3. 查看现有规范："
 echo "     openspec list --specs"

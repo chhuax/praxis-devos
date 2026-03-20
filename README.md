@@ -32,7 +32,10 @@
 框架是独立的工具包，通过 `--dir` 指定目标项目目录（不指定则安装到当前目录）：
 
 ```bash
-# 安装到当前目录
+# 安装到当前目录（不指定技术栈）
+./install.sh
+
+# 安装并指定技术栈
 ./install.sh --stack yonbip-java
 
 # 安装到指定项目目录
@@ -56,6 +59,8 @@
 # 卸载
 ./install.sh --uninstall --dir /path/to/my-project
 ```
+
+> **技术栈是可选的。** 不指定 `--stack` 时，框架核心功能（OpenSpec、Skills、Git Hooks）仍正常工作，只是不加载技术栈特定的编码规范。
 
 ## 项目结构
 
@@ -124,6 +129,41 @@
 - **代码规范**：项目特有的命名或架构约定。
 
 > **提示**：建议参考 `stacks/{栈名}/project-example.md` 进行填写。
+
+## 技术栈配置
+
+技术栈是**可选的**。不配置时，框架核心功能正常工作，只是不加载技术栈特定的编码规范和 Skills。
+
+### 查看当前技术栈
+
+技术栈声明在 `openspec/project.md` 顶部的 HTML 注释中：
+
+```markdown
+<!-- praxis-devos:stack = yonbip-java -->
+```
+
+值为 `none` 表示未配置。
+
+### 切换 / 配置技术栈
+
+只需修改 **一个地方** — `openspec/project.md` 中的注释标记：
+
+```markdown
+<!-- praxis-devos:stack = yonbip-java -->
+```
+
+确保 `stacks/{栈名}/` 目录存在且包含 `stack.md` 和 `rules.md`。
+
+### AI 代理自动识别
+
+如果未显式配置技术栈，AI 代理会按以下优先级尝试识别：
+
+1. **显式声明**（推荐）：读取 `openspec/project.md` 中的标记
+2. **目录扫描**：检查 `stacks/` 下有哪些栈可用
+3. **特征文件推断**：根据 `pom.xml`、`package.json` 等项目文件推断
+4. **无法识别**：提示用户技术栈为可选项
+
+> AI 代理在推断出栈名后会**主动询问确认**，确认后自动写入 `openspec/project.md`。
 
 ## 扩展新技术栈
 
