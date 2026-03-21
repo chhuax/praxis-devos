@@ -122,6 +122,16 @@ Install to your current directory or a specific project:
 
 We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to add new stacks or improve existing skills.
 
+## Sponsor
+
+Open source is not easy. If this project helps you, consider buying me a coffee ☕
+
+<p align="center">
+  <img src="docs/assets/wechat-sponsor.jpg" alt="WeChat Pay" width="200" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="docs/assets/alipay-sponsor.jpg" alt="Alipay" width="200" />
+</p>
+
 ## License
 
 Copyright 2024-2026 Praxis DevOS Authors.
