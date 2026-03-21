@@ -126,7 +126,7 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 Open source is not easy. If this project helps you, consider buying me a coffee ☕
 
-<img src="https://wxma-1254014761.cos.ap-beijing.myqcloud.com/wx-pay.png" alt="WeChat Pay" width="200" />
+<img src="https://wxma-1254014761.cos.ap-beijing.myqcloud.com/pay.png" alt="WeChat Pay" width="200" />
 
 ## License
 

@@ -183,7 +183,7 @@ stacks/{栈名}/
 
 开源不易，如果这个项目对你有帮助，欢迎赞助一杯咖啡 ☕
 
-<img src="https://wxma-1254014761.cos.ap-beijing.myqcloud.com/wx-pay.png" alt="微信赞赏" width="200" />
+<img src="https://wxma-1254014761.cos.ap-beijing.myqcloud.com/pay.png" alt="微信赞赏" width="200" />
 
 ## 许可证
 
