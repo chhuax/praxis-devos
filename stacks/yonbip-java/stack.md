@@ -34,16 +34,17 @@ commands:
   deps: "mvn dependency:tree"
 ```
 
-## 包含的 Skills
+## 包含的 Skills（栈专属）
 
-所有 skills 统一存放在项目根目录 `.claude/skills/` 下（OpenCode 和 Claude Code 共用）。
+以下 skills 存放在 `stacks/yonbip-java/skills/` 下，安装时复制到 `.claude/skills/`。
+它们**扩展**框架通用 skills，提供 YonBIP 产品特有的规范。
 
-| Skill | 路径 | 说明 |
-|-------|------|------|
-| database-guidelines | `.claude/skills/database-guidelines/SKILL.md` | 数据库设计、SQL 编写、索引规范 |
-| error-handling | `.claude/skills/error-handling/SKILL.md` | 异常处理规范、异常码体系、统一响应格式 |
-| security | `.claude/skills/security/SKILL.md` | 安全编码规范（注入防护、密码安全、XSS/CSRF） |
-| redis-guidelines | `.claude/skills/redis-guidelines/SKILL.md` | Redis 使用规范（命令、Key 设计、过期策略） |
+| Skill | 源路径 | 说明 | 扩展 |
+|-------|------|------|------|
+| yonbip-database | `stacks/yonbip-java/skills/yonbip-database/` | 多租户字段、YonBIP 命名规范、多数据库适配 | database-guidelines |
+| yonbip-error-handling | `stacks/yonbip-java/skills/yonbip-error-handling/` | 异常码体系、BusinessException、异常等级 | error-handling |
+| yonbip-security | `stacks/yonbip-java/skills/yonbip-security/` | CheckMarx/YCG 扫描、密码策略、会话超时 | security |
+| yonbip-redis | `stacks/yonbip-java/skills/yonbip-redis/` | 多租户 Key 设计、YMSRedisTemplate、Region 命名 | redis-guidelines |
 
 ## 包含的 Rules
 

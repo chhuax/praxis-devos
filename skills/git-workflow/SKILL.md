@@ -1,290 +1,185 @@
 ---
 name: git-workflow
 description: |
-  Git 工作流管理。用于创建分支、提交代码、代码审查、合并分支等 Git 操作。
-  强制执行分支命名规范、提交消息标准和预提交检查。
+  通用 Git 工作流技能。用于管理分支生命周期、规范化提交消息、执行合并与冲突解决。
+  支持 GitHub Flow 和 Git Flow 两种经典模式，强制执行 Conventional Commits 标准。
 triggers:
-  - Git
+  - git
+  - branch
+  - commit
+  - merge
+  - pr
+  - pull request
+  - rebase
+  - cherry-pick
+  - conflict
   - 分支
   - 提交
   - 合并
-  - PR
-  - Pull Request
-  - rebase
-  - cherry-pick
-  - 冲突解决
+  - 冲突
 ---
 
 # Git 工作流技能
 
 ## 目的
 
-管理团队协作中的 Git 操作，建立标准化规范：
-1. 分支命名规范 (feature/, bugfix/, hotfix/)
-2. 提交消息标准 (Conventional Commits)
-3. 预提交验证检查
-4. 合并与 PR 工作流
+为团队提供通用的 Git 协作规范，确保代码历史清晰、分支管理有序：
+1. **规范化分支命名**：区分功能、修复与发布。
+2. **标准化提交消息**：采用 Conventional Commits，便于自动生成变更日志。
+3. **确定性合并策略**：根据场景选择 Squash 或 Merge。
+4. **安全预提交检查**：减少集成失败风险。
 
 ## 何时使用此技能
 
-- 创建 feature/bugfix/hotfix 分支
-- 编写规范的提交消息
-- 执行预提交检查
-- 合并分支
-- 管理 Pull Request
-- 解决冲突
+- 初始化项目 Git 结构或选择工作流模式。
+- 创建 `feature/`、`bugfix/`、`hotfix/` 或 `release/` 分支。
+- 编写代码提交消息时（强制）。
+- 准备合并代码或发起 Pull Request (PR) / Merge Request (MR)。
+- 解决代码冲突。
+
+---
+
+## 分支模式选择
+
+项目应在以下两种模式中择一使用。
+
+### 1. GitHub Flow (简单模式)
+适用于持续交付、单主干开发的团队。
+
+- **main**: 始终保持可部署状态的主分支。
+- **feature/**: 从 `main` 切出，开发完成后合并回 `main` 并删除。
+
+### 2. Git Flow (标准模式)
+适用于有固定发布周期、需要维护多个版本的团队。
+
+- **main**: 存放生产环境代码。
+- **develop**: 日常开发集成分支。
+- **feature/**: 从 `develop` 切出，合并回 `develop`。
+- **release/**: 从 `develop` 切出，进行发布前最后修整，完成后同时合并回 `main` 和 `develop`。
+- **hotfix/**: 从 `main` 切出，修复紧急生产问题，完成后同时合并回 `main` 和 `develop`。
 
 ---
 
 ## 分支命名规范
 
-### 长期分支（永久存在）
-
-| 分支                      | 环境                | 用途               |
-| ------------------------- | ------------------- | ------------------ |
-| **develop**               | 测试环境 + 日常环境 | 日常开发主分支     |
-| **release**               | 预发布环境          | 准备发布的预发分支 |
-| **hotfix/迭代版本号-fix** | 公有云生产环境      | 线上版本分支       |
-| **onpremise-***           | 专属化生产环境      | 私有化部署版本     |
-
-### 临时分支（MR 后自动删除）
-
-| 分支类型   | 模式                                  | 切出源                | 合并目标   | 用途     |
-| ---------- | ------------------------------------- | --------------------- | ---------- | -------- |
-| feature    | `feature/{YYYYMMDD}/{故事ID}`         | develop               | develop    | 功能开发 |
-| bugfix     | `bugfix/{YYYYMMDD}/{源分支}/{bugid}`  | develop 或 release    | 源分支     | Bug 修复 |
-| hotfix-bug | `hotfix/{YYYYMMDD}/{bugid}`           | hotfix/YYYYMMDD-fix   | 源 hotfix  | 生产修复 |
+| 分支类型 | 模式 (建议) | 起始分支 | 合并目标 | 用途 |
+| :--- | :--- | :--- | :--- | :--- |
+| **feature** | `feature/{issue-id}-{description}` | `main` / `develop` | 起始分支 | 新功能开发 |
+| **bugfix** | `bugfix/{issue-id}-{description}` | `main` / `develop` | 起始分支 | 普通 Bug 修复 |
+| **hotfix** | `hotfix/{version}-fix` | `main` | `main` & `develop` | 生产紧急修复 |
+| **release** | `release/{version}` | `develop` | `main` & `develop` | 发布预备分支 |
 
 ### 示例
-
 ```bash
-# 功能分支
-feature/20260106/STORY-123
-
-# Bug 修复分支（从 develop）
-bugfix/20260106/develop/BUG-456
-
-# Bug 修复分支（从 release）
-bugfix/20260106/release/BUG-789
-
-# 生产紧急修复分支
-hotfix/20260106/BUG-111
-```
-
-### 创建分支
-
-```bash
-# 功能分支（从 develop）
-git checkout develop
-git pull origin develop
-git checkout -b feature/20260106/STORY-123
-
-# Bug 修复分支（从 develop）
-git checkout develop
-git pull origin develop
-git checkout -b bugfix/20260106/develop/BUG-456
-
-# Bug 修复分支（从 release）
-git checkout release
-git pull origin release
-git checkout -b bugfix/20260106/release/BUG-789
-
-# 生产紧急修复分支（从 hotfix）
-git checkout hotfix/20260106-fix
-git pull origin hotfix/20260106-fix
-git checkout -b hotfix/20260106/BUG-111
+feature/123-add-login-api
+bugfix/456-fix-header-style
+hotfix/v1.0.1-fix
+release/v1.1.0
 ```
 
 ---
 
-## 提交消息标准
+## 提交消息标准 (Conventional Commits)
 
-### 格式 (Conventional Commits)
-
+### 格式
 ```
-{type}({scope}): {subject}
+<type>(<scope>): <subject>
 
-{body}
+<body>
 
-{footer}
+<footer>
 ```
 
-### 提交类型
+### 提交类型 (Type)
 
-| 类型     | 说明         | 示例                                      |
-| -------- | ------------ | ----------------------------------------- |
-| feat     | 新功能       | `feat(auth): add JWT authentication`      |
-| fix      | Bug 修复     | `fix(login): resolve session timeout`     |
-| docs     | 文档         | `docs(readme): update installation guide` |
-| style    | 代码格式     | `style(api): fix indentation`             |
-| refactor | 代码重构     | `refactor(user): simplify validation`     |
-| test     | 测试         | `test(auth): add login unit tests`        |
-| chore    | 构建/工具    | `chore(deps): update dependencies`        |
-| perf     | 性能优化     | `perf(query): optimize user lookup`       |
+| 类型 | 说明 | 示例 |
+| :--- | :--- | :--- |
+| **feat** | 新功能 | `feat(auth): 增加 JWT 认证支持` |
+| **fix** | Bug 修复 | `fix(db): 修复连接池泄漏问题` |
+| **docs** | 仅文档变更 | `docs(readme): 完善安装指南` |
+| **style** | 代码格式（不影响逻辑） | `style(ui): 统一缩进为 2 空格` |
+| **refactor** | 代码重构（既非功能也非修复） | `refactor(user): 简化权限验证逻辑` |
+| **perf** | 性能优化 | `perf(search): 优化索引查询速度` |
+| **test** | 增加或修改测试 | `test(api): 补充登录接口单元测试` |
+| **chore** | 构建过程或辅助工具的变动 | `chore(deps): 升级 spring-boot 版本` |
 
 ### 示例
-
 ```bash
 # 简单提交
-git commit -m "feat(auth): add password reset functionality"
+git commit -m "feat(api): 增加用户注册接口"
 
-# 带正文的提交
-git commit -m "fix(api): resolve rate limiting issue
+# 包含正文和破坏性变更的提交
+git commit -m "feat(api): 重构响应格式
 
-The rate limiter was not properly resetting after the window expired.
-This caused legitimate requests to be blocked.
+BREAKING CHANGE: 所有接口返回字段由 snake_case 改为 camelCase。
 
-Task: TASK-123"
-
-# 破坏性变更
-git commit -m "feat(api): change response format
-
-BREAKING CHANGE: API responses now use camelCase instead of snake_case.
-All clients need to update their parsers.
-
-Task: TASK-456"
+Closes #123"
 ```
 
 ---
 
-## 预提交检查
+## 预提交检查清单
 
-### 检查清单
+在执行 `git commit` 或推送 PR 前，必须确保：
 
-提交前验证：
+- [ ] **变更完整**：所有相关修改已通过 `git add` 暂存。
+- [ ] **分支正确**：当前所在分支符合命名规范，且是预期的开发分支。
+- [ ] **无冲突标记**：代码中不存在 `<<<<<<< HEAD` 等残留标记。
+- [ ] **本地验证通过**：
+  - 运行 Lint 检查（如 `npm run lint` / `mvn checkstyle:check`）
+  - 运行单元测试（如 `npm test` / `mvn test`）
+  - 项目能够成功构建（如 `npm run build` / `mvn compile`）
 
-- [ ] 所有变更已暂存
-- [ ] 分支名称符合规范
-- [ ] 代码中无冲突标记
-- [ ] 本地测试通过
-- [ ] Lint 检查通过
-
-### 通用命令
-
-```bash
-# 检查状态
-git status
-
-# 检查冲突标记
-git diff --check
-
-# 暂存所有变更
-git add .
-
-# 暂存特定文件
-git add path/to/file
-```
-
-### 技术栈特定命令
-
-> 以下命令取决于项目使用的技术栈。
-> 当前栈通过 `openspec/project.md` 中的 `<!-- praxis-devos:stack = {栈名} -->` 标记识别。
-> 请参考 `stacks/{当前栈}/stack.md` 中的 `commands` 定义。
-
-| 操作 | 说明 |
-|------|------|
-| `{commands.lint}` | 代码风格检查 |
-| `{commands.test}` | 运行测试 |
-| `{commands.build}` | 构建项目 |
-| `{commands.verify}` | 完整验证（构建+测试） |
+> **提示**：具体构建和测试命令请参考项目根目录下的 `stacks/{stack}/stack.md` 或 `README.md`。
 
 ---
 
-## 合并工作流
+## 合并策略与 PR 实操
 
-### 合并前检查
+### 合并策略建议
 
-```bash
-# 更新目标分支
-git checkout develop
-git pull origin develop
+| 场景 | 推荐策略 | 命令示例 |
+| :--- | :--- | :--- |
+| **功能开发完结** | **Squash Merge** (压缩合并) | 在 PR/MR 界面勾选 "Squash commits" |
+| **发布/修复归档** | **Merge Commit** (普通合并) | `git merge --no-ff release/v1.0` |
+| **同步上游变更** | **Rebase** (变基) | `git pull --rebase origin main` |
 
-# 切回功能分支并 rebase
-git checkout feature/20260106/STORY-123
-git rebase develop
-
-# 解决冲突（如有）
-# 编辑冲突文件
-git add .
-git rebase --continue
-```
-
-### 合并策略
-
-| 策略 | 命令 | 适用场景 |
-|------|------|---------|
-| Squash merge | `git merge --squash feature/xxx` | MR 自动 Squash，一个 feature 一次 MR |
-| Merge commit | `git merge --no-ff hotfix/xxx` | 保留 hotfix 完整历史 |
-| Rebase | `git rebase develop` | 线性历史 |
-
-### 合并后清理
-
-```bash
-# 删除本地分支
-git branch -d feature/20260106/STORY-123
-
-# 删除远程分支
-git push origin --delete feature/20260106/STORY-123
-```
+### PR/MR 最佳实践
+1. **小步快跑**：一个 PR 只解决一个问题，避免巨大的 "Monster PR"。
+2. **描述清晰**：说明 "为什么改"、"改了什么"、"如何验证"。
+3. **及时清理**：合并后立即删除远程和本地的临时分支。
 
 ---
 
-## 冲突解决
+## 冲突解决步骤
 
-### 步骤
-
-1. 识别冲突文件：`git status`
-2. 打开冲突文件，查找 `<<<<<<<` 标记
-3. 选择正确的代码（或合并两者）
-4. 删除冲突标记
-5. 暂存已解决的文件：`git add <file>`
-6. 继续操作：`git rebase --continue` 或 `git merge --continue`
-
-### 冲突标记格式
-
-```
-<<<<<<< HEAD
-当前分支的代码
-=======
-传入分支的代码
->>>>>>> feature/xxx
-```
-
----
-
-- **MR 控制**：一个 feature 一次 MR，自动 Squash 提交
-- **分支生命周期**：临时分支（feature/bugfix/hotfix-bug）MR 合并后自动删除
-- **版本命名**：迭代版本号格式为 YYYYMMDD（如 `feature/20260106/STORY-123`、`hotfix/20260106-fix`）
-- **迭代切换点**：develop 推送到 release 后，更新 develop 版本号，标志新迭代开始
+1. **定位冲突**：执行 `git status` 查看未对齐的文件。
+2. **手动修复**：打开冲突文件，搜索 `<<<<<<<`。
+3. **决策代码**：保留当前分支变更、保留传入分支变更，或两者结合。
+4. **标记完成**：
+   ```bash
+   git add <resolved-file>
+   # 如果是 rebase 中冲突
+   git rebase --continue
+   # 如果是普通 merge 冲突
+   git commit -m "fix: 解决合并冲突"
+   ```
 
 ---
 
 ## 核心规则
 
 ### ✅ 应该做
-
-- 频繁提交，保持提交粒度小
-- 提交消息清晰描述变更内容
-- 合并前先 rebase 目标分支
-- 使用 `--no-ff` 保留合并历史
-- 合并后删除已完成的分支
+- 保持提交粒度原子化，一个提交只做一件事。
+- 频繁从目标分支（如 `main`）拉取最新代码到本地。
+- 推送 PR 前先在本地执行 `git rebase` 以保持历史线性（可选）。
+- 认真编写提交消息，它是未来的文档。
 
 ### ❌ 不应该做
-
-- 直接在 main/develop 上提交
-- 提交消息含糊不清（如 "fix bug"、"update"）
-- 提交包含调试代码或临时文件
-- 强制推送到共享分支 (`git push -f`)
-- 忽略冲突标记
-
----
-
-## 相关文件
-
-- `.gitignore` — Git 忽略规则
-- `.pre-commit-config.yaml` — 预提交钩子配置（如已配置）
-- `openspec/project.md` — 技术栈声明（`<!-- praxis-devos:stack = {栈名} -->` 标记）
-- `stacks/{当前栈}/stack.md` — 技术栈特定的构建/测试/lint 命令
+- **禁止** 直接在 `main` 分支进行日常开发提交。
+- **禁止** 提交包含敏感信息（密码、API Key）的文件（应使用 `.gitignore`）。
+- **禁止** 强制推送 (`git push -f`) 到公共协作分支，除非确定没有其他人基于该分支开发。
+- **禁止** 在未解决冲突的情况下强行提交。
 
 ---
 

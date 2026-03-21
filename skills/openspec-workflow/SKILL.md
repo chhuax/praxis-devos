@@ -201,16 +201,18 @@ openspec/changes/<变更ID>/
 1. **阅读 proposal.md** - 理解变更内容
 2. **阅读 design.md**（如果存在）- 审查技术决策
 3. **阅读 tasks.md** - 获取实现任务清单
-4. **准备工作区**（可选）- 如需隔离，加载 `using-git-worktrees` skill 创建独立工作区
-5. **生成实现计划**（多步骤任务）- 加载 `writing-plans` skill 生成详细实现计划
+4. **准备工作区**（可选）- 如需隔离，加载 `using-git-worktrees`† skill 创建独立工作区
+5. **生成实现计划**（多步骤任务）- 加载 `writing-plans`† skill 生成详细实现计划
 6. **按顺序实现** - 依次完成任务
-   - **强制 TDD**：加载 `test-driven-development` skill，遵循 RED-GREEN-REFACTOR 流程
-   - **并行执行**（多个独立子任务时）：加载 `subagent-driven-development` skill
-   - **遇到 bug / 测试失败**：加载 `systematic-debugging` skill 系统化排查
+   - **强制 TDD**：加载 `test-driven-development`† skill，遵循 RED-GREEN-REFACTOR 流程
+   - **并行执行**（多个独立子任务时）：加载 `subagent-driven-development`† skill
+   - **遇到 bug / 测试失败**：加载 `systematic-debugging`† skill 系统化排查
 7. **标记任务完成** - 完成后更新复选框
 8. **对照规范验证** - 确保实现符合需求
-9. **完成前验证** - 加载 `verification-before-completion` skill 执行系统化验收
-10. **收尾** - 加载 `finishing-a-development-branch` skill 决定合并/PR 策略
+9. **完成前验证** - 加载 `verification-before-completion`† skill 执行系统化验收
+10. **收尾** - 加载 `finishing-a-development-branch`† skill 决定合并/PR 策略
+
+> † 标记的 skills 来自 [SuperPowers](https://github.com/obra/superpowers) 插件（推荐但可选）。未安装时，AI 代理可使用内建能力完成相应步骤。
 
 ### 任务跟踪
 

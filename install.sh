@@ -362,7 +362,8 @@ install_skills() {
         return
     fi
 
-    log_info "安装 Skills → .claude/skills/"
+    # 1. 安装通用 skills（始终安装）
+    log_info "安装通用 Skills → .claude/skills/"
 
     for skill_dir in "$skills_src"/*/; do
         [ -d "$skill_dir" ] || continue
@@ -372,9 +373,26 @@ install_skills() {
         if [ -f "$skill_dir/SKILL.md" ]; then
             mkdir -p "$TARGET_DIR/.claude/skills/$skill_name"
             copy_file "$skill_dir/SKILL.md" "$TARGET_DIR/.claude/skills/$skill_name/SKILL.md"
-            log_ok "  $skill_name"
+            log_ok "  $skill_name（通用）"
         fi
     done
+
+    # 2. 安装栈专属 skills（仅指定栈且存在时）
+    if [ -n "$STACK" ] && [ -d "$SCRIPT_DIR/stacks/$STACK/skills" ]; then
+        log_info "安装栈专属 Skills（$STACK）→ .claude/skills/"
+
+        for skill_dir in "$SCRIPT_DIR/stacks/$STACK/skills"/*/; do
+            [ -d "$skill_dir" ] || continue
+            local skill_name
+            skill_name="$(basename "$skill_dir")"
+
+            if [ -f "$skill_dir/SKILL.md" ]; then
+                mkdir -p "$TARGET_DIR/.claude/skills/$skill_name"
+                copy_file "$skill_dir/SKILL.md" "$TARGET_DIR/.claude/skills/$skill_name/SKILL.md"
+                log_ok "  $skill_name（$STACK）"
+            fi
+        done
+    fi
 }
 
 install_hooks() {

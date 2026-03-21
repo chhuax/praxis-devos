@@ -16,66 +16,15 @@
 
 ### 1.2 数据库命名
 
-> 详细数据库设计规范见 `database-guidelines` skill
+> 完整规范见 `yonbip-database` skill（Schema、表名、字段命名、多租户字段等）
 
-#### Schema（数据库）
-
-| 类型 | 格式 | 示例 | 约束 |
-|------|------|------|------|
-| 平台库 | `iuap_产品_库名` | `iuap_aip_rapdb` | 总长度≤30字符 |
-| 领域库 | `yonbip_领域_库名` | `yonbip_scm_pubdb` | 总长度≤30字符 |
-
-#### 表名
-
-| 类型 | 格式 | 示例 | 约束 |
-|------|------|------|------|
-| 固定表 | `前缀_业务表英文含义` | `org_factory_define` | 长度≤48字符 |
-| 主表（头） | `前缀_业务含义_h` | `order_h` | h=head |
-| 子表（体） | `前缀_业务含义_b` | `order_b` | b=body |
-| 孙表 | `前缀_业务含义_g` | `order_g` | g=grand |
-| 扩展表 | `前缀_业务含义_ext` | `org_ext` | ext=extension |
-| 客开扩展 | `前缀_业务含义_isvext` | `org_isvext` | ISV扩展 |
-| 报表表 | `前缀_s_业务含义` | `xxx_s_report` | s=summary |
-| 临时表 | `tmp_{YYYYMMDD}_表名` | `tmp_20240301_xxx` | |
-| 备份表 | `bak_{YYYYMMDD}_表名` | `bak_20240301_xxx` | |
-| 待删除表 | `del_{YYYYMMDD}_表名` | `del_20240301_xxx` | 半年后自动清理 |
-
-#### 字段命名
-
-| 类型 | 前缀/后缀 | Java类型 | 数据库类型 | 取值示例 |
-|------|----------|----------|-----------|---------|
-| Boolean | `b_` | Boolean | smallint | 0=false, 1=true |
-| 枚举 | `e_` | String | varchar(36) | 元数据引用 |
-| 参照主键 | `id` 结尾 | Long/String | bigint/varchar(36) | orgId |
-| 顺序 | `i_` | Integer | int | iOrder |
-| 金额 | `amount` 结尾 | BigDecimal | decimal(20,8) | natAmount |
-| 数量 | `qty` 结尾 | BigDecimal | decimal(20,8) | orderQty |
-| 时间 | `ts_` | Date | timestamp/f=datetime | tsCreateTime |
-| 日期 | `dt_` | Date | date | dtBirthday |
-| 创建人 | `creator` | String | varchar(36) | |
-| 创建时间 | `createTime` | Date | timestamp | |
-| 修改人 | `modifier` | String | varchar(36) | |
-| 修改时间 | `modifyTime` | Date | timestamp | |
-
-**强制字段：所有业务表必须带 `ytenant_id` 字段**
+**快速提要**：所有业务表必须带 `ytenant_id` 字段，表名≤48字符，字段使用类型前缀（`b_` Boolean, `e_` 枚举, `ts_` 时间等）。
 
 ### 1.3 Redis 命名
 
-> 详细 Redis 使用规范见 `redis-guidelines` skill
+> 完整规范见 `yonbip-redis` skill（Key 格式、分布式锁、Region 命名等）
 
-#### Key 命名
-
-| 类型 | 格式 | 示例 |
-|------|------|------|
-| 普通缓存 | `Region:租户ID:用户自定义Key` | `iuap_apcom_xx:hsnukb4g:resource123` |
-| 分布式锁 | `Region:租户ID:lock:资源名` | `iuap_apcom_xx:hsnukb4g:lock:lockresourcename123` |
-
-| 约束项 | 要求 |
-|------|------|
-| 业务命名长度 | ≤64字符 |
-| Key 总长度 | ≤256字符 |
-| 字符集 | 禁止中文及全角字符 |
-| 特殊字符 | 禁止 <code>, &amp; " ' &#96; \ &lt; &gt; { } [ ] ^ % ~</code> |
+**快速提要**：Key 格式 `Region:租户ID:自定义Key`，长度≤256字符，禁止中文及特殊字符。
 
 ### 1.4 线程池命名
 
@@ -290,40 +239,9 @@ feature ─────> develop
 
 ### 4.5 提交规范
 
-#### Commit Message 格式
+> 完整提交规范见通用 `git-workflow` skill（Conventional Commits 格式、类型定义等）
 
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-#### type 类型
-
-| 类型 | 说明 |
-|------|------|
-| feat | 新功能 |
-| fix | Bug修复 |
-| docs | 文档更新 |
-| style | 代码格式调整 |
-| refactor | 重构 |
-| perf | 性能优化 |
-| test | 测试相关 |
-| chore | 构建/工具相关 |
-
-#### 示例
-
-```
-feat(order): 添加订单取消功能
-
-- 新增订单取消接口
-- 添加取消原因枚举
-- 更新订单状态流转图
-
-Closes #123
-```
+**快速提要**：格式 `{type}({scope}): {subject}`，type 包括 feat/fix/docs/style/refactor/test/chore/perf。
 
 ---
 

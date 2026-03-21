@@ -1,245 +1,208 @@
 ---
 name: error-handling
-description: |
-  YonBIP 异常处理规范与统一响应格式。使用此 skill 当需要：
-  1. 处理业务异常
-  2. 设计异常码体系
-  3. 统一响应格式
-  4. 全局异常捕获
-  
-  涵盖：标准异常组件、异常码格式、异常等级、响应格式、HTTP 状态码
-triggers:
-  - 异常处理
-  - 异常码
-  - BusinessException
-  - 统一响应
-  - 全局异常捕获
-  - displayCode
-  - traceId
-  - HTTP 状态码
----
-
-# YonBIP 异常处理规范
-
-本 skill 提供 YonBIP 产品的异常处理规范和统一响应格式。
-
-## 快速索引
-
-| 类别 | 说明 |
-|------|------|
-| [标准异常组件](#1-标准异常组件) | Maven 依赖与异常码格式 |
-| [异常等级](#2-异常等级) | 0-99 等级定义 |
-| [响应格式](#3-标准异常响应格式) | JSON 响应结构 |
-| [公共异常码](#4-公共异常码) | 运行时异常、分类异常、兜底异常 |
-| [处理规范](#5-异常处理规范) | 业务异常、兜底捕获、禁止模式 |
-| [HTTP状态码](#6-http-状态码) | 状态码与处理方式 |
-
----
-
-## 1. 标准异常组件
-
-### Maven 依赖
-
-```xml
-<dependency>
-    <groupId>com.yonyou.iuap</groupId>
-    <artifactId>yms-core-api</artifactId>
-    <version>${version}</version>
-</dependency>
-```
-
-### 异常码格式
-
-```
-格式：{产品编码}-{二级分类}-{6位序号}
-示例：120-230-100006
-```
-
----
-
-## 2. 异常等级
-
-| level值 | 含义 | displayCode | message | detailMsg | 示意图 |
-|---------|------|-------------|---------|-----------|--------|
-| 0 | 错误 | √ | √ | √ | 错误提示 |
-| 1 | 警告 | √ | √ | × | 警告提示 |
-| 2 | 询问 | √ | √ | × | 确认提示 |
-| 3-99 | 系统预留 | - | - | - | - |
-| 100-999 | 领域扩展 | - | - | √ | 领域自定义 |
-| 1000+ | 领域扩展 | - | - | × | 领域自定义 |
-
----
-
-## 3. 标准异常响应格式
-
-```json
-{
-  "code": "xxx",
-  "displayCode": "120-230-100006",
-  "message": "会计平台未查询到该单据的相关消息",
-  "detailMsg": "请检查是否已经推送会计平台",
-  "level": 0,
-  "traceId": "sd00034129",
-  "uploadable": 0
-}
-```
-
-| 字段 | 说明 |
-|------|------|
-| code | 旧版异常码（如存在则保持） |
-| displayCode | 新标准异常码（14位） |
-| message | 异常摘要（业务含义） |
-| detailMsg | 异常详情 |
-| level | 异常等级：0=错误，1=警告，2=询问 |
-| traceId | 链路追踪ID |
-| uploadable | 是否可上报：0=否，1=是 |
-
----
-
-## 4. 公共异常码
-
-### 运行时异常
-
-| 异常码 | 异常类型 | 说明 |
-|-------|---------|------|
-| 999-999-000001 | IllegalArgumentException | 非法参数异常 |
-| 999-999-000002 | NullPointerException | 空指针异常 |
-| 999-999-000003 | SQLSyntaxErrorException | SQL语法错误 |
-| 999-999-000004 | NumberFormatException | 数字格式异常 |
-| 999-999-000005 | IllegalStateException | 非法状态异常 |
-| 999-999-000006 | ClassCastException | 类转换异常 |
-| 999-999-000007 | StringIndexOutOfBoundsException | 字符数组越界 |
-| 999-999-000008 | ArrayIndexOutOfBoundsException | 数组越界异常 |
-| 999-999-000010 | UnsupportedOperationException | 不支持的操作 |
-| 999-999-000011 | IndexOutOfBoundsException | 索引越界异常 |
-| 999-999-000012 | ClassNotFoundException | 类找不到异常 |
-| 999-999-000013 | ArithmeticException | 数学运算异常 |
-| 999-999-000014 | InstantiationException | 实例化异常 |
-
-### 分类异常
-
-| 异常码 | 类别 | 说明 |
-|-------|------|------|
-| 999-999-100001 | 数据库异常 | |
-| 999-999-100002 | 网络异常 | |
-| 999-999-100003 | 框架异常 | |
-| 999-999-100004 | Redis异常 | |
-| 999-999-100005 | 消息队列异常 | |
-| 999-999-100006 | RPC请求异常 | |
-| 999-999-100007 | REST请求异常 | |
-
-### 兜底异常
-
-| 异常码 | 说明 |
-|-------|------|
-| 999-999-999999 | 未知异常兜底 |
-
----
-
-## 5. 异常处理规范
-
-### 5.1 业务异常
-
-```java
-// ✅ 使用标准异常码
-throw new BusinessException("120-230-100006",
-                          "会计平台未查询到该单据的相关消息",
-                          "请检查是否已经推送会计平台");
-```
-
-### 5.2 兜底捕获
-
-```java
-// ✅ 统一兜底捕获
-@ExceptionHandler(Exception.class)
-public Result handleException(Exception e) {
-    if (e instanceof BusinessException be) {
-        return Result.error(be);
-    }
-
-    log.error("[统一捕获异常]-[异常类型:{}]", e.getClass().getName(), e);
-
-    var be = new BusinessException();
-    be.setDisplayCode("999-999-999999");
-    be.setMessage("系统异常，请稍后重试");
-    be.setLevel(0);
-    be.setTraceId(MDC.get("traceId"));
-
-    return Result.error(be);
-}
-```
-
-### 5.3 禁止的异常处理
-
-```java
-// ❌ 禁止
-catch (Exception e) {
-    e.printStackTrace();  // 无效打印
-}
-
-// ❌ 禁止
-catch (Exception e) {
-    // 吞掉异常
-}
-
-// ❌ 禁止
-throw new RuntimeException("错误");  // 不规范
-
-// ✅ 正确
-catch (Exception e) {
-    log.error("操作失败", e);
-    throw new BusinessException("120-230-100001", "操作失败", e.getMessage());
-}
-```
-
----
-
-## 6. HTTP 状态码
-
-| 状态码 | 含义 | 处理方式 |
-|-------|------|---------|
-| 200 | 成功 | 前端不显示 |
-| 500 | 标准异常码 | 警告提示/错误提示 |
-| 401 | 未登录 | 跳转登录页 |
-| 403 | 拒绝访问 | 无权限提醒 |
-| 404 | 页面找不到 | 友好提示页面 |
-| 502 | 错误网关 | 友好提示页面 |
-| 503 | 服务不可用 | 友好提示页面 |
-| 504 | 网关超时 | 友好提示页面 |
-
----
-
-## 7. 异常码分配
-
-### 产品编码
-
-每个产品有独立的3位产品编码，如：
-- 120 = 会计平台
-- 230 = 某领域产品
-
-### 二方包起始编号：001
-### 微服务起始编号：501
-
----
-
-## 8. 异常日志要求
-
-### Error 级别日志
-
-```java
-// ❌ 禁止在 Error 级别 JSON 序列化整个对象
-log.error("响应: {}", AppContext.toJson(responseObject));
-
-// ✅ 只输出关键参数
-log.error("操作失败, orderId={}, userId={}", orderId, userId, e);
-```
-
-### 敏感信息
-
-```java
-// ❌ 禁止输出密码
-log.error("密码错误: {}", password);
-
-// ✅ 不记录敏感信息
-log.error("用户登录失败, userId={}", userId);
-```
+1: ---
+2: name: error-handling
+3: description: |
+4:   通用异常处理规范与统一响应格式。使用此 skill 当需要：
+5:   1. 设计或实现业务异常（Business Exception）
+6:   2. 设计层级化的异常码体系
+7:   3. 定义标准的错误响应格式（参考 RFC 7807）
+8:   4. 实现全局异常处理器（Global Exception Handler）
+9:   
+10:   涵盖：错误分类、异常传播、日志规范、HTTP 状态码映射、结构化响应
+11: triggers:
+12:   - 异常处理
+13:   - 异常码
+14:   - BusinessException
+15:   - 统一响应
+16:   - 全局异常捕获
+17:   - 错误分类
+18:   - traceId
+19:   - HTTP 状态码
+20: ---
+21: 
+22: # 通用异常处理规范
+23: 
+24: 本规范定义了跨技术栈通用的异常处理原则，旨在提高系统的可观测性、健壮性和前后端协作效率。
+25: 
+26: ## 快速索引
+27: 
+28: | 类别 | 说明 |
+29: |------|------|
+30: | [错误分类](#1-错误分类) | 业务异常 vs 系统异常，客户端 vs 服务端 |
+31: | [异常码设计](#2-异常码设计原则) | 层级化、可读性与唯一性 |
+32: | [响应格式](#3-标准错误响应格式) | 基于 RFC 7807 的结构化响应 |
+33: | [异常传播](#4-异常传播规范) | 分层架构中的捕获与抛出原则 |
+34: | [处理模式](#5-异常处理模式) | 全局拦截、捕获日志重抛、禁止吞掉异常 |
+35: | [HTTP状态码](#6-http-状态码映射) | 业务错误与 HTTP 状态码的映射关系 |
+36: 
+37: ---
+38: 
+39: ## 1. 错误分类
+40: 
+41: 异常应根据来源和可恢复性进行分类，避免所有错误都混淆为单一类型。
+42: 
+43: | 分类 | 说明 | 示例 | 建议 HTTP 码 |
+44: |------|------|------|------------|
+45: | **客户端错误 (Client)** | 输入非法、权限不足、资源不存在 | 参数校验失败、Token 过期 | 400, 401, 403, 404 |
+46: | **业务异常 (Business)** | 符合语法但违反业务逻辑 | 余额不足、订单已支付 | 422 (Unprocessable Content) 或 200/500 |
+47: | **系统异常 (System)** | 基础设施故障、第三方服务不可用 | 数据库连接超时、磁盘满 | 500, 502, 503, 504 |
+48: | **未知错误 (Unknown)** | 未预期的运行时异常 | NullPointerException | 500 |
+49: 
+50: ---
+51: 
+52: ## 2. 异常码设计原则
+53: 
+54: 异常码（Error Code）应同时具备机器可解析性和人类可读性。
+55: 
+56: - **层级化**：建议采用 `模块-分类-编号` 结构（如 `USER-AUTH-001`）。
+57: - **唯一性**：每个具体的错误场景对应唯一的错误码。
+58: - **文档化**：错误码应有对应的文档说明，包含触发原因和解决建议。
+59: 
+60: ✅ **推荐格式**：
+61: - `ORDER_NOT_FOUND` (字符串常量，易读)
+62: - `100-04-001` (数字/字母组合，适合大型分布式系统)
+63: 
+64: ---
+65: 
+66: ## 3. 标准错误响应格式
+67: 
+68: 参考 RFC 7807 (Problem Details for HTTP APIs)，提供结构化的 JSON 响应。
+69: 
+70: ```json
+71: {
+72:   "type": "https://example.com/probs/out-of-stock",
+73:   "title": "库存不足",
+74:   "status": 422,
+75:   "detail": "商品 [ID: 12345] 当前库存为 0，无法完成下单。",
+76:   "instance": "/orders/98765",
+77:   "errorCode": "SHOP-ORDER-001",
+78:   "traceId": "a1b2c3d4e5f6g7h8",
+79:   "errors": [
+80:     { "field": "quantity", "message": "必须大于 0" }
+81:   ]
+82: }
+83: ```
+84: 
+85: | 字段 | 说明 |
+86: |------|------|
+87: | type | 指向错误类型文档的 URI |
+88: | title | 错误的简短摘要（人类可读） |
+89: | status | 对应的 HTTP 状态码 |
+90: | detail | 针对本次发生的详细解释 |
+91: | errorCode | 内部定义的业务错误码 |
+92: | traceId | 用于链路追踪的唯一请求 ID |
+93: | errors | （可选）多处字段校验失败时的详细列表 |
+94: 
+95: ---
+96: 
+97: ## 4. 异常传播规范
+98: 
+99: 在分层架构中，应明确每一层的异常职责。
+100: 
+101: 1. **DAO/Repository 层**：不应处理业务逻辑，抛出底层的持久化异常（如 `DataAccessException`）。
+102: 2. **Service 层**：捕获底层异常，转化为 **业务异常 (BusinessException)** 抛出。**严禁返回错误码字符串**，应使用异常机制中断流程。
+103: 3. **Controller/API 层**：作为异常的终点，由全局处理器捕获异常并转换为标准响应格式。
+104: 
+105: ---
+106: 
+107: ## 5. 异常处理模式
+108: 
+109: ### 5.1 抛出业务异常
+110: 
+111: ```java
+112: // ✅ 使用自定义业务异常，包含错误码和上下文
+113: if (user == null) {
+114:     throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在: " + userId);
+115: }
+116: ```
+117: 
+118: ### 5.2 全局异常拦截 (Spring 示例)
+119: 
+120: ```java
+121: @RestControllerAdvice
+122: public class GlobalExceptionHandler {
+123: 
+124:     @ExceptionHandler(BusinessException.class)
+125:     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+126:         log.warn("业务异常: {}", e.getMessage());
+127:         return ResponseEntity.status(e.getHttpStatus())
+128:                              .body(new ErrorResponse(e.getCode(), e.getMessage()));
+129:     }
+130: 
+131:     @ExceptionHandler(Exception.class)
+132:     public ResponseEntity<ErrorResponse> handleSystemException(Exception e) {
+133:         // 记录堆栈信息，生成 traceId
+134:         String traceId = TraceContext.getTraceId();
+135:         log.error("系统未知错误 [traceId: {}]", traceId, e); 
+136:         
+137:         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+138:                              .body(new ErrorResponse("SYSTEM_ERROR", "系统开小差了，请稍后再试", traceId));
+139:     }
+140: }
+141: ```
+142: 
+143: ### 5.3 最佳实践与禁止模式
+144: 
+145: ```java
+146: // ❌ 禁止：吞掉异常而不处理或不记录
+147: try { 
+148:     doSomething(); 
+149: } catch (Exception e) {} 
+150: 
+151: // ❌ 禁止：只打印堆栈而不抛出（除非是顶层异步任务）
+152: try { 
+153:     doSomething(); 
+154: } catch (Exception e) { 
+155:     e.printStackTrace(); 
+156: }
+157: 
+158: // ✅ 正确：记录上下文并重新抛出/转化
+159: try {
+160:     externalClient.call();
+161: } catch (IOException e) {
+162:     log.error("调用第三方接口失败, param={}", param, e);
+163:     throw new ServiceUnavailableException("外部服务不可用", e);
+164: }
+165: ```
+166: 
+167: ---
+168: 
+169: ## 6. HTTP 状态码映射
+170: 
+171: 业务错误应尽量映射到语义接近的 HTTP 状态码。
+172: 
+173: | 业务场景 | 推荐 HTTP 状态码 |
+174: |---------|-----------------|
+175: | 请求参数缺失、格式错误 | 400 Bad Request |
+176: | 身份认证失败（未登录） | 401 Unauthorized |
+177: | 权限不足（无权操作该资源） | 403 Forbidden |
+178: | 找不到对应 ID 的资源 | 404 Not Found |
+179: | 并发修改冲突（如乐观锁失败） | 409 Conflict |
+180: | 业务逻辑不通过（如余额不足） | 422 Unprocessable Entity |
+181: | 触发限流 | 429 Too Many Requests |
+182: | 服务器内部不可恢复错误 | 500 Internal Server Error |
+183: | 下游服务超时/不可用 | 503 Service Unavailable |
+184: 
+185: ---
+186: 
+187: ## 7. 日志脱敏与脱噪
+188: 
+189: - **敏感数据遮蔽**：日志中严禁出现明文密码、信用卡号、SKU 私密信息等。
+190: - **日志脱噪**：对于预期的业务异常（如参数校验失败），使用 `WARN` 级别且不记录完整堆栈；对于非预期的系统异常，使用 `ERROR` 级别并记录完整堆栈。
+191: - **结构化日志**：包含 `traceId` 或 `correlationId`，确保能跨服务追踪。
+192: 
+193: ```java
+194: // ✅ 结构化日志示例
+195: log.error("Order payment failed | orderId={} | userId={} | reason={}", orderId, userId, reason, e);
+196: ```
+197: 
+198: ---
+199: 
+200: ## 8. 总结
+201: 
+202: 良好的异常处理不仅是为了修复错误，更是为了让系统在失败时：
+203: 1. **能感知**（有日志，有告警）
+204: 2. **可定位**（有 traceId，有上下文）
+205: 3. **对用户友好**（有清晰的提示，不暴露内部技术细节）
+206: 4. **对开发者友好**（代码逻辑清晰，不被冗长的 try-catch 淹没）

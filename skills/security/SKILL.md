@@ -1,15 +1,13 @@
 ---
 name: security
 description: |
-  YonBIP 安全编码规范。使用此 skill 当需要：
-  1. 输入验证与防护
-  2. 密码安全处理
-  3. 输出编码
-  4. XSS/CSRF 防护
-  5. 文件上传安全
-  6. 会话管理
-  
-  涵盖：SQL注入防护、密码安全、XSS防护、CSRF防护、文件安全、依赖安全
+  通用安全编码规范。使用此 skill 当需要：
+  1. 输入验证与各种注入防护（SQL, Command, LDAP 等）
+  2. 输出编码与 XSS 防护
+  3. 身份认证与会话管理最佳实践
+  4. CSRF 防护与安全响应头配置
+  5. 文件上传安全与敏感数据处理
+  6. 依赖项安全与漏洞扫描
 triggers:
   - 安全编码
   - SQL 注入
@@ -20,319 +18,206 @@ triggers:
   - 输入验证
   - 会话管理
   - 依赖漏洞
+  - 敏感数据
 ---
 
-# YonBIP 安全编码规范
+# 通用安全编码规范
 
-本 skill 提供 YonBIP 产品的安全编码规范指导。
+本 skill 提供基于 OWASP Top 10 的通用安全编码规范指导，适用于任何技术栈。
 
 ## 快速索引
 
 | 类别 | 说明 |
 |------|------|
-| [输入验证](#1-输入验证必须) | SQL注入、XPath注入、命令注入防护 |
-| [密码安全](#2-密码安全必须) | 密码算法、复杂度、硬编码防护 |
-| [输出安全](#3-输出安全必须) | HTML转义、JSON安全、敏感信息脱敏 |
-| [XSS防护](#4-xss-防护) | 前端/后端防护措施 |
-| [CSRF防护](#5-csrf-防护) | Token验证 |
-| [文件上传](#6-文件上传安全) | 类型校验、大小限制、路径安全 |
-| [会话管理](#7-会话管理) | Token、Cookie、超时 |
-| [依赖安全](#8-依赖安全) | 漏洞扫描、组件管理 |
+| [1. 输入验证与注入防护](#1-输入验证与注入防护) | SQL注入、命令注入、LDAP/XPath 注入 |
+| [2. 输出编码与 XSS 防护](#2-输出编码与-xss-防护) | HTML/JS/URL 编码、CSP、XSS 预防 |
+| [3. 身份认证与密码安全](#3-身份认证与密码安全) | 哈希算法、MFA、硬编码防护 |
+| [4. 会话管理](#4-会话管理) | Secure/HttpOnly Cookie、Token、超时 |
+| [5. CSRF 防护](#5-csrf-防护) | Token 校验、SameSite 策略 |
+| [6. 文件上传安全](#6-文件上传安全) | 魔数校验、随机文件名、路径穿越防护 |
+| [7. 敏感数据处理](#7-敏感数据处理) | 脱敏、加密、日志安全 |
+| [8. 依赖与环境安全](#8-依赖与环境安全) | 漏洞扫描 (SCA)、安全响应头 |
 
 ---
 
-## 1. 输入验证（必须）
+## 1. 输入验证与注入防护
 
-### 1.1 禁止动态拼接 SQL
+### 1.1 SQL 注入防护
+必须使用参数化查询（Prepared Statements），严禁拼接字符串构建 SQL。
 
 ```java
-// ❌ 禁止
-String sql = "SELECT * FROM user WHERE name = '" + name + "'";
-
-// ✅ 使用预编译
-var sql = """
-        SELECT id, name
-        FROM user
-        WHERE name = ?
-        """;
+// ✅ Java (JDBC/MyBatis/JPA)
+var sql = "SELECT id, name FROM users WHERE email = ?";
 var ps = conn.prepareStatement(sql);
-ps.setString(1, name);
+ps.setString(1, userEmail);
+
+// ✅ JavaScript (Node.js pg/mysql2)
+const results = await db.query('SELECT id, name FROM users WHERE email = $1', [userEmail]);
+
+// ❌ 严禁拼接
+const sql = "SELECT * FROM users WHERE email = '" + userEmail + "'";
 ```
 
-### 1.2 禁止动态构建 XPath
+### 1.2 命令注入防护
+尽量避免调用系统命令。如必须调用，使用 API 而非 shell 字符串，并进行严格的参数白名单校验。
 
 ```java
-// ❌ 禁止
-String xpath = "//user[name='" + userInput + "']";
+// ✅ 使用数组形式调用，不经过 shell 解析
+new ProcessBuilder("ls", "-l", directoryPath).start();
 
-// ✅ 使用参数化
-var expression = """
-        //user[@name=$name]
-        """;
-var xpath = XPath.newInstance(expression);
-xpath.setVariable("name", userInput);
+// ❌ 拼接 shell 字符串
+Runtime.getRuntime().exec("sh script.sh " + userInput);
 ```
 
-### 1.3 不可信输入必须编码转换
+### 1.3 其他注入 (LDAP, XPath, Header)
+所有进入系统的外部数据都应视为不可信，必须根据上下文进行验证或过滤。
 
-| 输出位置 | 编码方式 |
+---
+
+## 2. 输出编码与 XSS 防护
+
+### 2.1 上下文相关的输出编码
+根据数据输出的位置选择正确的编码方式。
+
+| 输出位置 | 编码/处理方式 |
 |---------|---------|
-| HTML标签内 | HTML实体编码 |
-| HTML属性内 | HTML属性编码 |
-| JavaScript | JavaScript编码 |
-| URL | URL编码 |
-| CSS | CSS编码 |
+| HTML Body | HTML 实体编码 (e.g. `<` -> `&lt;`) |
+| HTML Attribute | HTML 属性编码 |
+| JavaScript 变量 | JavaScript 编码 (JSON.stringify 或专用库) |
+| URL 参数 | URL 编码 (percent-encoding) |
+| CSS 样式 | CSS 编码 |
 
-### 1.4 禁止命令注入
-
-```java
-// ❌ 禁止
-Runtime.exec("cmd " + userInput);
-
-// ✅ 白名单验证
-String[] allowedCommands = {"cmd1", "cmd2"};
-if (Arrays.asList(allowedCommands).contains(userInput)) {
-    Runtime.exec("cmd " + userInput);
-}
-```
-
----
-
-## 2. 密码安全（必须）
-
-### 2.1 禁止弱密码算法
-
-```
-❌ MD5
-❌ SHA-1
-❌ 3DES
-❌ AES-128
-❌ RSA-1024
-❌ DES
-
-✅ SHA-256（密码）
-✅ AES-256（数据加密）
-✅ RSA-2048/ECC（签名）
-```
-
-### 2.2 密码复杂度
-
-```
-长度：≥8位
-包含：大写字母、小写字母、数字、特殊字符（≥3种）
-禁止：包含手机号、企业名称、用户名
-有效期：90天
-```
-
-### 2.3 禁止硬编码密钥
-
-```java
-// ❌ 禁止
-String apiKey = "sk-1234567890";
-String dbPassword = "password123";
-
-// ✅ 使用配置中心
-String apiKey = configService.getApiKey();
-String dbPassword = configService.getDbPassword();
-```
-
-### 2.4 密码传输加密
-
-```
-❌ 明文传输
-❌ MD5/SHA1
-❌ Base64
-
-✅ RSA
-✅ SM4
-✅加盐哈希
-```
-
----
-
-## 3. 输出安全（必须）
-
-### 3.1 HTML输出转义
-
-```java
-// ❌ 禁止
-out.println("<div>" + userInput + "</div>");
-
-// ✅ 转义后输出
-var html = """
-        <div>%s</div>
-        """.formatted(HtmlUtils.htmlEscape(userInput));
-out.println(html);
-```
-
-### 3.2 JSON输出转义
-
-```java
-// ❌ 禁止
-String json = "{\"name\":\"" + userInput + "\"}";
-
-// ✅ 使用JSON库
-var json = new JSONObject();
-json.put("name", userInput);
-```
-
-### 3.3 敏感信息脱敏
-
-| 信息类型 | 脱敏规则 |
-|---------|---------|
-| 身份证 | 显示首尾位，如：3\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*1 |
-| 手机号 | 隐藏中间6位，如：134\*\*\*\*\*\*\*\*48 |
-| 银行卡 | 仅显示后4位，如：\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*8639 |
-| 地址 | 最多到区级 |
-
----
-
-## 4. XSS 防护
-
-### 4.1 前端防护
+### 2.2 前端防御 (DOM-based XSS)
+避免使用直接解析 HTML 的 API。
 
 ```javascript
-// ❌ 禁止
-element.innerHTML = userInput;
-
-// ✅ 使用 textContent
+// ✅ 使用 textContent (自动转义)
 element.textContent = userInput;
 
-// ✅ 或使用Vue/React的默认转义
+// ❌ 使用 innerHTML (易受攻击)
+element.innerHTML = userInput;
 ```
 
-### 4.2 后端防护
+### 2.3 内容安全策略 (CSP)
+通过响应头限制资源加载来源。
+`Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted.cdn.com;`
+
+---
+
+## 3. 身份认证与密码安全
+
+### 3.1 强密码哈希
+严禁使用 MD5, SHA-1 等快速哈希算法。必须使用加盐的慢速哈希算法。
 
 ```java
-// 添加安全响应头
-response.setHeader("X-Content-Type-Options", "nosniff");
-response.setHeader("X-Frame-Options", "SAMEORIGIN");
-var csp = """
-        default-src 'self'
-        """;
-response.setHeader("Content-Security-Policy", csp);
+// ✅ 使用 Argon2 或 bcrypt
+String hash = BCrypt.withDefaults().hashToString(12, password.toCharArray());
+
+// ❌ 严禁使用 MD5 或纯 SHA-256
+MessageDigest.getInstance("MD5").digest(password.getBytes());
 ```
+
+### 3.2 严禁硬编码
+密钥、凭证必须存储在环境变量、配置文件（加密）或密钥管理服务（KMS）中。
+
+```javascript
+// ✅ 从环境读取
+const apiKey = process.env.API_KEY;
+
+// ❌ 留在代码里
+const apiKey = "sk_live_51M...";
+```
+
+### 3.3 多因素认证 (MFA)
+对于特权操作或敏感账户，应强制开启 MFA (TOTP, WebAuthn 等)。
+
+---
+
+## 4. 会话管理
+
+### 4.1 安全 Cookie
+所有身份凭证 Cookie 必须设置安全标志。
+
+```javascript
+// ✅ Node.js/Express 示例
+res.cookie('sessionID', token, {
+  httpOnly: true, // 防止 JS 读取
+  secure: true,   // 仅通过 HTTPS 传输
+  sameSite: 'Strict', // 防范 CSRF
+  maxAge: 3600000 // 设置合理的过期时间
+});
+```
+
+### 4.2 会话生命周期
+- **超时退出**：设置合理的绝对超时和无活动超时。
+- **重新登录**：在修改密码、绑定邮箱等敏感操作前要求重新验证。
 
 ---
 
 ## 5. CSRF 防护
 
-```java
-// 添加CSRF Token
-@RequestMapping("/form")
-public String form(@RequestParam String csrfToken, Model model) {
-    if (!csrfValidator.validate(csrfToken)) {
-        throw new SecurityException("CSRF Token无效");
-    }
-    // ...
-}
-```
+### 5.1 Token 机制
+在所有状态变更请求（POST, PUT, DELETE）中要求携带不可预测的 CSRF Token。
+
+### 5.2 SameSite Cookie
+将 Cookie 的 `SameSite` 属性设为 `Lax` 或 `Strict` 作为第一道防线。
 
 ---
 
 ## 6. 文件上传安全
 
-### 6.1 文件类型校验
+### 6.1 内容验证
+不能仅依赖文件扩展名或 Content-Type，必须检查文件头（Magic Bytes）。
 
 ```java
-// ❌ 禁止：只校验扩展名
-String filename = "file.exe.txt";
-
-// ✅ 校验文件魔数
-byte[] header = Files.readBytes(file, 8);
-String fileType = detectFileType(header);
+// ✅ 检查魔数
+byte[] header = readHeader(file);
+if (!isAllowedImage(header)) { throw new SecurityException(); }
 ```
 
-### 6.2 文件大小限制
-
-```java
-// 限制上传文件大小
-@MaxUploadSize fileSize = 10 * 1024 * 1024 // 10MB
-```
-
-### 6.3 文件名处理
-
-```java
-// ❌ 禁止直接使用用户文件名
-String filename = userProvidedFilename;
-
-// ✅ 重命名为随机字符串
-String filename = UUID.randomUUID() + ".pdf";
-```
-
-### 6.4 文件存储路径
-
-```java
-// 禁止路径穿越
-if (filename.contains("..")) {
-    throw new SecurityException("非法文件名");
-}
-```
+### 6.2 存储安全
+- **随机文件名**：上传后重命名文件（如 UUID），防止文件名导致的溢出或特殊字符攻击。
+- **存储路径**：严禁通过用户输入构造路径，防止路径穿越（Path Traversal）。
+- **执行权限**：确保上传目录没有执行权限（No-Execute）。
 
 ---
 
-## 7. 会话管理
+## 7. 敏感数据处理
 
-### 7.1 Token 要求
-
-```
-长度：≥256位
-随机源：SecureRandom
-包含时间戳
-```
-
-### 7.2 Cookie 安全
+### 7.1 日志脱敏
+严禁在日志中记录密码、CVV、完整身份证号或个人通讯隐私。
 
 ```java
-var cookie = new Cookie("session", token);
-cookie.setHttpOnly(true);    // 必须
-cookie.setSecure(true);       // 必须（HTTPS）
-cookie.setPath("/");
-cookie.setMaxAge(3600);
+// ✅ 脱敏处理
+logger.info("User {} logged in", maskUser(userId));
 ```
 
-### 7.3 会话超时
-
-```
-无活动超时：≤10分钟
-绝对超时：3小时（Web端）
-```
-
-### 7.4 登录失败处理
-
-```
-失败次数：5次
-锁定策略：1小时锁定或管理员解锁
-失败示警：剩余次数提示
-```
+### 7.2 加密存储
+- **静态数据 (At Rest)**：使用 AES-256 等对称加密算法存储敏感信息。
+- **传输中数据 (In Transit)**：强制使用 TLS 1.2+。
 
 ---
 
-## 8. 依赖安全
+## 8. 依赖与环境安全
 
-### 8.1 开源组件管理
+### 8.1 组件漏洞扫描 (SCA)
+集成自动化工具定期扫描项目依赖。
+- **工具建议**：Snyk, GitHub Dependabot, OWASP Dependency-Check, Trivy。
 
-```
-❌ 禁止使用有已知漏洞的组件
-❌ 禁止使用 EOM 后的组件
-❌ 禁止 fastjson（升级到安全版本或替换）
+### 8.2 安全响应头
+配置基础安全头以增强浏览器端的防御。
 
-✅ 使用自动扫描工具检查漏洞
-```
-
-### 8.2 第三方组件安全扫描
-
-```
-工具：CheckMarx、YCG
-要求：中危及以上漏洞必须修复
-```
+| Header | 推荐值 | 作用 |
+|--------|--------|------|
+| `X-Content-Type-Options` | `nosniff` | 禁止浏览器猜测内容类型 |
+| `X-Frame-Options` | `DENY` 或 `SAMEORIGIN` | 防范点击劫持 (Clickjacking) |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | 强制 HSTS (HTTPS) |
+| `Referrer-Policy` | `no-referrer-when-downgrade` | 控制 Referrer 信息泄露 |
 
 ---
 
-## 9. 代码审计要求
+## 9. 持续安全验证
 
-| 扫描类型 | 工具 | 要求 |
-|---------|------|------|
-| 代码扫描 | CheckMarx/YCG | 中危+必须修复 |
-| 黑盒扫描 | 安全测试工具 | 中危+必须修复 |
-| 渗透测试 | 安全团队 | 发现漏洞必须修复 |
+- **静态扫描 (SAST)**：在 CI 中运行代码扫描（如 SonarQube, Semgrep）。
+- **动态扫描 (DAST)**：对运行中的应用进行黑盒测试（如 OWASP ZAP）。
+- **安全审计**：重大变更或发版前进行人工代码审计或渗透测试。

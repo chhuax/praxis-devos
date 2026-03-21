@@ -1,14 +1,15 @@
 ---
 name: database-guidelines
 description: |
-  YonBIP 数据库设计规范与 SQL 编写指南。使用此 skill 当需要：
+  通用数据库设计规范与 SQL 编写指南。使用此 skill 当需要：
   1. 设计数据库表结构
   2. 编写 SQL 查询语句
   3. 创建索引
-  4. 处理分页
-  5. 多数据库适配
+  4. 优化查询性能
+  5. 处理分页
+  6. 进行数据库迁移设计
   
-  涵盖：表设计规范、SQL 编写规范、索引设计、分页规范、多数据库适配
+  涵盖：表设计、SQL 编写、索引优化、分页最佳实践、迁移安全、跨数据库兼容
 triggers:
   - 数据库设计
   - 表结构
@@ -17,60 +18,48 @@ triggers:
   - 分页查询
   - 建表
   - 字段命名
-  - ytenant_id
+  - 数据库迁移
+  - SQL 注入
 ---
 
-# YonBIP 数据库设计规范
+# 通用数据库设计规范
 
-本 skill 提供 YonBIP 产品的数据库设计规范和 SQL 编写指导。
+本 skill 提供通用的数据库设计规范和 SQL 编写指导，适用于任何主流关系型数据库（MySQL, PostgreSQL, SQLite, SQL Server 等）。
 
 ## 快速索引
 
 | 类别 | 说明 |
 |------|------|
-| [强制规则](#1-强制规则) | 所有表必须遵守的基础规范 |
-| [SQL编写规范](#2-sql-编写规范) | 查询、插入、更新规范 |
-| [索引设计](#3-索引设计规范) | 索引创建原则与命名 |
-| [分页规范](#4-分页规范) | 分页查询标准方式 |
-| [多数据库适配](#5-多数据库适配) | MySQL/Oracle/PostgreSQL 适配 |
+| [1. 表设计规范](#1-表设计规范) | 命名、类型选择与基础结构 |
+| [2. SQL 编写规范](#2-sql-编写规范) | 性能、安全与防注入 |
+| [3. 索引设计原则](#3-索引设计原则) | 提升检索效率的核心准则 |
+| [4. 分页最佳实践](#4-分页最佳实践) | 大数据量下的分页方案 |
+| [5. 迁移与安全](#5-迁移与安全) | 零停机迁移与向后兼容 |
 
 ---
 
-## 1. 强制规则
+## 1. 表设计规范
 
-### 1.1 基础规范
+### 1.1 命名约定
 
-1. **所有业务表必须带 `ytenant_id` 字段**
-   - 类型：varchar(36)
-   - 属性：NOT NULL
-   - 建议不设置默认值
-   - 必须带索引：`i_ytenant_id` 或以 `ytenant_id` 开头的索引
+1. **小写与下划线**：所有数据库对象（表、列、索引、约束）必须使用小写字母、数字和下划线。
+2. **有意义的名称**：禁止使用 `table1`, `col_a` 等无意义名称。表名应为复数或单数（根据项目惯例保持一致），推荐使用名词。
+3. **前缀管理**：
+   - 临时表：`tmp_` 前缀，如 `tmp_order_cleanup_20240321`。
+   - 备份表：`bak_` 前缀，如 `bak_user_v1`。
+   - 关联表：使用两个主体表的名称连接，如 `user_role`。
 
-2. **表名长度≤48字符**（为特征表扩展预留）
+### 1.2 数据类型选择
 
-3. **禁止使用数据库关键字和保留字**
-
-4. **对象名必须使用小写字母、数字、下划线**
-
-5. **临时表必须 `tmp_` 前缀**，格式：`tmp_{YYYYMMDD}_表名`
-
-6. **备份表必须 `bak_` 前缀**，格式：`bak_{YYYYMMDD}_表名`
-
-7. **待删除表必须 `del_` 前缀**，格式：`del_{YYYYMMDD}_表名`，DBA半年后自动清理
-
-### 1.2 数据类型规范
-
-| Java类型 | 数据库类型 | 说明 |
-|----------|-----------|------|
-| Boolean | smallint | 0=false, 1=true |
-| Integer | int | |
-| Long | bigint | |
-| String | varchar(36) | 参照主键 |
-| String | varchar(255) | 普通字符串 |
-| String | text/clob | 大文本 |
-| BigDecimal | decimal(20,8) | 金额 |
-| Date/Timestamp | timestamp/datetime | 时间 |
-| Date | date | 日期 |
+1. **精确度优先**：
+   - 金额/财务数据：**必须**使用 `decimal` (或 `numeric`)，禁止使用 `float`/`double`。
+   - 布尔值：使用 `smallint` (0/1) 或专门的 `boolean` 类型。
+2. **长度适中**：
+   - 避免对所有字符串都使用 `text`。对于有明确长度限制的（如手机号、邮编），使用 `varchar(N)`。
+   - 主键 ID：推荐使用 `bigint` (自增) 或 `varchar(36)` (UUID/ULID)。
+3. **日期与时间**：
+   - 存储时间戳：推荐使用 `timestamp` 或 `datetime`。
+   - 仅日期：使用 `date`。
 
 ---
 
@@ -78,122 +67,79 @@ triggers:
 
 ### 2.1 性能优化规则
 
-1. **避免全表扫描**
-   - WHERE 条件必须有索引
-   - 避免在索引字段上使用函数或表达式
+1. **避免 SELECT ***：只查询需要的列。减少 I/O 压力和网络传输。
+2. **禁止在索引列上使用函数**：这会导致索引失效（SARGability）。
+   - ❌ `WHERE YEAR(create_time) = 2024`
+   - ✅ `WHERE create_time >= '2024-01-01' AND create_time < '2025-01-01'`
+3. **避免隐式类型转换**：确保参数类型与列类型一致。
+   - ❌ `WHERE string_col = 123` (如果 string_col 是 varchar)
+4. **慎用 LIKE 左模糊**：`LIKE '%abc'` 无法使用索引，`LIKE 'abc%'` 可以。
 
-2. **避免隐式转换**
-   - 字段类型与比较值类型必须一致
+### 2.2 安全规范 (防注入)
 
-3. **禁止三层以上嵌套循环**
+1. **强制使用参数化查询**：禁止直接拼接变量到 SQL 字符串中。
+   ```java
+   // ❌ 错误：存在 SQL 注入风险
+   String sql = "SELECT * FROM users WHERE email = '" + email + "'";
 
-4. **使用预编译（绑定变量）**
-    ```java
-    // ❌ 错误
-    String sql = "SELECT * FROM user WHERE name = '" + name + "'";
+   // ✅ 正确：使用占位符
+   String sql = "SELECT id, name FROM users WHERE email = ?";
+   // 使用 PreparedStatement 绑定参数
+   ```
+2. **输入验证**：在应用层对输入进行基本的类型、长度和格式校验。
 
-    // ✅ 正确
-    var sql = """
-            SELECT id, name
-            FROM user
-            WHERE name = ?
-            """;
-    var ps = conn.prepareStatement(sql);
-    ps.setString(1, name);
-    ```
+---
 
-5. **避免笛卡尔积**
+## 3. 索引设计原则
 
-6. **避免 SELECT ***
-   - 只查询需要的字段
+### 3.1 创建准则
 
-7. **IN 列表不超过1000个**
+1. **选择性高优先**：对区分度高的列（如 email, username）建立索引。
+2. **覆盖索引 (Covering Index)**：如果一个索引包含（覆盖）了查询需要的所有字段，则无需回表查询，速度极快。
+3. **联合索引顺序**：
+   - 将选择性最高的列放在最左侧。
+   - 遵循**最左前缀原则**。
+4. **单表索引控制**：通常单表索引不宜超过 5 个，过多的索引会降低写入（INSERT/UPDATE/DELETE）性能。
 
-8. **逻辑删除字段应建立联合索引**
+### 3.2 常见错误
 
-### 2.2 禁止的SQL模式
+- **重复索引**：已经有了 `(a, b)` 的联合索引，再建一个 `(a)` 的单列索引是多余的。
+- **低区分度索引**：在“性别”或“状态（0/1）”这种只有极少数取值的列上单独建索引通常没有意义。
 
+---
+
+## 4. 分页最佳实践
+
+### 4.1 偏移量分页 (Offset-based)
+适用于数据量较小的情况。
 ```sql
--- ❌ 禁止动态拼接SQL
-SELECT * FROM table WHERE name = '${param}'
-
--- ❌ 禁止使用OR连接多个条件（用UNION ALL替代）
-WHERE a = 1 OR a = 2 OR a = 3
-
--- ❌ 禁止LIKE左模糊
-WHERE name LIKE '%abc'  -- 无法使用索引
-
--- ✅ 正确的模糊查询
-WHERE name LIKE 'abc%'  -- 可以使用索引
-
--- ❌ 禁止在WHERE中对字段进行函数操作
-WHERE DATE(create_time) = '2024-01-01'
-
--- ✅ 正确写法
-WHERE create_time >= '2024-01-01' AND create_time < '2024-01-02'
+SELECT id, name FROM products ORDER BY id LIMIT 20 OFFSET 100;
 ```
+**缺点**：当 OFFSET 很大时（如 OFFSET 1000000），数据库仍需扫描并丢弃前 100 万行，性能剧降。
+
+### 4.2 游标/流式分页 (Cursor-based)
+推荐用于大数据量无限滚动或 API 场景。
+```sql
+-- 记录上一页最后一条记录的 ID
+SELECT id, name FROM products WHERE id > 12345 ORDER BY id LIMIT 20;
+```
+**优点**：始终通过索引快速定位，性能稳定。
 
 ---
 
-## 3. 索引设计规范
+## 5. 迁移与安全
 
-### 3.1 创建索引原则
+### 5.1 架构迁移原则
 
-1. **区分度高的字段优先建索引**
+1. **向后兼容**：
+   - 增加新列时应允许 NULL 或提供默认值。
+   - 避免重命名列（应先加新列，双写，再迁移读，最后删旧列）。
+2. **小步快跑**：将大的 Schema 变更拆分为多个小的、可逆的步骤。
+3. **影子表切换**：对于海量数据的表结构变更，建议使用影子表（Shadow Table）同步数据后进行原子切换，以实现零停机。
 
-2. **联合索引遵循最左前缀原则**
+### 5.2 跨数据库意识
 
-3. **联合索引字段数≤5，最多7个**
-
-4. **单表索引数≤5个**
-
-5. **禁止重复索引**
-
-### 3.2 索引命名规范
-
-```
-格式：i_表名_字段名_字段名
-示例：i_user_ytenant_id_org_id
-```
-
----
-
-## 4. 分页规范
-
-使用多数据库适配的分页方式：
-
-```java
-// 使用框架提供的分页工具
-PageHelper.startPage(pageNum, pageSize);
-var users = userMapper.selectUsers();
-```
-
----
-
-## 5. 多数据库适配
-
-### 5.1 必须适配的内容
-
-1. **数据类型**
-   - Oracle：NUMBER, VARCHAR2, CLOB
-   - MySQL：INT, VARCHAR, TEXT
-   - PostgreSQL：INTEGER, VARCHAR, TEXT
-
-2. **分页语法**
-   - MySQL：LIMIT offset, size
-   - Oracle：ROWNUM
-   - SQL Server：OFFSET FETCH
-
-3. **日期函数**
-   - MySQL：NOW()
-   - Oracle：SYSDATE
-   - PostgreSQL：CURRENT_TIMESTAMP
-
-4. **序列**
-   - MySQL：AUTO_INCREMENT
-   - Oracle：SEQUENCE
-   - PostgreSQL：SERIAL
-
-### 5.2 推荐使用框架
-
-使用 MyBatis Plus 或 YMS 提供的多数据库适配工具，避免直接写原生SQL。
+编写 SQL 时尽量遵循 ANSI SQL 标准，减少对特定数据库特性的依赖：
+- **分页差异**：MySQL 用 `LIMIT`, Oracle 用 `OFFSET ... FETCH` 或 `ROWNUM`。
+- **日期函数**：各库差异大，建议在应用层处理日期逻辑或使用封装好的数据库工具类。
+- **自增方案**：MySQL 的 `AUTO_INCREMENT` vs PostgreSQL 的 `SERIAL` / `SEQUENCE`。
