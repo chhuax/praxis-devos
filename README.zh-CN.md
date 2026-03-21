@@ -183,11 +183,7 @@ stacks/{栈名}/
 
 开源不易，如果这个项目对你有帮助，欢迎赞助一杯咖啡 ☕
 
-<p align="center">
-  <img src="docs/assets/wechat-sponsor.jpg" alt="微信赞赏" width="200" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/assets/alipay-sponsor.jpg" alt="支付宝" width="200" />
-</p>
+☕ [Buy Me a Coffee](https://buymeacoffee.com/yourname) · 支付宝 · 微信支付
 
 ## 许可证
 

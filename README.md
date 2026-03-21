@@ -126,11 +126,7 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 Open source is not easy. If this project helps you, consider buying me a coffee ☕
 
-<p align="center">
-  <img src="docs/assets/wechat-sponsor.jpg" alt="WeChat Pay" width="200" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/assets/alipay-sponsor.jpg" alt="Alipay" width="200" />
-</p>
+☕ [Buy Me a Coffee](https://buymeacoffee.com/yourname) · Alipay · WeChat Pay
 
 ## License
 
