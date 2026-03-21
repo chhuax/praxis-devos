@@ -44,7 +44,7 @@ The framework operates on a three-layer model to provide clear boundaries for AI
     Defines *what* to build. It manages the lifecycle of changes from proposal to implementation and archiving, ensuring every line of code has a corresponding specification scenario.
 
 3.  **Layer 3: Pluggable Stacks (Technology Rules)**
-    Defines *coding standards*. Each stack (e.g., `yonbip-java`) provides its own set of rules, naming conventions, and domain-specific skills that the AI agent must follow.
+    Defines *coding standards*. Each stack provides its own set of rules, naming conventions, and domain-specific skills (database, security, error handling, etc.) that the AI agent must follow.
 
 *   **Optional: SuperPowers (Execution Quality)**
     An enhancement layer that provides advanced workflow skills like TDD automation, systematic debugging, and parallel agent dispatching.
@@ -64,7 +64,7 @@ praxis-devos/
 │   ├── openspec-workflow/     # Spec governance skills
 │   └── git-workflow/          # Git & PR lifecycle skills
 └── stacks/                    # Pluggable technology stacks
-    └── yonbip-java/           # Example: Java + Spring Boot stack
+    └── starter/               # Minimal template for creating new stacks
         ├── stack.md           # Stack metadata & skill mapping
         └── rules.md           # Technology-specific coding rules
 ```
@@ -79,11 +79,7 @@ Available to all projects, providing core workflow automation:
 *   `git-workflow`: Enforces branch naming and conventional commits.
 
 ### Stack-Specific Skills
-Loaded dynamically based on the active stack (e.g., `yonbip-java`):
-*   `database-guidelines`: SQL safety and indexing standards.
-*   `error-handling`: Standardized exception hierarchies and response formats.
-*   `security`: Secure coding practices based on OWASP standards.
-*   `redis-guidelines`: Cache patterns and key design.
+Loaded dynamically based on the active technology stack. Each stack defines its own domain-specific skills (e.g., database design, error handling, security, caching). See the stack's `stack.md` for available skills.
 
 ## Creating Your Own Stack
 
@@ -110,7 +106,7 @@ Install to your current directory or a specific project:
 ./install.sh
 
 # Install with a specific stack
-./install.sh --stack yonbip-java
+./install.sh --stack <stack-name>
 
 # Install to a target project directory
 ./install.sh --dir /path/to/project
