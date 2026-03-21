@@ -1,6 +1,12 @@
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+.AppleDouble
+.LSOverride
+ehthumbs.db
+Icon?
+._*
 
 # Editors
 .idea/
@@ -8,6 +14,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.fleet/
+nova/
+*.sublime-*
 
 # Node.js (OpenSpec CLI)
 node_modules/
@@ -17,10 +26,32 @@ target/
 dist/
 build/
 out/
+*.class
+*.jar
+*.war
+*.ear
 
 # Environment
 .env
 .env.local
+.env.*.local
 
 # Logs
 *.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Private / Enterprise stacks (do NOT commit)
+stacks/yonbip-java/
+
+# Coverage
+coverage/
+*.lcov
+
+# Misc
+*.bak
+*.orig
