@@ -81,12 +81,14 @@ praxis-devos/
 │   └── templates/                 # 提案/任务模板
 ├── skills/                        # 通用 Skills（流程类，所有栈共享）
 │   ├── openspec-workflow/         # OpenSpec 工作流
-│   └── git-workflow/              # Git 分支、提交、合并
+│   ├── git-workflow/              # Git 分支、提交、合并
+│   └── code-review/              # 代码评审流程与清单
 └── stacks/                        # 可插拔技术栈
-    └── starter/                   # 最小模板（创建新栈的起点）
+    ├── starter/                   # 最小模板（创建新栈的起点）
+    └── java-spring/              # Java + Spring Boot 参考栈
         ├── stack.md               # 技术栈声明
-        ├── rules.md               # 编码规范
-        └── skills/                # 栈专属 Skills（数据库、安全、异常处理等）
+        ├── rules.md               # Java 编码规范
+        └── skills/                # 栈专属 Skills（数据库、安全、测试等）
 ```
 
 ## Skills
@@ -99,6 +101,7 @@ praxis-devos/
 |-------|------|
 | openspec-workflow | OpenSpec 规范驱动开发工作流 |
 | git-workflow | Git 分支、提交、合并规范（GitHub Flow / Git Flow） |
+| code-review | 代码评审流程、评审清单、反馈分级、自审规范 |
 
 ### 栈专属 Skills（按技术栈加载）
 

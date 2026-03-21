@@ -62,11 +62,14 @@ praxis-devos/
 │   └── templates/             # Templates for specs and tasks
 ├── skills/                    # Universal workflow skills
 │   ├── openspec-workflow/     # Spec governance skills
-│   └── git-workflow/          # Git & PR lifecycle skills
+│   ├── git-workflow/          # Git & PR lifecycle skills
+│   └── code-review/          # Code review process & checklists
 └── stacks/                    # Pluggable technology stacks
-    └── starter/               # Minimal template for creating new stacks
+    ├── starter/               # Minimal template for creating new stacks
+    └── java-spring/           # Java + Spring Boot reference stack
         ├── stack.md           # Stack metadata & skill mapping
-        └── rules.md           # Technology-specific coding rules
+        ├── rules.md           # Java coding conventions
+        └── skills/            # Domain skills (database, security, testing...)
 ```
 
 ## Skills
@@ -77,6 +80,7 @@ The framework uses a composable skill system to extend AI agent capabilities.
 Available to all projects, providing core workflow automation:
 *   `openspec-workflow`: Manages the three-stage spec lifecycle.
 *   `git-workflow`: Enforces branch naming and conventional commits.
+*   `code-review`: Code review checklists, feedback standards, and self-review process.
 
 ### Stack-Specific Skills
 Loaded dynamically based on the active technology stack. Each stack defines its own domain-specific skills (e.g., database design, error handling, security, caching). See the stack's `stack.md` for available skills.
