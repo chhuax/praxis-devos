@@ -126,7 +126,7 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 Open source is not easy. If this project helps you, consider buying me a coffee ☕
 
-☕ [Buy Me a Coffee](https://buymeacoffee.com/yourname) · Alipay · WeChat Pay
+<img src="https://wxma-1254014761.cos.ap-beijing.myqcloud.com/wx-pay.png" alt="WeChat Pay" width="200" />
 
 ## License
 
