@@ -29,13 +29,17 @@ praxis-devos **编排** OpenSpec（定义做什么）和 SuperPowers（定义怎
 ## 快速开始
 
 ```bash
-# 1. 安装框架到项目目录
-./install.sh --dir /path/to/your-project
+# 1. 克隆框架
+git clone https://github.com/praxis-devos/praxis-devos.git
 
-# 2. 填写项目信息
+# 2. 安装到你的项目（可选择技术栈）
+./praxis-devos/install.sh --dir /path/to/your-project
+./praxis-devos/install.sh --stack java-spring --dir /path/to/your-project
+
+# 3. 填写项目信息
 #    编辑 openspec/project.md
 
-# 3. 开始使用
+# 4. 开始使用
 openspec list --specs
 ```
 

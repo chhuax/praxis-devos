@@ -20,16 +20,18 @@ While individual tools offer specific capabilities, Praxis DevOS provides a cohe
 
 ## Quick Start
 
-Get your project AI-ready in seconds:
-
 ```bash
-# 1. Install the framework (uses default starter stack)
-./install.sh
+# 1. Clone the framework
+git clone https://github.com/praxis-devos/praxis-devos.git
 
-# 2. Initialize your project context
-./install.sh --with-example
+# 2. Install to your project (with optional tech stack)
+./praxis-devos/install.sh --dir /path/to/your-project
+./praxis-devos/install.sh --stack java-spring --dir /path/to/your-project
 
-# 3. Start your first AI-driven change
+# 3. Fill in project context
+#    Edit openspec/project.md in your project
+
+# 4. Start your first AI-driven change
 openspec proposal "Add user authentication"
 ```
 
@@ -122,6 +124,6 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 ## License
 
-Copyright 2024 Praxis DevOS Authors.
+Copyright 2024-2026 Praxis DevOS Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0).

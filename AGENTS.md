@@ -69,7 +69,7 @@ AI 代理按以下顺序识别当前技术栈，**命中即停**：
 4. 无法识别
    └─ 告知用户：「未检测到技术栈配置。技术栈为可选项，不影响框架核心功能。
       如需启用技术栈规则，请在 openspec/project.md 顶部将
-      <!-- praxis-devos:stack = none --> 改为对应栈名（如 yonbip-java）。
+      <!-- praxis-devos:stack = none --> 改为对应栈名（如 java-spring）。
       可用技术栈见 stacks/ 目录。」
 ```
 
