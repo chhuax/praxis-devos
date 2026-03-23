@@ -154,7 +154,7 @@ const AGENTS_MD_TEMPLATE = `# [项目名称]
 
 ## 额外约定
 
-<!-- 列出本项目特有的编码约定（通用规范见 .opencode/stack-rules.md） -->
+<!-- 列出本项目特有的编码约定（通用规范见 .opencode/stack.md） -->
 `;
 
 const praxisInit = async (projectDir, stackName) => {
@@ -267,36 +267,8 @@ const praxisInit = async (projectDir, stackName) => {
         log(`✓ .opencode/stack.md copied (toolchain reference)`);
       }
 
-      // 4c: Copy rules.md → .opencode/stack-rules.md (coding standards)
-      const rulesMdSrc = path.join(stackSrc, 'rules.md');
-      const rulesMdDst = path.join(projectDir, '.opencode', 'stack-rules.md');
-      if (fs.existsSync(rulesMdSrc)) {
-        copyFile(rulesMdSrc, rulesMdDst);
-        log(`✓ .opencode/stack-rules.md copied (coding standards from ${stackName})`);
-      }
-
       log(`✓ Stack "${stackName}" installed to .opencode/`);
     }
-  }
-
-  // ── Step 5: SuperPowers in opencode.json ──────────────────────────────
-  const spPlugin = 'superpowers@git+https://github.com/obra/superpowers.git';
-  const ocConfigPath = path.join(projectDir, 'opencode.json');
-  try {
-    let config = {};
-    if (fs.existsSync(ocConfigPath)) {
-      config = JSON.parse(fs.readFileSync(ocConfigPath, 'utf8'));
-    }
-    config.plugin = config.plugin || [];
-    if (!config.plugin.includes(spPlugin)) {
-      config.plugin.push(spPlugin);
-      fs.writeFileSync(ocConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-      log('✓ SuperPowers added to opencode.json');
-    } else {
-      log('⊘ SuperPowers already in opencode.json');
-    }
-  } catch (err) {
-    log(`⚠ Could not update opencode.json: ${err.message}`);
   }
 
   return logs.join('\n');
@@ -328,7 +300,7 @@ const PraxisDevOSPlugin = async ({ client, directory }) => {
         description: 'Initialize the current project with praxis-devos. ' +
           'Auto-installs OpenSpec CLI, runs openspec init, copies framework templates, ' +
           'copies customizable skills (git-workflow, code-review) to .opencode/skills/, ' +
-          'copies stack skills to .opencode/skills/, and configures SuperPowers in opencode.json.',
+          'and copies stack skills to .opencode/skills/.',
         parameters: {
           type: 'object',
           properties: {
@@ -341,10 +313,16 @@ const PraxisDevOSPlugin = async ({ client, directory }) => {
           },
         },
         execute: async (args) => {
-          const result = await praxisInit(directory, args.stack || null);
-          return {
-            content: [{ type: 'text', text: `praxis-init completed:\n\n${result}` }],
-          };
+          try {
+            const result = await praxisInit(directory, args.stack || null);
+            return {
+              content: [{ type: 'text', text: String(result || 'praxis-init completed (no output)') }],
+            };
+          } catch (err) {
+            return {
+              content: [{ type: 'text', text: `praxis-init failed: ${err?.message || String(err)}` }],
+            };
+          }
         },
       },
 
@@ -352,18 +330,27 @@ const PraxisDevOSPlugin = async ({ client, directory }) => {
         description: 'List all available technology stacks in praxis-devos.',
         parameters: { type: 'object', properties: {} },
         execute: async () => {
-          const stacks = listDirs(STACKS_DIR);
-          const details = stacks.map((name) => {
-            const stackMd = readFile(path.join(STACKS_DIR, name, 'stack.md'));
-            const firstLine = stackMd ? stackMd.split('\n')[0].replace(/^#\s*/, '') : 'No description';
-            return `  ${name} — ${firstLine}`;
-          });
-          return {
-            content: [{
-              type: 'text',
-              text: `Available stacks:\n${details.join('\n')}`,
-            }],
-          };
+          try {
+            const stacks = listDirs(STACKS_DIR);
+            const details = stacks.map((name) => {
+              const stackMd = readFile(path.join(STACKS_DIR, name, 'stack.md'));
+              const firstLine = stackMd ? stackMd.split('\n')[0].replace(/^#\s*/, '') : 'No description';
+              return `  ${name} — ${firstLine}`;
+            });
+            return {
+              content: [{
+                type: 'text',
+                text: `Available stacks:\n${details.join('\n')}`,
+              }],
+            };
+          } catch (err) {
+            return {
+              content: [{
+                type: 'text',
+                text: `Failed to list stacks: ${err?.message || String(err)}`,
+              }],
+            };
+          }
         },
       },
     },
