@@ -1,5 +1,5 @@
 ---
-name: openspec-workflow
+name: openspec
 description: |
   OpenSpec 规范驱动开发工作流。用于创建变更提案、检查现有规范、实现已批准的变更或归档已完成的工作。
   确保规范先行的开发模式。
