@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Community files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`
 
 ### Changed
-- Skills architecture: universal skills are now process-only (`openspec-workflow`, `git-workflow`, `code-review`); technology-specific skills moved to `stacks/{stack}/skills/`
+- Skills architecture: universal skills are now process-only (`openspec`, `git-workflow`, `code-review`); technology-specific skills moved to `stacks/{stack}/skills/`
 - `AGENTS.md`: dynamic stack skill loading, code-review added to routing tree
 - `CONTRIBUTING.md`: rewritten to match current three-layer architecture
 - SuperPowers marked as optional enhancement in `AGENTS.md`

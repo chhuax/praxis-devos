@@ -28,7 +28,7 @@ This starter stack has no custom skills. To add stack-specific skills:
 
 1. Create `stacks/starter/skills/{skill-name}/SKILL.md`
 2. Reference it in this file's skills table
-3. Run `install.sh --stack starter` to deploy
+3. Run `praxis-init` with your stack name to deploy
 
 ## Included Rules
 

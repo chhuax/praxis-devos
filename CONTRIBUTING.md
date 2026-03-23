@@ -6,7 +6,7 @@ We're excited to have you contribute to the praxis-devos framework! This guide o
 
 Praxis DevOS is built around a three-layered architecture designed for maximum flexibility and AI efficiency:
 
-- **Universal Skills** (`skills/`): Core process-oriented workflow skills such as `openspec-workflow`, `git-workflow`, and `code-review`. These are strictly technology-agnostic and focus on *how* work is managed.
+- **Universal Skills** (`skills/`): Core process-oriented workflow skills such as `openspec`, `git-workflow`, and `code-review`. These are strictly technology-agnostic and focus on *how* work is managed.
 - **Technology Stacks** (`stacks/`): Language and framework-specific implementations. Each stack defines its own `rules.md` (coding standards) and optional `skills/` (domain-specific expertise).
 - **OpenSpec** (`openspec/`): The core specification-driven development system that manages the lifecycle of all changes.
 
@@ -36,7 +36,7 @@ New stacks help AI agents understand different development environments.
 To contribute effectively, you will need:
 - **Node.js >= 20.19.0**: Required for running the OpenSpec CLI and associated tools.
 - **Git**: For version control and managing the contribution lifecycle.
-- **Installation Check**: Run `./install.sh --check` to verify that your local environment meets all requirements.
+- **Installation Check**: Ensure Node.js >= 20.19.0 and Git are installed. Use the OpenCode plugin system for project initialization.
 
 ## Coding and Documentation Guidelines
 
