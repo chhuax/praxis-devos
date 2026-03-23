@@ -1,0 +1,23 @@
+{
+  "name": "praxis-devos",
+  "version": "0.1.0",
+  "description": "AI-Native Development Framework — OpenSpec Governance + SuperPowers Execution + Pluggable Stacks",
+  "type": "module",
+  "main": ".opencode/plugins/praxis-devos.js",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chhuax/praxis-devos.git"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "ai-coding",
+    "openspec",
+    "superpowers",
+    "development-framework"
+  ]
+}
