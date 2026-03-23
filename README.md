@@ -1,6 +1,6 @@
 # praxis-devos
 
-> The AI-Native Development Framework — OpenSpec-Driven + Pluggable Stacks + Composable Skills
+> The AI-Native Development Framework — [OpenSpec](https://github.com/Fission-AI/OpenSpec) Governance + [SuperPowers](https://github.com/obra/superpowers) Execution + Pluggable Stacks
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -12,88 +12,128 @@ Praxis DevOS is a framework designed for AI coding agents like OpenCode and Clau
 
 ## Why praxis-devos?
 
-While individual tools offer specific capabilities, Praxis DevOS provides a cohesive orchestration layer that bridges the gap between high-level requirements and low-level execution.
+Where others emphasize execution or governance in isolation, Praxis DevOS unifies all three into a single, coherent framework. It uniquely integrates governance, standards, and execution to guide AI-driven development from proposal to production.
 
-*   **vs Superpowers**: Superpowers provides excellent execution skills but lacks a formal specification governance layer. Praxis DevOS uses OpenSpec to ensure every change is justified by a spec.
-*   **vs OpenSpec**: OpenSpec provides the specification workflow but doesn't manage technology-specific rules or coding guidelines. Praxis DevOS adds pluggable stacks to enforce domain-specific standards.
-*   **The Complete Picture**: Praxis DevOS = OpenSpec (Governance) + Pluggable Stacks (Standards) + Composable Skills (Execution).
+*   **[OpenSpec](https://github.com/Fission-AI/OpenSpec) (Governance)**: Formal specification governance ensures every change is justified by a spec — from proposal to implementation to archiving.
+*   **[SuperPowers](https://github.com/obra/superpowers) (Execution)**: Advanced execution skills provide TDD automation, systematic debugging, development planning, and verification — the engine that drives code quality.
+*   **Pluggable Stacks (Standards)**: Technology-specific rules, naming conventions, and domain skills enforce consistent coding standards across any stack.
+
+The Complete Picture: Praxis DevOS = [OpenSpec](https://github.com/Fission-AI/OpenSpec) (Governance) + [SuperPowers](https://github.com/obra/superpowers) (Execution) + Pluggable Stacks (Standards).
 
 ## Quick Start
 
 ```bash
-# 1. Clone the framework
-git clone https://github.com/praxis-devos/praxis-devos.git
+# 1. Add praxis-devos plugin to your project's opencode.json
+{
+  "plugin": [
+    "praxis-devos@git+https://github.com/chhuax/praxis-devos.git",
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ]
+}
 
-# 2. Install to your project (with optional tech stack)
-./praxis-devos/install.sh --dir /path/to/your-project
-./praxis-devos/install.sh --stack java-spring --dir /path/to/your-project
+# 2. Restart OpenCode (plugins auto-install)
 
-# 3. Fill in project context
-#    Edit openspec/project.md in your project
+# 3. Initialize your project (ask the AI or it will offer automatically)
+#    "Run praxis-init with java-spring stack"
 
-# 4. Start your first AI-driven change
-openspec proposal "Add user authentication"
+# 4. Fill in project context
+#    Edit AGENTS.md in your project
+
 ```
 
 ## Architecture
 
-The framework operates on a three-layer model to provide clear boundaries for AI agents:
+The framework operates on a three-pillar model, orchestrated by RULES.md:
 
-1.  **Layer 1: AGENTS.md (Framework Rules)**
-    Defines *how* to work. It contains the global strategy, decision trees for skill loading, and the intent gating logic that determines if a task needs a full proposal or a quick fix.
+```
+┌─────────────────────────────────────────────────────┐
+│                    RULES.md                          │
+│          Global Strategy & Dispatcher (WHEN)         │
+├──────────────────┬──────────────┬───────────────────┤
+│     OpenSpec     │  SuperPowers  │  Pluggable Stacks │
+│    Governance    │   Execution   │     Standards     │
+│     (WHAT)       │    (HOW)      │    (STANDARD)     │
+└──────────────────┴──────────────┴───────────────────┘
+```
 
-2.  **Layer 2: OpenSpec (Specification-Driven Dev)**
-    Defines *what* to build. It manages the lifecycle of changes from proposal to implementation and archiving, ensuring every line of code has a corresponding specification scenario.
+1.  **[OpenSpec](https://github.com/Fission-AI/OpenSpec) (Governance)**
+    Defines *what* to build. Manages the lifecycle of changes from proposal to implementation and archiving, ensuring every line of code has a corresponding specification scenario.
 
-3.  **Layer 3: Pluggable Stacks (Technology Rules)**
+2.  **[SuperPowers](https://github.com/obra/superpowers) (Execution)**
+    Defines *how* to execute. Provides TDD automation, systematic debugging, development planning, and verification — the engine that drives code quality.
+
+3.  **Pluggable Stacks (Standards)**
     Defines *coding standards*. Each stack provides its own set of rules, naming conventions, and domain-specific skills (database, security, error handling, etc.) that the AI agent must follow.
-
-*   **Optional: SuperPowers (Execution Quality)**
-    An enhancement layer that provides advanced workflow skills like TDD automation, systematic debugging, and parallel agent dispatching.
 
 ## Project Structure
 
 ```text
-praxis-devos/
-├── AGENTS.md                  # Global strategy & dispatcher center
-├── install.sh                 # One-click installation script
-├── openspec/                  # Specification system
-│   ├── project.md             # Project business context
-│   ├── specs/                 # Current system specifications
-│   ├── changes/               # Active change proposals
-│   └── templates/             # Templates for specs and tasks
-├── skills/                    # Universal workflow skills
-│   ├── openspec-workflow/     # Spec governance skills
-│   ├── git-workflow/          # Git & PR lifecycle skills
-│   └── code-review/          # Code review process & checklists
-└── stacks/                    # Pluggable technology stacks
-    ├── starter/               # Minimal template for creating new stacks
-    └── java-spring/           # Java + Spring Boot reference stack
-        ├── stack.md           # Stack metadata & skill mapping
-        ├── rules.md           # Java coding conventions
-        └── skills/            # Domain skills (database, security, testing...)
+praxis-devos/                          # Plugin repository
+├── RULES.md                           # Framework rules (injected into AI system prompt)
+├── .opencode/plugins/praxis-devos.js  # Plugin entry point
+├── package.json                       # Package manifest
+├── openspec/                          # Specification templates
+│   └── templates/                     # Proposal & task templates
+├── skills/                            # Plugin-bundled skills (framework-coupled)
+│   └── openspec/                      # OpenSpec governance workflow
+└── stacks/                            # Pluggable technology stacks (templates)
+    ├── starter/                       # Minimal template for creating new stacks
+    └── java-spring/                   # Java + Spring Boot reference stack
+        ├── stack.md                   # Stack metadata
+        └── skills/                    # Domain skills (database, security, testing...)
+
+your-project/                          # After running praxis-init
+├── opencode.json                      # Plugin configuration
+├── AGENTS.md                          # Project strategy (you fill this in)
+├── openspec/                          # OpenSpec structure (created by CLI)
+│   ├── AGENTS.md                      # OpenSpec workflow instructions
+│   ├── specs/                         # Current system specifications
+│   ├── changes/                       # Active change proposals
+│   └── templates/                     # Proposal & task templates
+└── .opencode/skills/                  # All skills live here
+    ├── git-workflow/                   # Git & PR lifecycle (customizable)
+    ├── code-review/                   # Code review process & checklists
+    ├── java-database/                 # ← from stack (if java-spring selected)
+    ├── java-error-handling/           # ← from stack
+    ├── java-security/                 # ← from stack
+    └── java-testing/                  # ← from stack
 ```
 
 ## Skills
 
 The framework uses a composable skill system to extend AI agent capabilities.
 
-### Universal Skills
-Available to all projects, providing core workflow automation:
-*   `openspec-workflow`: Manages the three-stage spec lifecycle.
-*   `git-workflow`: Enforces branch naming and conventional commits.
-*   `code-review`: Code review checklists, feedback standards, and self-review process.
+### Plugin Skills
+Bundled with the plugin, framework-coupled — not meant for user customization:
+*   `openspec`: Manages the three-stage spec lifecycle (proposal → implementation → archive).
+
+### User-Customizable Skills
+Copied to your project's `.opencode/skills/` by `praxis-init`. You can freely modify these to match your team's workflow:
+*   `git-workflow`: Branch naming, commit conventions, merge flow.
+*   `code-review`: Review checklists, feedback standards, self-review process.
+
+### SuperPowers Skills
+Loaded from the SuperPowers plugin system and treated as a core execution layer.
+- `brainstorming`: Structured idea generation to help scope features and outcomes.
+- `writing-plans`: Translate ideas into concrete development plans and milestones.
+- `test-driven-development`: Automated RED-GREEN-REFACTOR cycles to drive code quality.
+- `systematic-debugging`: Systematic workflows to locate and fix issues efficiently.
+- `subagent-driven-development`: Parallel dispatch of multiple SuperPowers agents to speed up work.
+- `verification-before-completion`: Pre-merge validations, tests, and quality gates before completion.
+- `finishing-a-development-branch`: Finalize work, prepare PRs, and ensure clean history.
+- `using-git-worktrees`: Isolate work areas with Git worktrees for parallel development.
 
 ### Stack-Specific Skills
-Loaded dynamically based on the active technology stack. Each stack defines its own domain-specific skills (e.g., database design, error handling, security, caching). See the stack's `stack.md` for available skills.
+Loaded dynamically based on the selected technology stack. Each stack provides domain-specific skills (e.g., database design, error handling, security, caching) that are copied to `.opencode/skills/` during initialization.
 
 ## Creating Your Own Stack
 
-You can easily adapt Praxis DevOS to any technology by creating a new directory in `stacks/`:
+You can create a new stack by adding a directory in the framework's `stacks/`:
 
-1.  **`stack.md`**: Define the runtime, build tools, and toolchain commands (YAML). Map your custom skills here.
-2.  **`rules.md`**: Write down your naming conventions, logging standards, and architectural constraints.
-3.  **Skills**: Add domain-specific skills in your stack folder to give AI agents specialized knowledge.
+1.  **`stack.md`**: Define the runtime, build tools, and toolchain commands.
+2.  **`skills/`**: Add domain-specific skills to give AI agents specialized knowledge.
+
+When users run `praxis-init` with your stack, the skills are copied to their project's `.opencode/skills/`.
 
 ## Prerequisites
 
@@ -105,18 +145,51 @@ You can easily adapt Praxis DevOS to any technology by creating a new directory 
 
 ## Installation
 
-Install to your current directory or a specific project:
+### OpenCode Plugin (Recommended)
+
+1. Add plugins to your project's `opencode.json`:
+
+```json
+{
+  "plugin": [
+    "praxis-devos@git+https://github.com/chhuax/praxis-devos.git",
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ]
+}
+```
+
+2. Restart OpenCode — plugins auto-install on startup.
+
+3. Initialize your project — ask the AI or it will offer automatically:
+
+```
+"Run praxis-init with java-spring stack"
+```
+
+`praxis-init` will:
+- Auto-install OpenSpec CLI (`@fission-ai/openspec`) if not found
+- Run `openspec init` to create the specification structure
+- Copy framework templates (proposal/task templates)
+- Copy `git-workflow` and `code-review` skills to `.opencode/skills/` (customizable)
+- Copy selected stack's skills, coding standards, and toolchain reference to `.opencode/`
+- Create `AGENTS.md` skeleton (if not present)
+- Configure SuperPowers in `opencode.json`
+
+4. Fill in project context — edit `AGENTS.md` in your project.
+
+> Claude Code users: run `/plugin install superpowers@claude-plugins-official` separately.
+
+### Upgrading
+
+The plugin is installed via `git+https://`, so OpenCode caches a specific Git commit. To pull the latest version:
 
 ```bash
-# Standard installation
-./install.sh
-
-# Install with a specific stack
-./install.sh --stack <stack-name>
-
-# Install to a target project directory
-./install.sh --dir /path/to/project
+rm -rf ~/.cache/opencode/node_modules/praxis-devos
+rm -f ~/.cache/opencode/bun.lock
+# Then restart OpenCode
 ```
+
+> **Note**: `praxis-init` is idempotent — existing files in your project will NOT be overwritten. To pick up new templates or stack rules, delete the specific file first, then re-run `praxis-init`.
 
 ## Contributing
 
