@@ -2,7 +2,7 @@
 
 编辑 `openspec/` 下文件时自动注入的最小指令集。
 
-> **完整工作流指南**（模板、故障排除、最佳实践）→ 加载 `openspec-workflow` skill。
+> **完整工作流指南**（模板、故障排除、最佳实践）→ 加载 `openspec` skill。
 
 ## TL;DR 快速核查
 
@@ -123,6 +123,6 @@ openspec show [change] --json --deltas-only        # 调试 delta 解析
 
 ---
 
-> **详细模板、delta 编写指南、故障排除、快乐路径脚本** → 加载 `openspec-workflow` skill。
+> **详细模板、delta 编写指南、故障排除、快乐路径脚本** → 加载 `openspec` skill。
 >
 > 记住：**规范即真相 (Specs are truth)。变更是提案 (Changes are proposals)。保持它们同步。**
