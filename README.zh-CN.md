@@ -87,13 +87,15 @@ your-project/                              # 运行 praxis-init 后
 │   ├── specs/                             # 当前规范
 │   ├── changes/                           # 活跃变更提案
 │   └── templates/                         # 提案/任务模板
-└── .opencode/skills/                      # 所有 skills 统一在这里
-    ├── git-workflow/                       # Git 分支、提交、合并（可自由修改）
-    ├── code-review/                        # 代码评审流程与清单
-    ├── java-database/                     # ← 来自技术栈（如选了 java-spring）
-    ├── java-error-handling/               # ← 来自技术栈
-    ├── java-security/                     # ← 来自技术栈
-    └── java-testing/                      # ← 来自技术栈
+└── .opencode/
+    ├── stack.md                           # 工具链参考（来自所选技术栈）
+    └── skills/                            # 所有 skills 统一在这里
+        ├── git-workflow/                   # Git 分支、提交、合并（可自由修改）
+        ├── code-review/                    # 代码评审流程与清单
+        ├── java-database/                  # ← 来自技术栈（如选了 java-spring）
+        ├── java-error-handling/            # ← 来自技术栈
+        ├── java-security/                  # ← 来自技术栈
+        └── java-testing/                   # ← 来自技术栈
 ```
 
 ## Skills
@@ -145,7 +147,6 @@ your-project/                              # 运行 praxis-init 后
 ```
 stacks/{栈名}/
 ├── stack.md               # 技术栈元信息
-├── rules.md               # 编码规范
 ├── skills/                # 栈专属 Skills（可选）
 └── project-example.md     # AGENTS.md 填写示例（可选）
 ```
@@ -183,10 +184,8 @@ stacks/{栈名}/
 - 运行 `openspec init` 创建规范目录结构
 - 复制框架模板（提案/任务模板）
 - 复制 `git-workflow` 和 `code-review` 到 `.opencode/skills/`（可自定义）
-- 复制所选技术栈的编码规范到 `.opencode/stack-rules.md`
 - 复制所选技术栈的工具链声明到 `.opencode/stack.md`
 - 创建 `AGENTS.md` 骨架文件（如不存在）
-- 配置 SuperPowers 到 `opencode.json`
 
 > Claude Code 用户：另需执行 `/plugin install superpowers@claude-plugins-official`。
 

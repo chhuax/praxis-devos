@@ -90,13 +90,15 @@ your-project/                          # After running praxis-init
 │   ├── specs/                         # Current system specifications
 │   ├── changes/                       # Active change proposals
 │   └── templates/                     # Proposal & task templates
-└── .opencode/skills/                  # All skills live here
-    ├── git-workflow/                   # Git & PR lifecycle (customizable)
-    ├── code-review/                   # Code review process & checklists
-    ├── java-database/                 # ← from stack (if java-spring selected)
-    ├── java-error-handling/           # ← from stack
-    ├── java-security/                 # ← from stack
-    └── java-testing/                  # ← from stack
+└── .opencode/
+    ├── stack.md                       # Toolchain reference (from selected stack)
+    └── skills/                        # All skills live here
+        ├── git-workflow/              # Git & PR lifecycle (customizable)
+        ├── code-review/               # Code review process & checklists
+        ├── java-database/             # ← from stack (if java-spring selected)
+        ├── java-error-handling/       # ← from stack
+        ├── java-security/             # ← from stack
+        └── java-testing/              # ← from stack
 ```
 
 ## Skills
@@ -171,9 +173,8 @@ When users run `praxis-init` with your stack, the skills are copied to their pro
 - Run `openspec init` to create the specification structure
 - Copy framework templates (proposal/task templates)
 - Copy `git-workflow` and `code-review` skills to `.opencode/skills/` (customizable)
-- Copy selected stack's skills, coding standards, and toolchain reference to `.opencode/`
+- Copy selected stack's skills and toolchain reference to `.opencode/`
 - Create `AGENTS.md` skeleton (if not present)
-- Configure SuperPowers in `opencode.json`
 
 4. Fill in project context — edit `AGENTS.md` in your project.
 
