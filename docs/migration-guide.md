@@ -2,11 +2,6 @@
 
 本文说明如何把旧版以 `.opencode/` 为中心的 Praxis DevOS 项目，迁移到新的多 agent 架构。
 
-> 当前 `praxis-devos` 还未发布到 npm registry。
-> 在正式发布前，文档中的 `praxis-devos ...` 示例命令应通过：
-> `npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...`
-> 来执行。
-
 ## 迁移目标
 
 迁移完成后，项目会切换为以下模式：
