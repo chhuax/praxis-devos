@@ -137,6 +137,20 @@ Praxis 会在 `.praxis/manifest.json` 中声明这两个依赖是必需项。
 - 这个项目依赖哪些外部能力
 - 哪些 agent 运行时必须具备 `superpowers`
 
+## 与规则门控的关系
+
+Praxis 不只提供 `doctor` 和 `bootstrap` 命令，还会把依赖状态摘要编译进：
+
+- `.praxis/adapters/compiled-rules.md`
+- `AGENTS.md` 的托管区
+- `CLAUDE.md` 的托管区
+
+这意味着 agent 在读取项目入口规则时，会直接看到：
+
+- `openspec` 是否缺失
+- 各 agent 的 `superpowers` 是否已安装
+- 缺失依赖时应先安装，不要直接进入实现
+
 ## 建议
 
 - 新项目初始化后，第一时间执行 `praxis-devos doctor`

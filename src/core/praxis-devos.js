@@ -419,6 +419,36 @@ const renderRulesSection = (title, content) => {
   return `## ${title}\n\n${normalized}`;
 };
 
+function renderDependencyGateSummary(projectDir) {
+  const openspecInstalled = commandExists('openspec');
+  const agentChecks = SUPPORTED_AGENTS.map((agent) => ({
+    agent,
+    detection: detectSuperpowersForAgent(projectDir, agent),
+  }));
+
+  const lines = [
+    '## 依赖门禁',
+    '',
+    openspecInstalled
+      ? '- [OK] `openspec` 已可用。'
+      : '- [MISSING] `openspec` 不可用。继续执行规范初始化、校验、归档前，先安装它。',
+  ];
+
+  for (const { agent, detection } of agentChecks) {
+    const status = formatStatus(detection.status);
+    const guidance = detection.status === 'ok'
+      ? '可以使用对应的 Superpowers 能力。'
+      : '如果当前在该 agent 下工作，先执行 `praxis-devos bootstrap --agent ' + agent + '` 或按官方文档完成安装，再继续实现。';
+
+    lines.push(`- [${status}] \`superpowers:${agent}\` — ${detection.detail} ${guidance}`);
+  }
+
+  lines.push('');
+  lines.push('规则：缺少当前运行环境所需的 `superpowers` 或缺少 `openspec` 时，应先安装依赖，不要直接进入实现。');
+
+  return lines.join('\n');
+}
+
 const renderManagedRulesBlock = (projectDir) => {
   const paths = projectPaths(projectDir);
   const frameworkRules = readFile(paths.praxisFrameworkRulesMd) || readFile(FRAMEWORK_RULES_MD) || '';
@@ -442,6 +472,8 @@ const renderManagedRulesBlock = (projectDir) => {
     '- 新功能、API 变更、架构重构、破坏性变更，必须先走 OpenSpec 提案。',
     '- 涉及代码编写时，必须遵循 TDD 与对应技术栈规则。',
     '- 标记完成前，必须执行验证门控与 OpenSpec 校验。',
+    '',
+    renderDependencyGateSummary(projectDir),
     '',
     renderRulesSection('框架门控规则', frameworkRules),
     stackRules ? renderRulesSection('技术栈 / 项目规则', stackRules) : '',

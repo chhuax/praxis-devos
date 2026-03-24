@@ -121,6 +121,8 @@ The framework source of truth for gating rules remains `RULES.md`, but each init
 
 Before that distribution step, Praxis generates a shared intermediate artifact at `.praxis/adapters/compiled-rules.md`.
 
+That compiled rules artifact also includes a dependency gate summary, so agents can see when `openspec` or the current runtime's `superpowers` installation is missing and stop before implementation.
+
 If `AGENTS.md` or `CLAUDE.md` already exists, Praxis only appends or refreshes the managed block between `<!-- PRAXIS_DEVOS_START -->` and `<!-- PRAXIS_DEVOS_END -->`. User-owned content outside that block is preserved.
 
 ## CLI

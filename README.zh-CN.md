@@ -121,6 +121,8 @@ npx praxis-devos init --stack java-spring
 
 在分发之前，Praxis 会先生成统一的规则编译产物 `.praxis/adapters/compiled-rules.md`，各 agent 入口都基于这份中间结果同步。
 
+这份规则编译产物还会带上依赖门禁摘要：如果当前环境缺少 `openspec` 或缺少对应 agent 的 `superpowers`，规则会明确要求先安装依赖，再继续实现。
+
 如果项目原本已经有 `AGENTS.md` 或 `CLAUDE.md`，Praxis 只会追加或刷新 `<!-- PRAXIS_DEVOS_START -->` 到 `<!-- PRAXIS_DEVOS_END -->` 之间的托管区，不会覆盖区块外的人工内容。
 
 ## CLI
