@@ -1,65 +1,88 @@
 # Contributing to Praxis DevOS
 
-We're excited to have you contribute to the praxis-devos framework! This guide outlines how to get started and how to maintain the project's high standards.
+We're excited to have you contribute to Praxis DevOS. This guide explains the architectural boundaries contributors should preserve.
 
 ## Project Architecture
 
-Praxis DevOS is built around a three-layered architecture designed for maximum flexibility and AI efficiency:
+Praxis DevOS is built around four layers:
 
-- **Universal Skills** (`skills/`): Core process-oriented workflow skills such as `openspec`, `git-workflow`, and `code-review`. These are strictly technology-agnostic and focus on *how* work is managed.
-- **Technology Stacks** (`stacks/`): Language and framework-specific implementations. Each stack defines its own `rules.md` (coding standards) and optional `skills/` (domain-specific expertise).
-- **OpenSpec** (`openspec/`): The core specification-driven development system that manages the lifecycle of all changes.
+- **Framework rules** (`RULES.md`): global workflow and dispatch rules
+- **Universal skills** (`skills/`): technology-agnostic process skills
+- **Technology stacks** (`stacks/`): `stack.md`, `rules.md`, and optional domain skills
+- **Canonical project state** (`.praxis/` in downstream projects): the only source of truth for installed project assets
+
+OpenCode, Codex, and Claude Code must be treated as adapter targets, not as owners of the project state.
 
 ## How to Contribute
 
 ### Adding a Universal Skill
-Universal skills should be strictly PROCESS-focused. Avoid code examples tied to a specific language.
-1. Create a new directory under `skills/{skill-name}/` and add a `SKILL.md` file.
-2. Follow the standard Agent Skills format, including the YAML frontmatter and clear instructions.
-3. Ensure the skill is broadly applicable across all potential technology stacks.
+
+Universal skills should remain PROCESS-focused and stack-neutral.
+
+1. Create `skills/{skill-name}/SKILL.md`
+2. Follow the standard skill format
+3. Avoid language-specific examples unless the skill is explicitly stack-bound
 
 ### Adding a Technology Stack
-New stacks help AI agents understand different development environments.
-1. Use `stacks/starter/` as your starting point by copying the entire directory.
-2. Complete `stack.md` with runtime versions, build tools, and essential commands.
-3. Define comprehensive coding conventions in `rules.md` (naming, patterns, anti-patterns).
-4. Add domain-specific skills to the `skills/` sub-directory within your stack.
-5. Refer to `stacks/README.md` for a detailed guide on stack creation.
+
+1. Copy `stacks/starter/` into `stacks/{new-stack}/`
+2. Complete `stack.md` with runtime versions, build tools, and commands
+3. Define coding constraints in `rules.md`
+4. Add domain-specific skills under `skills/`
+5. Update documentation when the stack becomes public
 
 ### Improving Existing Content
-- Fix typos, enhance clarity in descriptions, and add relevant examples.
-- Ensure universal skills remain technology-neutral at all times.
-- Keep stack-specific skills focused purely on their designated technology.
+
+- Fix clarity, examples, and terminology
+- Keep universal skills technology-neutral
+- Keep stack skills scoped to their stack
+- Preserve the multi-agent architecture boundaries
 
 ## Development Setup
 
-To contribute effectively, you will need:
-- **Node.js >= 20.19.0**: Required for running the OpenSpec CLI and associated tools.
-- **Git**: For version control and managing the contribution lifecycle.
-- **Installation Check**: Ensure Node.js >= 20.19.0 and Git are installed. Use the OpenCode plugin system for project initialization.
+You will need:
+
+- **Node.js >= 20.19.0**
+- **Git**
+
+Use the external CLI for project initialization and migration:
+
+```bash
+node bin/praxis-devos.js init --stack starter
+node bin/praxis-devos.js sync
+```
 
 ## Coding and Documentation Guidelines
 
-- **Code Identifiers**: All variables, functions, and class names must be in English.
-- **Language Policy**: Use Chinese for Chinese-focused documentation and English for global documentation like this one.
-- **Commit Messages**: Follow the Conventional Commits specification: `type(scope): description`.
-- **Focus**: Keep Pull Requests granular. Each PR should address a single feature or bug fix.
+- **Code Identifiers**: English only
+- **Language Policy**: `docs/` 下文档默认可使用中文；面向国际读者的根文档保持英文或中英双语
+- **Commit Messages**: Conventional Commits, e.g. `feat(cli): add migrate command`
+- **Focus**: Keep pull requests granular
 
 ## Pull Request Process
 
-1. Fork the repository on GitHub.
-2. Create a dedicated feature branch from `main`: `git checkout -b feature/your-feature-name`.
-3. Implement your changes and verify them thoroughly.
-4. Commit your work using the Conventional Commits format.
-5. Push your branch to your fork and open a Pull Request.
-6. Link the PR to any relevant issues or discussions.
+1. Fork the repository
+2. Create a branch from `main`
+3. Implement and verify your changes
+4. Commit with Conventional Commits
+5. Push and open a Pull Request
+6. Link related issues or discussions
 
 ## What NOT to Submit
 
-- **Enterprise-specific content**: Keep proprietary tools or company-specific patterns in private stacks.
-- **Branded content**: Avoid hardcoding specific brand names or third-party tools unless they are part of a public technology stack.
-- **Protected sections**: Never modify the `<!-- PRAXIS_DEVOS_START -->` block in the root `AGENTS.md` file.
+- Enterprise-specific content that belongs in private stacks
+- Hardcoded assumptions that canonical project state lives in `.opencode/`
+- Changes that bypass the shared core and reintroduce agent-specific init logic
+- Manual edits to the managed `<!-- PRAXIS_DEVOS_START -->` blocks in generated project files unless you are changing the generator itself
+
+## Managed Blocks
+
+Praxis may write managed blocks into downstream `AGENTS.md` and `CLAUDE.md`.
+
+- Content inside `<!-- PRAXIS_DEVOS_START -->` and `<!-- PRAXIS_DEVOS_END -->` is framework-managed
+- Content outside those markers is user-owned
+- Sync logic must preserve user-owned content and only replace the managed block
 
 ## Code of Conduct
 
-All contributors are expected to uphold the standards outlined in our [Code of Conduct](CODE_OF_CONDUCT.md). We strive to maintain a welcoming and professional environment for everyone.
+All contributors are expected to uphold the standards outlined in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
