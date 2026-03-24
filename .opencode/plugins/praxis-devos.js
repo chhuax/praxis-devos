@@ -9,12 +9,14 @@
 
 import {
   bootstrapProject,
+  bootstrapOpenSpec,
   buildSystemPrompt,
   collectSkillsPaths,
   doctorProject,
   initProject,
   listStacksDetailed,
   migrateProject,
+  runOpenSpecCommand,
   syncProject,
   SUPPORTED_AGENTS,
 } from '../../src/core/praxis-devos.js';
@@ -155,6 +157,36 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
       },
     },
 
+    'praxis-openspec': {
+      description: 'Run OpenSpec through the Praxis wrapper inside the current project.',
+      parameters: {
+        type: 'object',
+        properties: {
+          args: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'OpenSpec arguments, for example ["list", "--specs"]',
+          },
+        },
+        required: ['args'],
+      },
+      execute: async (args) => {
+        try {
+          const result = runOpenSpecCommand({
+            projectDir: directory,
+            args: args.args || [],
+          });
+          return {
+            content: [{ type: 'text', text: String(result || 'praxis-openspec completed (no output)') }],
+          };
+        } catch (err) {
+          return {
+            content: [{ type: 'text', text: `praxis-openspec failed: ${err?.message || String(err)}` }],
+          };
+        }
+      },
+    },
+
     'praxis-doctor': {
       description: 'Check required openspec and superpowers dependencies for the current project and agents.',
       parameters: {
@@ -199,14 +231,30 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
             items: { type: 'string' },
             description: `Agents to bootstrap. Defaults to: ${SUPPORTED_AGENTS.join(', ')}`,
           },
+          openspec: {
+            type: 'boolean',
+            description: 'Include OpenSpec bootstrap instructions.',
+          },
         },
       },
       execute: async (args) => {
         try {
-          const result = bootstrapProject({
-            projectDir: directory,
-            agents: args.agents || SUPPORTED_AGENTS,
-          });
+          const outputs = [];
+
+          if (args.openspec) {
+            outputs.push(bootstrapOpenSpec({
+              projectDir: directory,
+            }));
+          }
+
+          if (!args.openspec || args.agents) {
+            outputs.push(bootstrapProject({
+              projectDir: directory,
+              agents: args.agents || SUPPORTED_AGENTS,
+            }));
+          }
+
+          const result = outputs.join('\n\n');
           return {
             content: [{ type: 'text', text: String(result || 'praxis-bootstrap completed (no output)') }],
           };

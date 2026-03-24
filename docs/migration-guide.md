@@ -66,6 +66,7 @@ praxis-devos migrate
 ### 新项目初始化
 
 ```bash
+praxis-devos bootstrap --openspec
 praxis-devos init --stack java-spring
 ```
 

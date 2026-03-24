@@ -72,6 +72,7 @@ Detailed architecture and migration notes:
 ### 1. Initialize the project outside any agent runtime
 
 ```bash
+npx praxis-devos bootstrap --openspec
 npx praxis-devos init --stack java-spring
 ```
 
@@ -84,6 +85,8 @@ This will:
 - copy stack metadata into `.praxis/stack.md`
 - copy stack rules into `.praxis/rules.md`
 - sync adapters for OpenCode, Codex, and Claude Code
+
+If OpenSpec is not available, `init` now fails directly instead of falling back to a manual scaffold.
 
 ### 2. Fill in project context
 
@@ -107,7 +110,7 @@ Add to your project's `opencode.json`:
 
 Then restart OpenCode.
 
-The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, and `praxis-migrate`.
+The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, and `praxis-openspec`.
 
 ## How Rule Gating Works
 
@@ -132,7 +135,9 @@ praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
 praxis-devos doctor --strict
+praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
+praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
 
@@ -143,10 +148,13 @@ Praxis DevOS has two hard dependencies:
 - `openspec` as a CLI dependency
 - `superpowers` as an agent runtime dependency
 
+OpenSpec is now invoked only through `praxis-devos openspec ...`, preferring a project-local installation and falling back to a global install only for compatibility.
+
 Because Superpowers installs differently on OpenCode, Codex, and Claude Code, Praxis does not copy it into `.praxis/`. Instead it exposes dependency commands:
 
 ```bash
 praxis-devos doctor
+praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent codex
 praxis-devos bootstrap --agent claude
 ```

@@ -55,7 +55,7 @@ RULES.md 规则 > OpenSpec 工作流 > SuperPowers skills > 技术栈领域 skil
 ### 提案变更额外检查
 - [ ] 逐条验证 proposal 中每个 `#### Scenario:` 的预期行为
 - [ ] `tasks.md` 中每一项都标记为 `[x]`
-- [ ] `openspec validate <change-id> --strict --no-interactive` 通过
+- [ ] `praxis-devos openspec validate <change-id> --strict --no-interactive` 通过
 
 ### Git 提交前检查
 - [ ] 提交消息符合 Conventional Commits 格式

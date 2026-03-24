@@ -14,7 +14,7 @@ Praxis DevOS 强依赖两类外部能力：
 - 类型：CLI
 - 用途：规范初始化、校验、归档
 - 特征：与具体 agent 无关
-- 当前策略：通过 `PATH` 检测是否可用
+- 当前策略：统一通过 `praxis-devos openspec ...` 调用，优先使用项目本地安装，找不到时才回退到全局安装
 
 ### Superpowers
 
@@ -53,7 +53,7 @@ praxis-devos doctor --strict
 
 检查内容：
 
-- `openspec` 是否在 `PATH` 中
+- `openspec` 是否可被 `praxis-devos openspec ...` 成功解析
 - OpenCode 是否在 `opencode.json` 中声明了 `superpowers` 插件
 - Codex 是否检测到 `~/.agents/skills/superpowers`
 - Claude Code 安装是否需要人工确认
@@ -69,6 +69,7 @@ praxis-devos doctor --strict
 使用：
 
 ```bash
+praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
 praxis-devos bootstrap --agent codex
 praxis-devos bootstrap --agent claude
@@ -76,9 +77,41 @@ praxis-devos bootstrap --agent claude
 
 行为：
 
+- `openspec`：输出 OpenSpec 的项目本地/全局安装建议
 - `opencode`：自动写入或更新项目根目录 `opencode.json`
 - `codex`：输出官方安装步骤
 - `claude`：输出官方 marketplace 安装命令
+
+## OpenSpec
+
+OpenSpec 是 Praxis DevOS 的硬依赖，不再提供“无 OpenSpec 的降级初始化”。
+
+所有 OpenSpec 命令统一使用：
+
+```bash
+praxis-devos openspec list --specs
+praxis-devos openspec validate <change-id> --strict --no-interactive
+praxis-devos openspec archive <change-id> --yes
+```
+
+解析顺序：
+
+1. 项目本地 `node_modules/.bin/openspec`
+2. 全局 `openspec`
+
+推荐安装：
+
+```bash
+npm install -D @fission-ai/openspec
+```
+
+全局安装只作为兼容兜底：
+
+```bash
+npm install -g @fission-ai/openspec
+```
+
+如果当前环境无法解析 OpenSpec，`praxis-devos init` 会直接失败。
 
 ## OpenCode
 

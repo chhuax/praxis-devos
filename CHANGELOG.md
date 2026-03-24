@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Project architecture from OpenCode-only initialization to a multi-agent model centered on `.praxis/`
 - OpenCode plugin now acts as a thin adapter over the shared core instead of owning initialization logic
-- OpenSpec initialization now uses `openspec init --tools none --force` to stay agent-neutral
+- OpenSpec is now treated as a hard dependency and invoked through `praxis-devos openspec ...`
 - Stack installation target changed from `.opencode/` to `.praxis/`
 - User-customizable skills now install into `.praxis/skills/`
 - Framework documentation rewritten to explain the canonical layer, migration path, and adapter strategy

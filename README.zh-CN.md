@@ -72,6 +72,7 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `prax
 ### 1. 在 agent 之外初始化项目
 
 ```bash
+npx praxis-devos bootstrap --openspec
 npx praxis-devos init --stack java-spring
 ```
 
@@ -84,6 +85,8 @@ npx praxis-devos init --stack java-spring
 - 把技术栈工具链写入 `.praxis/stack.md`
 - 把技术栈规则写入 `.praxis/rules.md`
 - 同步 OpenCode、Codex、Claude Code 的适配入口
+
+如果当前环境还没有 OpenSpec，`init` 会直接失败，不再降级为手工脚手架模式。
 
 ### 2. 补充项目上下文
 
@@ -107,7 +110,7 @@ npx praxis-devos init --stack java-spring
 
 然后重启 OpenCode。
 
-插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate` 这类薄封装工具。
+插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-openspec` 这类薄封装工具。
 
 ## 门控规则如何生效
 
@@ -132,7 +135,9 @@ praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
 praxis-devos doctor --strict
+praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
+praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
 
@@ -143,10 +148,13 @@ Praxis DevOS 强依赖：
 - `openspec`：CLI 依赖
 - `superpowers`：agent runtime 依赖
 
+其中 OpenSpec 现在统一通过 `praxis-devos openspec ...` 调用，优先使用项目本地安装，找不到时才回退到全局安装。
+
 由于 `superpowers` 在 OpenCode、Codex、Claude Code 下的安装方式不同，Praxis 不会把它复制到 `.praxis/`，而是通过依赖管理命令处理：
 
 ```bash
 praxis-devos doctor
+praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent codex
 praxis-devos bootstrap --agent claude
 ```

@@ -20,12 +20,15 @@ export const PRAXIS_FRAMEWORK_RULES = 'framework-rules.md';
 export const PRAXIS_COMPILED_RULES = 'compiled-rules.md';
 export const SUPERPOWERS_OPENCODE_PLUGIN = 'superpowers@git+https://github.com/obra/superpowers.git';
 export const PRAXIS_OPENCODE_PLUGIN = 'praxis-devos@git+https://github.com/chhuax/praxis-devos.git';
+export const OPENSPEC_PACKAGE = '@fission-ai/openspec';
 
 const SUPERPOWERS_DOCS = {
   main: 'https://github.com/obra/superpowers',
   codex: 'https://github.com/obra/superpowers/blob/main/docs/README.codex.md',
   opencode: 'https://github.com/obra/superpowers/blob/main/docs/README.opencode.md',
 };
+
+const OPENSPEC_INSTALL_DOC = 'https://github.com/Fission-AI/OpenSpec';
 
 const AGENTS_MANAGED_START = '<!-- PRAXIS_DEVOS_START -->';
 const AGENTS_MANAGED_END = '<!-- PRAXIS_DEVOS_END -->';
@@ -116,6 +119,39 @@ export const commandExists = (cmd) => {
   } catch {
     return false;
   }
+};
+
+const localExecutablePath = (projectDir, executable) => {
+  const fileName = process.platform === 'win32' ? `${executable}.cmd` : executable;
+  return path.join(projectDir, 'node_modules', '.bin', fileName);
+};
+
+const resolveOpenSpecRuntime = (projectDir) => {
+  const localPath = localExecutablePath(projectDir, 'openspec');
+  if (fs.existsSync(localPath)) {
+    return {
+      status: 'ok',
+      source: 'project-local',
+      command: localPath,
+      detail: `OpenSpec available via ${localPath}`,
+    };
+  }
+
+  if (commandExists('openspec')) {
+    return {
+      status: 'ok',
+      source: 'global',
+      command: 'openspec',
+      detail: 'OpenSpec CLI is available on PATH',
+    };
+  }
+
+  return {
+    status: 'missing',
+    source: 'missing',
+    command: null,
+    detail: 'OpenSpec CLI is missing. Install it with `praxis-devos bootstrap --openspec`.',
+  };
 };
 
 const run = (cmd, opts = {}) => {
@@ -299,24 +335,22 @@ const ensurePraxisManifest = ({ projectDir, stackName, agents, migratedFrom }) =
 };
 
 const ensureOpenSpecLayout = ({ projectDir, log }) => {
-  const openspecCli = commandExists('openspec');
-
-  if (openspecCli) {
-    const initResult = runFile('openspec', ['init', projectDir, '--tools', 'none', '--force']);
-    if (initResult.ok) {
-      log('✓ openspec init completed');
-      return;
-    }
-
-    log(`⚠ openspec init warning: ${initResult.stderr}`);
-  } else {
-    log('⚠ OpenSpec CLI not found, falling back to local openspec/ scaffold');
+  const runtime = resolveOpenSpecRuntime(projectDir);
+  if (runtime.status !== 'ok' || !runtime.command) {
+    throw new Error(
+      `OpenSpec is required before project initialization. ${runtime.detail}`,
+    );
   }
 
-  for (const dir of ['specs', 'changes', 'archive', 'templates']) {
-    ensureDir(path.join(projectDir, 'openspec', dir));
+  const initResult = runFile(runtime.command, ['init', projectDir, '--tools', 'none', '--force'], {
+    cwd: projectDir,
+  });
+  if (initResult.ok) {
+    log(`✓ openspec init completed (${runtime.source})`);
+    return;
   }
-  log('✓ openspec/ directories created (manual fallback)');
+
+  throw new Error(`OpenSpec init failed: ${initResult.stderr}`);
 };
 
 const ensureFrameworkFiles = ({ projectDir, log }) => {
@@ -420,7 +454,7 @@ const renderRulesSection = (title, content) => {
 };
 
 function renderDependencyGateSummary(projectDir) {
-  const openspecInstalled = commandExists('openspec');
+  const openspecRuntime = resolveOpenSpecRuntime(projectDir);
   const agentChecks = SUPPORTED_AGENTS.map((agent) => ({
     agent,
     detection: detectSuperpowersForAgent(projectDir, agent),
@@ -429,9 +463,9 @@ function renderDependencyGateSummary(projectDir) {
   const lines = [
     '## 依赖门禁',
     '',
-    openspecInstalled
-      ? '- [OK] `openspec` 已可用。'
-      : '- [MISSING] `openspec` 不可用。继续执行规范初始化、校验、归档前，先安装它。',
+    openspecRuntime.status === 'ok'
+      ? `- [OK] \`openspec\` 已可用（${openspecRuntime.source}）。通过 \`praxis-devos openspec ...\` 调用。`
+      : '- [MISSING] `openspec` 不可用。继续执行规范初始化、校验、归档前，先执行 `praxis-devos bootstrap --openspec`。',
   ];
 
   for (const { agent, detection } of agentChecks) {
@@ -444,7 +478,7 @@ function renderDependencyGateSummary(projectDir) {
   }
 
   lines.push('');
-  lines.push('规则：缺少当前运行环境所需的 `superpowers` 或缺少 `openspec` 时，应先安装依赖，不要直接进入实现。');
+  lines.push('规则：缺少当前运行环境所需的 `superpowers` 或缺少 `openspec` 时，应先安装依赖，不要直接进入实现。所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`。');
 
   return lines.join('\n');
 }
@@ -701,6 +735,26 @@ export const listStacksDetailed = () => listDirs(STACKS_DIR).map((name) => {
   return { name, description: firstLine };
 });
 
+export const runOpenSpecCommand = ({ projectDir, args }) => {
+  const runtime = resolveOpenSpecRuntime(projectDir);
+  if (runtime.status !== 'ok' || !runtime.command) {
+    throw new Error(
+      `OpenSpec is required for this command. ${runtime.detail}`,
+    );
+  }
+
+  const result = runFile(runtime.command, args, {
+    cwd: projectDir,
+    timeout: 300_000,
+  });
+
+  if (!result.ok) {
+    throw new Error(result.stderr || 'OpenSpec command failed');
+  }
+
+  return result.stdout || 'OpenSpec command completed with no output.';
+};
+
 const readProjectJson = (filePath) => {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -857,23 +911,43 @@ export const bootstrapProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
     outputs.push('');
   }
 
-  outputs.push('If openspec is not installed, install it separately:');
-  outputs.push('npm install -g @fission-ai/openspec');
-
   return outputs.join('\n').trim();
+};
+
+export const bootstrapOpenSpec = ({ projectDir }) => {
+  const runtime = resolveOpenSpecRuntime(projectDir);
+  if (runtime.status === 'ok') {
+    return [
+      '== openspec ==',
+      `OpenSpec already available (${runtime.source})`,
+      `- ${runtime.detail}`,
+      '- Use the unified wrapper command:',
+      '  praxis-devos openspec list --specs',
+    ].join('\n');
+  }
+
+  return [
+    '== openspec ==',
+    'OpenSpec is a hard dependency of Praxis DevOS.',
+    'Preferred install (project-local):',
+    `- npm install -D ${OPENSPEC_PACKAGE}`,
+    'Then use the unified wrapper command:',
+    '  praxis-devos openspec list --specs',
+    'Fallback install (global):',
+    `- npm install -g ${OPENSPEC_PACKAGE}`,
+    `Reference: ${OPENSPEC_INSTALL_DOC}`,
+  ].join('\n');
 };
 
 export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = false }) => {
   const selectedAgents = uniqueAgents(agents);
   const results = [];
 
-  const openspecInstalled = commandExists('openspec');
+  const openspecRuntime = resolveOpenSpecRuntime(projectDir);
   results.push({
     name: 'openspec',
-    status: openspecInstalled ? 'ok' : 'missing',
-    detail: openspecInstalled
-      ? 'OpenSpec CLI is available on PATH'
-      : 'OpenSpec CLI is missing from PATH',
+    status: openspecRuntime.status,
+    detail: openspecRuntime.detail,
   });
 
   for (const agent of selectedAgents) {
@@ -892,6 +966,7 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
 
   lines.push('');
   lines.push('Bootstrap commands:');
+  lines.push('- praxis-devos bootstrap --openspec');
   lines.push(`- praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);
 
   const hasBlockingIssue = results.some((result) =>
@@ -912,6 +987,7 @@ export const parseCliArgs = (argv) => {
     agents: [],
     projectDir: process.cwd(),
     strict: false,
+    withOpenSpec: false,
   };
 
   while (args.length > 0) {
@@ -941,7 +1017,32 @@ export const parseCliArgs = (argv) => {
 
     if (token === '--strict') {
       parsed.strict = true;
+      continue;
     }
+
+    if (token === '--openspec') {
+      parsed.withOpenSpec = true;
+    }
+  }
+
+  return parsed;
+};
+
+const parseOpenSpecCliArgs = (argv) => {
+  const args = [...argv];
+  const parsed = {
+    projectDir: process.cwd(),
+    args: [],
+  };
+
+  while (args.length > 0) {
+    const token = args.shift();
+    if (token === '--project-dir') {
+      parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
+      continue;
+    }
+
+    parsed.args.push(token);
   }
 
   return parsed;
@@ -955,6 +1056,7 @@ Commands:
   migrate        Move legacy .opencode project assets into .praxis
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
+  openspec       Run OpenSpec through the Praxis wrapper
   list-stacks    List available technology stacks
   help           Show this help
 
@@ -964,12 +1066,21 @@ Options:
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
   --strict               Fail doctor if required dependencies are missing
+  --openspec             Include or target OpenSpec bootstrap
 
 Supported agents:
   ${SUPPORTED_AGENTS.join(', ')}
 `;
 
 export const runCli = (argv) => {
+  if (argv[0] === 'openspec') {
+    const parsedOpenSpec = parseOpenSpecCliArgs(argv.slice(1));
+    return runOpenSpecCommand({
+      projectDir: parsedOpenSpec.projectDir,
+      args: parsedOpenSpec.args,
+    });
+  }
+
   const parsed = parseCliArgs(argv);
   const agents = parsed.agents.length > 0 ? parsed.agents : SUPPORTED_AGENTS;
 
@@ -991,10 +1102,22 @@ export const runCli = (argv) => {
   }
 
   if (parsed.command === 'bootstrap') {
-    return bootstrapProject({
-      projectDir: parsed.projectDir,
-      agents,
-    });
+    const outputs = [];
+
+    if (parsed.withOpenSpec) {
+      outputs.push(bootstrapOpenSpec({
+        projectDir: parsed.projectDir,
+      }));
+    }
+
+    if (!parsed.withOpenSpec || parsed.agents.length > 0) {
+      outputs.push(bootstrapProject({
+        projectDir: parsed.projectDir,
+        agents,
+      }));
+    }
+
+    return outputs.join('\n\n');
   }
 
   if (parsed.command === 'init') {
