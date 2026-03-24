@@ -7,14 +7,6 @@ Praxis DevOS 强依赖两类外部能力：
 
 这两类依赖的管理方式不同，不能混在一起处理。
 
-> 当前 `praxis-devos` 还未发布到 npm registry。
->
-> 在正式发布前，文档里的 `praxis-devos ...` 命令都应通过 Git URL 执行，例如：
->
-> ```bash
-> npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos doctor
-> ```
-
 ## 依赖分层
 
 ### OpenSpec
@@ -131,7 +123,7 @@ npm install -g @fission-ai/openspec
 
 OpenCode 当前采用项目级插件配置。`bootstrap --agent opencode` 会把以下插件写入 `opencode.json`：
 
-- `praxis-devos@git+https://github.com/chhuax/praxis-devos.git`
+- `praxis-devos`
 - `superpowers@git+https://github.com/obra/superpowers.git`
 
 之后需要重启 OpenCode。

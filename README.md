@@ -71,19 +71,11 @@ Detailed architecture and migration notes:
 
 ## Quick Start
 
-> This repository is not yet published on the npm registry.
->
-> Until it is published, run all `praxis-devos` commands through the Git package source, for example:
->
-> ```bash
-> npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos doctor
-> ```
-
 ### 1. Initialize the project outside any agent runtime
 
 ```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos bootstrap --openspec
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos init --stack java-spring
+npx praxis-devos bootstrap --openspec
+npx praxis-devos init --stack java-spring
 ```
 
 This will:
@@ -112,7 +104,7 @@ Add to your project's `opencode.json`:
 ```json
 {
   "plugin": [
-    "praxis-devos@git+https://github.com/chhuax/praxis-devos.git",
+    "praxis-devos",
     "superpowers@git+https://github.com/obra/superpowers.git"
   ]
 }
@@ -141,12 +133,6 @@ If `AGENTS.md` or `CLAUDE.md` already exists, Praxis only appends or refreshes t
 Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. Those commands mean "enter the proposal path", not "start implementation immediately"; if the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
 
 ## CLI
-
-The examples below assume `praxis-devos` is directly available; while the package is unpublished on npm, replace it with:
-
-```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...
-```
 
 ```bash
 praxis-devos init --stack java-spring

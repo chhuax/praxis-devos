@@ -71,19 +71,11 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `prax
 
 ## 快速开始
 
-> 当前仓库尚未发布到 npm registry。
->
-> 在正式发布前，下面所有 `praxis-devos` 命令都应通过 Git URL 执行，例如：
->
-> ```bash
-> npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos doctor
-> ```
-
 ### 1. 在 agent 之外初始化项目
 
 ```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos bootstrap --openspec
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos init --stack java-spring
+npx praxis-devos bootstrap --openspec
+npx praxis-devos init --stack java-spring
 ```
 
 该命令会：
@@ -112,7 +104,7 @@ npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxi
 ```json
 {
   "plugin": [
-    "praxis-devos@git+https://github.com/chhuax/praxis-devos.git",
+    "praxis-devos",
     "superpowers@git+https://github.com/obra/superpowers.git"
   ]
 }
@@ -141,12 +133,6 @@ npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxi
 另外，Praxis 约定 `/change` 为显式提案主入口，`/proposal` 为兼容别名。它们的语义是“进入提案通道”，不是“直接开始实现”；如果需求不明确，应先进入 `brainstorming`，再决定完整提案或轻量提案。
 
 ## CLI
-
-以下示例假定 `praxis-devos` 已可直接调用；在当前未发布到 npm 的阶段，请将其替换为：
-
-```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...
-```
 
 ```bash
 praxis-devos init --stack java-spring
