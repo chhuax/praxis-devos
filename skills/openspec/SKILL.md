@@ -39,6 +39,7 @@ triggers:
 ## 快速参考
 
 ```bash
+praxis-devos change --title "Add two factor auth" --capability auth
 praxis-devos openspec list
 praxis-devos openspec list --specs
 praxis-devos openspec show <id>
@@ -55,8 +56,9 @@ praxis-devos openspec archive <id> --yes
 1. 立即切换到提案模式
 2. 禁止直接进入实现
 3. 如果需求不明确，先加载 `brainstorming`
-4. 如果需求明确，再创建 proposal / spec delta
-5. 提案获批后，才进入实现和 Git 分支阶段
+4. 如果需求明确，可直接运行 `praxis-devos change --title ... --capability ...`
+5. 或手工创建 proposal / spec delta
+6. 提案获批后，才进入实现和 Git 分支阶段
 
 ### 1. 实现前先核查
 

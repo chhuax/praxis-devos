@@ -68,6 +68,7 @@ Detailed architecture and migration notes:
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
+- [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
 
 ## Quick Start
 
@@ -112,7 +113,7 @@ Add to your project's `opencode.json`:
 
 Then restart OpenCode.
 
-The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, and `praxis-openspec`.
+The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, `praxis-change`, and `praxis-openspec`.
 
 ## How Rule Gating Works
 
@@ -138,6 +139,7 @@ Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposa
 praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
+praxis-devos change --title "Add two factor auth" --capability auth
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode

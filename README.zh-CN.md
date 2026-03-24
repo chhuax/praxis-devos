@@ -68,6 +68,7 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `prax
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
+- [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
 
 ## 快速开始
 
@@ -112,7 +113,7 @@ npx praxis-devos init --stack java-spring
 
 然后重启 OpenCode。
 
-插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-openspec` 这类薄封装工具。
+插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-change`、`praxis-openspec` 这类薄封装工具。
 
 ## 门控规则如何生效
 
@@ -138,6 +139,7 @@ npx praxis-devos init --stack java-spring
 praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
+praxis-devos change --title "Add two factor auth" --capability auth
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
