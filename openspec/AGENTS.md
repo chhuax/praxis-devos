@@ -4,6 +4,14 @@
 
 > **完整工作流指南**（模板、故障排除、最佳实践）→ 加载 `openspec` skill。
 
+## 显式入口
+
+- 用户输入 `/change` 时，表示显式要求进入提案通道
+- `/proposal` 是兼容别名
+- 如果需求不明确，先加载 `brainstorming`
+- 如果需求明确，再开始创建 proposal / spec delta
+- 这两个入口都不应直接进入实现，也不应自动创建 Git 分支
+
 ## TL;DR 快速核查
 
 - 搜索现有工作：`praxis-devos openspec list --specs`，`praxis-devos openspec list`
@@ -13,7 +21,7 @@
 - 编写 deltas：`## ADDED|MODIFIED|REMOVED|RENAMED Requirements`
 - 每个需求至少一个 `#### Scenario:`
 - 验证：`praxis-devos openspec validate [change-id] --strict --no-interactive`
-- **请求批准后才开始实现**
+- **请求批准后才开始实现，批准后再创建实现分支**
 
 ---
 

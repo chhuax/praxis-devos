@@ -1,50 +1,48 @@
-# Starter Stack — Coding Rules
+# Starter 技术栈初始编码基线
 
-Universal coding conventions for the starter stack. Extend this file when creating language-specific stacks.
+用于创建语言或框架专属技术栈时的最小默认规则。请把它视为起点，而不是最终标准答案。
 
-## Naming Conventions
+## 命名规范
 
-- **Variables & Functions**: Use meaningful, descriptive names in camelCase (JavaScript/Java) or snake_case (Python).
-- **Constants**: ALL_CAPS with underscores.
-- **Classes & Types**: PascalCase.
-- **Avoid**: Single-letter names (except loop counters `i`, `j`), cryptic abbreviations.
+- 变量与函数：使用有意义的名称；按语言习惯使用 `camelCase` 或 `snake_case`
+- 常量：使用 `UPPER_SNAKE_CASE`
+- 类与类型：使用 `PascalCase`
+- 避免无意义缩写和单字母命名（循环计数器 `i`、`j` 除外）
 
-## Formatting & Style
+## 格式与风格
 
-- Maintain consistent indentation (2 spaces for YAML/JSON, 4 spaces for code).
-- Use your language's standard formatter before committing.
-- Keep lines reasonably sized (aim for <100 characters).
-- Use trailing commas in multi-line structures where allowed.
+- 保持统一缩进
+- 提交前使用对应语言或框架的标准格式化工具
+- 控制行宽，避免超长行
+- 多行结构在语言允许时使用尾随逗号
 
-## Error Handling
+## 错误处理
 
-- **Never silently swallow exceptions.** Always log or re-throw with context.
-- Use structured error responses (include error code, message, and context).
-- Fail fast: validate inputs at entry points, propagate errors upward.
+- 不要静默吞掉异常；记录上下文或重新抛出
+- 对外返回结构化错误信息
+- 在入口处尽早校验输入，尽快失败
 
-## Security
+## 安全
 
-- **Never hardcode credentials, API keys, or secrets** in code.
-- Use environment variables, config files (ignored via `.gitignore`), or secure vaults.
-- Sanitize user inputs before database queries or API calls.
-- Validate data types and bounds on entry.
+- 不要在代码中硬编码凭据、密钥或敏感配置
+- 使用环境变量、配置文件或密钥管理系统
+- 对外部输入做类型、长度和边界校验
+- 在数据库查询和 API 调用前完成必要的输入净化
 
-## Testing
+## 测试与验证
 
-- Write tests for new features and bug fixes (TDD workflow).
-- Aim for >80% code coverage on business logic.
-- Test both happy path and error cases.
-- Use descriptive test names that explain the scenario.
+- 为新功能和缺陷修复补充必要测试
+- 测试策略按变更风险选择，不强制所有场景都采用 TDD
+- 覆盖正常路径、错误路径和边界条件
+- 使用能表达业务意图的测试名称
 
-## Comments & Documentation
+## 注释与文档
 
-- Comment the "why", not the "what" — code should be self-explanatory.
-- Document public APIs, edge cases, and non-obvious decisions.
-- Keep comments synchronized with code during refactoring.
+- 解释“为什么”，而不是逐行解释“做了什么”
+- 对公开 API、边界条件和非显然决策补充说明
+- 重构后同步更新注释和文档
 
-## Version Control
+## 版本控制
 
-- Use Conventional Commits format: `type(scope): description`.
-  - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
-  - Example: `feat(auth): add JWT validation`
-- Keep commits atomic and logically grouped.
+- 使用 Conventional Commits：`type(scope): description`
+- 保持提交原子化，一个提交只解决一个清晰问题

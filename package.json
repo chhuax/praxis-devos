@@ -7,6 +7,23 @@
   "bin": {
     "praxis-devos": "./bin/praxis-devos.js"
   },
+  "files": [
+    ".opencode/plugins/praxis-devos.js",
+    "bin/",
+    "docs/",
+    "openspec/",
+    "skills/",
+    "src/",
+    "stacks/",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "README.zh-CN.md",
+    "RULES.md",
+    "SECURITY.md"
+  ],
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20.19.0"

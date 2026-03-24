@@ -4,6 +4,11 @@
 
 Praxis DevOS 需要同时支持多个 AI 编码助手，而不能把项目状态耦合到某一个运行时目录或插件协议。
 
+> 当前 `praxis-devos` 还未发布到 npm registry。
+> 在正式发布前，文档中的 `praxis-devos ...` 示例命令应通过：
+> `npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...`
+> 来执行。
+
 因此框架明确拆分为三层：
 
 - **规范层资产**：保存在 `.praxis/`，是唯一事实来源
@@ -67,6 +72,7 @@ your-project/
 - Codex 读取仓库根目录 `AGENTS.md`
 - Praxis 在 `AGENTS.md` 中维护一段受管控区块，指向 `.praxis/` 和 `openspec/`
 - 如果项目已经存在 `AGENTS.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
+- `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
 - 不要求 Codex 使用专属项目目录
 
 ### Claude Code
@@ -74,6 +80,7 @@ your-project/
 - Claude Code 读取仓库根目录 `CLAUDE.md`
 - Praxis 在 `CLAUDE.md` 中维护一段受管控区块，指向 `.praxis/` 和 `openspec/`
 - 如果项目已经存在 `CLAUDE.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
+- `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
 - 不把 canonical project state 放进 Claude 专属目录
 
 ## CLI 归属
@@ -158,6 +165,8 @@ Praxis 的设计就是：
 - 依赖门禁摘要
 - 框架门控规则
 - 技术栈 / 项目规则
+
+注意：这里的“强制执行”指的是规范治理和完成前验证，不意味着所有代码变更都必须走 TDD。TDD 在框架层是风险驱动策略，不是全局硬门槛。
 
 随后再分发到：
 

@@ -1,0 +1,15 @@
+.git/
+.praxis/
+AGENTS.md
+CLAUDE.md
+opencode.json
+.opencode/README.md
+.opencode/skills/
+.opencode/stack.md
+.opencode/stack-rules.md
+node_modules/
+coverage/
+dist/
+build/
+out/
+*.log
