@@ -4,11 +4,6 @@
 
 Praxis DevOS 需要同时支持多个 AI 编码助手，而不能把项目状态耦合到某一个运行时目录或插件协议。
 
-> 当前 `praxis-devos` 还未发布到 npm registry。
-> 在正式发布前，文档中的 `praxis-devos ...` 示例命令应通过：
-> `npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...`
-> 来执行。
-
 因此框架明确拆分为三层：
 
 - **规范层资产**：保存在 `.praxis/`，是唯一事实来源

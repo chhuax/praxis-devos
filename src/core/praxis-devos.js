@@ -737,6 +737,160 @@ export const listStacksDetailed = () => listDirs(STACKS_DIR).map((name) => {
   return { name, description: firstLine };
 });
 
+const normalizeChangeId = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+  .replace(/-{2,}/g, '-');
+
+const normalizeCapability = (value) => normalizeChangeId(value).replace(/^-+|-+$/g, '') || 'general';
+
+const deriveChangeId = (title) => {
+  const normalized = normalizeChangeId(title);
+  return normalized || 'change';
+};
+
+const deriveCapability = ({ capability, changeId }) => {
+  if (capability) {
+    return normalizeCapability(capability);
+  }
+
+  const parts = normalizeChangeId(changeId).split('-').filter(Boolean);
+  if (parts.length > 1) {
+    return normalizeCapability(parts.slice(1).join('-'));
+  }
+
+  return 'general';
+};
+
+const validateChangeType = (value) => {
+  const normalized = String(value || 'auto').trim().toLowerCase();
+  if (['auto', 'full', 'lite'].includes(normalized)) {
+    return normalized;
+  }
+
+  throw new Error(`Unsupported change type: ${value}. Use auto, full, or lite.`);
+};
+
+const renderProposalContent = ({ title, summary, changeId, capability, type }) => {
+  const why = summary?.trim() || `需要为“${title}”建立 OpenSpec 提案，并补齐范围与验收边界。`;
+  const proposalLines = [
+    `# 变更：${title}`,
+    '',
+    '## 为什么',
+    why,
+    '',
+    '## 变更内容',
+    `- 为 \`${capability}\` 能力创建 ${type === 'lite' ? '轻量' : '完整'}提案`,
+    '- 补充或更新对应 spec delta',
+    '- 提案获批后再进入实现与建分支',
+    '',
+    '## 影响范围',
+    `- 影响规范：${capability}`,
+    '- 影响代码：待补充',
+    '',
+    '## 备注',
+    `- change-id: \`${changeId}\``,
+  ];
+
+  return `${proposalLines.join('\n')}\n`;
+};
+
+const renderTasksContent = () => `## 1. 实现任务
+- [ ] 1.1 细化提案范围与影响面
+- [ ] 1.2 补充 spec delta 与场景
+- [ ] 1.3 提案获批后进入实现
+- [ ] 1.4 完成前执行验证与回归检查
+`;
+
+const renderSpecDeltaContent = ({ title }) => `## ADDED Requirements
+### Requirement: ${title}
+TODO: 补充该需求的规范性描述，使用 MUST / SHALL 表达行为约束。
+
+#### Scenario: 待补充主场景
+- **WHEN** 待补充触发条件
+- **THEN** 待补充预期结果
+`;
+
+export const createChangeScaffold = ({
+  projectDir,
+  title,
+  changeId = null,
+  capability = null,
+  type = 'auto',
+  summary = '',
+}) => {
+  const paths = projectPaths(projectDir);
+
+  if (!fs.existsSync(paths.openspecDir)) {
+    throw new Error('OpenSpec workspace is missing. Run `praxis-devos init --stack <stack>` first.');
+  }
+
+  const trimmedTitle = String(title || '').trim();
+  if (!trimmedTitle) {
+    throw new Error('Change title is required. Pass it with `--title` or as a positional argument.');
+  }
+
+  const resolvedType = validateChangeType(type);
+  const effectiveType = resolvedType === 'auto' ? 'full' : resolvedType;
+  const nextChangeId = normalizeChangeId(changeId) || deriveChangeId(trimmedTitle);
+  const nextCapability = deriveCapability({ capability, changeId: nextChangeId });
+  const changeDir = path.join(paths.openspecDir, 'changes', nextChangeId);
+  const proposalPath = path.join(changeDir, 'proposal.md');
+  const tasksPath = path.join(changeDir, 'tasks.md');
+  const specPath = path.join(changeDir, 'specs', nextCapability, 'spec.md');
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(nextChangeId)) {
+    throw new Error(`Invalid change-id: ${nextChangeId}. Use kebab-case.`);
+  }
+
+  if (fs.existsSync(changeDir)) {
+    throw new Error(`Change "${nextChangeId}" already exists at ${changeDir}`);
+  }
+
+  writeText(
+    proposalPath,
+    renderProposalContent({
+      title: trimmedTitle,
+      summary,
+      changeId: nextChangeId,
+      capability: nextCapability,
+      type: effectiveType,
+    }),
+  );
+
+  if (effectiveType === 'full') {
+    writeText(tasksPath, renderTasksContent());
+  }
+
+  writeText(specPath, renderSpecDeltaContent({ title: trimmedTitle }));
+
+  const created = [
+    path.relative(projectDir, proposalPath),
+    effectiveType === 'full' ? path.relative(projectDir, tasksPath) : null,
+    path.relative(projectDir, specPath),
+  ].filter(Boolean);
+
+  const lines = [
+    `Created OpenSpec ${effectiveType === 'lite' ? 'lightweight' : 'full'} change scaffold: ${nextChangeId}`,
+    `- capability: ${nextCapability}`,
+    ...created.map((file) => `- ${file}`),
+    '',
+    'Next steps:',
+    '- refine proposal.md and spec delta before validation',
+    `- run: praxis-devos openspec validate ${nextChangeId} --strict --no-interactive`,
+    '- request approval before implementation',
+    '- after approval, create the implementation branch and start coding',
+  ];
+
+  if (resolvedType === 'auto') {
+    lines.splice(1, 0, '- type: auto -> full (safer default)');
+  }
+
+  return lines.join('\n');
+};
+
 export const runOpenSpecCommand = ({ projectDir, args }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
   if (runtime.status !== 'ok' || !runtime.command) {
@@ -1050,12 +1204,83 @@ const parseOpenSpecCliArgs = (argv) => {
   return parsed;
 };
 
+const parseChangeCliArgs = (argv) => {
+  const args = [...argv];
+  if (args[0] === 'create') {
+    args.shift();
+  }
+
+  const parsed = {
+    projectDir: process.cwd(),
+    title: '',
+    summary: '',
+    capability: null,
+    changeId: null,
+    type: 'auto',
+  };
+  const titleParts = [];
+
+  while (args.length > 0) {
+    const token = args.shift();
+
+    if (token === '--project-dir') {
+      parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
+      continue;
+    }
+
+    if (token === '--title') {
+      parsed.title = args.shift() || '';
+      continue;
+    }
+
+    if (token === '--summary') {
+      parsed.summary = args.shift() || '';
+      continue;
+    }
+
+    if (token === '--capability') {
+      parsed.capability = args.shift() || null;
+      continue;
+    }
+
+    if (token === '--change-id') {
+      parsed.changeId = args.shift() || null;
+      continue;
+    }
+
+    if (token === '--type') {
+      parsed.type = args.shift() || 'auto';
+      continue;
+    }
+
+    if (token === '--full') {
+      parsed.type = 'full';
+      continue;
+    }
+
+    if (token === '--lite') {
+      parsed.type = 'lite';
+      continue;
+    }
+
+    titleParts.push(token);
+  }
+
+  if (!parsed.title && titleParts.length > 0) {
+    parsed.title = titleParts.join(' ');
+  }
+
+  return parsed;
+};
+
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
   init           Initialize a project with canonical .praxis assets
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
+  change         Create an OpenSpec change scaffold from the explicit proposal path
+  proposal       Compatibility alias of \`change\`
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
   openspec       Run OpenSpec through the Praxis wrapper
@@ -1067,6 +1292,11 @@ Options:
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
+  --title <text>         Change title for \`change\` / \`proposal\`
+  --capability <name>    OpenSpec capability directory for \`change\`
+  --change-id <id>       Explicit change-id for \`change\`
+  --type <mode>          Scaffold type: auto, full, or lite
+  --summary <text>       One-line summary for proposal scaffolding
   --strict               Fail doctor if required dependencies are missing
   --openspec             Include or target OpenSpec bootstrap
 
@@ -1081,6 +1311,11 @@ export const runCli = (argv) => {
       projectDir: parsedOpenSpec.projectDir,
       args: parsedOpenSpec.args,
     });
+  }
+
+  if (argv[0] === 'change' || argv[0] === 'proposal') {
+    const parsedChange = parseChangeCliArgs(argv.slice(1));
+    return createChangeScaffold(parsedChange);
   }
 
   const parsed = parseCliArgs(argv);

@@ -68,22 +68,15 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `prax
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
+- [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
 
 ## 快速开始
-
-> 当前仓库尚未发布到 npm registry。
->
-> 在正式发布前，下面所有 `praxis-devos` 命令都应通过 Git URL 执行，例如：
->
-> ```bash
-> npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos doctor
-> ```
 
 ### 1. 在 agent 之外初始化项目
 
 ```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos bootstrap --openspec
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos init --stack java-spring
+npx praxis-devos bootstrap --openspec
+npx praxis-devos init --stack java-spring
 ```
 
 该命令会：
@@ -112,7 +105,7 @@ npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxi
 ```json
 {
   "plugin": [
-    "praxis-devos@git+https://github.com/chhuax/praxis-devos.git",
+    "praxis-devos",
     "superpowers@git+https://github.com/obra/superpowers.git"
   ]
 }
@@ -120,7 +113,7 @@ npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxi
 
 然后重启 OpenCode。
 
-插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-openspec` 这类薄封装工具。
+插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-change`、`praxis-openspec` 这类薄封装工具。
 
 ## 门控规则如何生效
 
@@ -142,16 +135,11 @@ npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxi
 
 ## CLI
 
-以下示例假定 `praxis-devos` 已可直接调用；在当前未发布到 npm 的阶段，请将其替换为：
-
-```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...
-```
-
 ```bash
 praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
+praxis-devos change --title "Add two factor auth" --capability auth
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode

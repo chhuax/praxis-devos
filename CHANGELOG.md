@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-25
+
+### Added
+- Deterministic `praxis-devos change` / `praxis-devos proposal` scaffold command for the explicit proposal path
+- OpenCode plugin tools `praxis-change` and `praxis-proposal`
+- Base regression tests with `node --test`
+- Top-level published OpenCode plugin entrypoint at `opencode-plugin.js`
+
+### Changed
+- npm package metadata now points `main` to the top-level OpenCode plugin entrypoint
+- CLI help now exposes `change` and `proposal` commands explicitly
+- `skills/openspec` and README examples now show the executable proposal scaffold path
+- package metadata is aligned with npm's publish-time normalization
+
+### Fixed
+- published tarball no longer depends on the hidden `.opencode/` directory as the primary entrypoint
+- `bin` metadata now uses the normalized executable path expected by npm
+
 ## [0.2.0] - 2026-03-25
 
 ### Added

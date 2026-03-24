@@ -1,14 +1,17 @@
 {
   "name": "praxis-devos",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI-Native Development Framework — OpenSpec Governance + SuperPowers Execution + Pluggable Stacks",
   "type": "module",
-  "main": ".opencode/plugins/praxis-devos.js",
+  "main": "opencode-plugin.js",
   "bin": {
-    "praxis-devos": "./bin/praxis-devos.js"
+    "praxis-devos": "bin/praxis-devos.js"
+  },
+  "scripts": {
+    "test": "node --test"
   },
   "files": [
-    ".opencode/plugins/praxis-devos.js",
+    "opencode-plugin.js",
     "bin/",
     "docs/",
     "openspec/",
@@ -30,7 +33,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/chhuax/praxis-devos.git"
+    "url": "git+https://github.com/chhuax/praxis-devos.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
     "opencode",

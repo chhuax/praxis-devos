@@ -68,22 +68,15 @@ Detailed architecture and migration notes:
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
+- [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
 
 ## Quick Start
-
-> This repository is not yet published on the npm registry.
->
-> Until it is published, run all `praxis-devos` commands through the Git package source, for example:
->
-> ```bash
-> npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos doctor
-> ```
 
 ### 1. Initialize the project outside any agent runtime
 
 ```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos bootstrap --openspec
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos init --stack java-spring
+npx praxis-devos bootstrap --openspec
+npx praxis-devos init --stack java-spring
 ```
 
 This will:
@@ -112,7 +105,7 @@ Add to your project's `opencode.json`:
 ```json
 {
   "plugin": [
-    "praxis-devos@git+https://github.com/chhuax/praxis-devos.git",
+    "praxis-devos",
     "superpowers@git+https://github.com/obra/superpowers.git"
   ]
 }
@@ -120,7 +113,7 @@ Add to your project's `opencode.json`:
 
 Then restart OpenCode.
 
-The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, and `praxis-openspec`.
+The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, `praxis-change`, and `praxis-openspec`.
 
 ## How Rule Gating Works
 
@@ -142,16 +135,11 @@ Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposa
 
 ## CLI
 
-The examples below assume `praxis-devos` is directly available; while the package is unpublished on npm, replace it with:
-
-```bash
-npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos ...
-```
-
 ```bash
 praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
+praxis-devos change --title "Add two factor auth" --capability auth
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
