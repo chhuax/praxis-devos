@@ -37,6 +37,8 @@ triggers:
 - 准备合并代码或发起 Pull Request (PR) / Merge Request (MR)。
 - 解决代码冲突。
 
+如果当前工作对应一个 OpenSpec 提案，本技能还负责把 `change-id` 映射到分支、提交和 PR。
+
 ---
 
 ## 分支模式选择
@@ -57,6 +59,47 @@ triggers:
 - **feature/**: 从 `develop` 切出，合并回 `develop`。
 - **release/**: 从 `develop` 切出，进行发布前最后修整，完成后同时合并回 `main` 和 `develop`。
 - **hotfix/**: 从 `main` 切出，修复紧急生产问题，完成后同时合并回 `main` 和 `develop`。
+
+---
+
+## 与 OpenSpec 联动
+
+Git 和提案应当联动，但不要在“创建提案”这一步硬绑定创建分支。
+
+### 建议边界
+
+- 创建提案：先写 `proposal.md` / spec delta，确认范围与审批
+- 提案获批并进入实现：再创建 Git 分支
+- 合并完成且行为已落地：再归档提案
+
+### 为什么不在创建提案时立即建分支
+
+- 提案可能被驳回、合并到别的提案或只停留在讨论阶段
+- 过早建分支会产生大量空分支和无效上下文
+- 多 agent 场景下，规范审批和代码实现往往不是同一步
+
+### 一旦进入实现，应该如何联动
+
+- 分支名 SHOULD 尽量复用 OpenSpec `change-id`
+- PR 标题或描述 SHOULD 显式引用 `change-id`
+- 提交内容 SHOULD 聚焦单个提案，避免把多个提案混在一个分支里
+
+### 推荐映射
+
+| 场景 | 推荐分支 |
+| :--- | :--- |
+| 新功能 / 增强 | `feature/<change-id>` |
+| 缺陷修复 | `bugfix/<change-id>` |
+| 破坏性重构 | `feature/<change-id>` 或 `refactor/<change-id>` |
+| 紧急线上修复 | `hotfix/<change-id>` |
+
+### 推荐顺序
+
+1. `praxis-devos openspec validate <change-id> --strict --no-interactive`
+2. 创建实现分支
+3. 开始编码与验证
+4. 发起 PR，并关联 `change-id`
+5. 合并后再执行 `praxis-devos openspec archive <change-id> --yes`
 
 ---
 

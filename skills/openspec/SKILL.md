@@ -138,10 +138,13 @@ openspec/changes/<change-id>/
 
 1. 阅读 `proposal.md`
 2. 阅读 `design.md`（如有）
-3. 如存在 `tasks.md`，按任务顺序实施
-4. 多步骤任务可加载 `writing-plans`
-5. Bug 或测试失败时加载 `systematic-debugging`
-6. 多个独立子任务可加载 `subagent-driven-development`
+3. 如提案已批准并准备实现，加载 `git-workflow` 并创建实现分支
+4. 如存在 `tasks.md`，按任务顺序实施
+5. 多步骤任务可加载 `writing-plans`
+6. Bug 或测试失败时加载 `systematic-debugging`
+7. 多个独立子任务可加载 `subagent-driven-development`
+
+提案创建本身不强制立刻创建 Git 分支；更合理的边界是“提案批准后、开始实现前”再开分支。分支名 SHOULD 优先复用 `change-id`，例如 `feature/add-two-factor-auth`。
 
 测试策略按风险选择：
 
@@ -181,6 +184,8 @@ praxis-devos openspec show <change-id> --json --deltas-only
 ```bash
 praxis-devos openspec archive <change-id> --yes
 ```
+
+归档通常应发生在代码已经合并之后，而不是提案刚写完或 PR 尚未合并时。
 
 ## 最佳实践
 
