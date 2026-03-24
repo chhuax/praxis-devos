@@ -194,6 +194,7 @@ praxis-devos bootstrap --agent claude
 ### 栈专属 Skills
 
 技术栈可以提供数据库、安全、异常处理、测试等领域 skill，同样安装到 `.praxis/skills/`。
+这些技术栈内容的定位是“初始基线”，安装到项目后可以继续按公司或项目规范修改。
 
 ## 技术栈
 

@@ -1,6 +1,6 @@
-# Java + Spring Boot 技术栈声明
+# Java + Spring Boot 技术栈基线
 
-> 通用 Java + Spring Boot 技术栈，适用于标准 Java Web 项目。
+> 通用 Java + Spring Boot 参考基线，适用于标准 Java Web 项目。安装到项目后，建议结合团队规范继续调整 `.praxis/rules.md` 和 `.praxis/skills/`。
 
 ## 基本信息
 
@@ -24,7 +24,7 @@ commands:
   deps: "mvn dependency:tree"         # Gradle: ./gradlew dependencies
 ```
 
-## 包含的 Skills（栈专属）
+## 包含的 Skills（栈专属领域能力）
 
 | Skill | 路径 | 说明 |
 |-------|------|------|
@@ -33,8 +33,10 @@ commands:
 | java-security | `skills/java-security/` | Spring Security、OWASP for Java、依赖扫描 |
 | java-testing | `skills/java-testing/` | JUnit 5、Mockito、Spring Boot Test |
 
+这些 skills 会在安装时复制到项目的 `.praxis/skills/`，后续可以按公司或项目规范修改。
+
 ## 包含的 Rules
 
 | 文件 | 说明 |
 |------|------|
-| `rules.md` | Java + Spring Boot 通用编码规范 |
+| `rules.md` | Java + Spring Boot 初始编码基线 |

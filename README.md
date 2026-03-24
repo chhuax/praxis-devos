@@ -194,6 +194,7 @@ Installed into `.praxis/skills/` during `init`. These are safe to customize in t
 ### Stack Skills
 
 Each stack can provide domain-specific skills such as database, security, error handling, or testing guidance. These are also installed into `.praxis/skills/`.
+Those stack assets are intended as initial baselines. After installation, teams are expected to keep adapting `.praxis/rules.md` and `.praxis/skills/` to their own company or project conventions.
 
 ## Stacks
 
