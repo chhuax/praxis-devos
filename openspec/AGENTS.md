@@ -6,13 +6,13 @@
 
 ## TL;DR 快速核查
 
-- 搜索现有工作：`openspec list --specs`，`openspec list`
+- 搜索现有工作：`praxis-devos openspec list --specs`，`praxis-devos openspec list`
 - 确定范围：新能力 vs 修改现有能力
 - 选择唯一 `change-id`：kebab-case，动词开头（`add-`、`update-`、`remove-`、`refactor-`）
 - 脚手架：`proposal.md`、`tasks.md`、`design.md`（可选）、spec deltas
 - 编写 deltas：`## ADDED|MODIFIED|REMOVED|RENAMED Requirements`
 - 每个需求至少一个 `#### Scenario:`
-- 验证：`openspec validate [change-id] --strict --no-interactive`
+- 验证：`praxis-devos openspec validate [change-id] --strict --no-interactive`
 - **请求批准后才开始实现**
 
 ---
@@ -33,14 +33,14 @@
 
 ### 第三阶段：归档变更
 
-`openspec archive <change-id> --yes` → 移至 `archive/`，更新 `specs/`
+`praxis-devos openspec archive <change-id> --yes` → 移至 `archive/`，更新 `specs/`
 
 ---
 
 ## 在任何任务之前
 
-- [ ] `openspec list --specs` — 查看现有规范
-- [ ] `openspec list` — 查看活跃变更
+- [ ] `praxis-devos openspec list --specs` — 查看现有规范
+- [ ] `praxis-devos openspec list` — 查看活跃变更
 - [ ] 阅读 `openspec/project.md` — 了解项目约定
 - [ ] 检查 `changes/` — 是否有冲突
 - [ ] 能力已存在？→ 优先修改，不要创建重复项
@@ -104,13 +104,13 @@ openspec/
 ## CLI 快速参考
 
 ```bash
-openspec list                                      # 活跃变更
-openspec list --specs                              # 现有规范
-openspec show [item]                               # 查看详情
-openspec show <spec-id> --type spec                # 查看特定规范
-openspec validate [id] --strict --no-interactive   # 验证
-openspec archive <id> --yes                        # 归档
-openspec show [change] --json --deltas-only        # 调试 delta 解析
+praxis-devos openspec list                                      # 活跃变更
+praxis-devos openspec list --specs                              # 现有规范
+praxis-devos openspec show [item]                               # 查看详情
+praxis-devos openspec show <spec-id> --type spec                # 查看特定规范
+praxis-devos openspec validate [id] --strict --no-interactive   # 验证
+praxis-devos openspec archive <id> --yes                        # 归档
+praxis-devos openspec show [change] --json --deltas-only        # 调试 delta 解析
 ```
 
 | 标志 | 作用 |

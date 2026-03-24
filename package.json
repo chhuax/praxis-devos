@@ -1,9 +1,12 @@
 {
   "name": "praxis-devos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-Native Development Framework — OpenSpec Governance + SuperPowers Execution + Pluggable Stacks",
   "type": "module",
   "main": ".opencode/plugins/praxis-devos.js",
+  "bin": {
+    "praxis-devos": "./bin/praxis-devos.js"
+  },
   "license": "Apache-2.0",
   "engines": {
     "node": ">=20.19.0"
@@ -14,6 +17,8 @@
   },
   "keywords": [
     "opencode",
+    "codex",
+    "claude-code",
     "plugin",
     "ai-coding",
     "openspec",
