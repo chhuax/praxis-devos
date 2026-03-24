@@ -26,6 +26,7 @@
 ## 2. Skill 触发表 — 按意图 / 阶段加载
 
 **规则**：多个 skill 可同时加载。涉及代码编写时，始终叠加当前技术栈的领域 skills。
+**命令面**：所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`，不要直接调用裸 `openspec`。
 
 | 意图 / 阶段 | 加载 Skill | 来源 |
 |---|---|---|
@@ -42,7 +43,7 @@
 | 隔离工作区 | `using-git-worktrees` | SuperPowers |
 | 技术栈领域（数据库等） | 栈专属 skills（如 java-database） | 技术栈 |
 
-> **标记「强制」的 skill** 不可跳过：标记完成 MUST 加载验证 skill。TDD 是高价值策略，但不是全局硬门槛。
+> **标记「强制」的 skill** 不可跳过：框架层唯一全局强制的 SuperPowers skill 是 `verification-before-completion`。TDD 是高价值策略，但不是全局硬门槛。
 
 ### Skill 优先级
 
