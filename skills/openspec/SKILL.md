@@ -29,6 +29,8 @@ triggers:
 
 ## 核心原则
 
+- `/change` 是显式提案主入口，`/proposal` 是兼容别名
+- 这两个入口表示“进入提案通道”，不是“直接开始实现”
 - 所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`
 - 不要直接调用裸 `openspec ...`
 - 提案是否需要，按变更风险判断
@@ -45,6 +47,16 @@ praxis-devos openspec archive <id> --yes
 ```
 
 ## 使用步骤
+
+### Slash 入口语义
+
+当用户输入 `/change ...` 或 `/proposal ...` 时：
+
+1. 立即切换到提案模式
+2. 禁止直接进入实现
+3. 如果需求不明确，先加载 `brainstorming`
+4. 如果需求明确，再创建 proposal / spec delta
+5. 提案获批后，才进入实现和 Git 分支阶段
 
 ### 1. 实现前先核查
 

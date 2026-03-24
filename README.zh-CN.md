@@ -138,6 +138,8 @@ npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxi
 
 如果项目原本已经有 `AGENTS.md` 或 `CLAUDE.md`，Praxis 只会追加或刷新 `<!-- PRAXIS_DEVOS_START -->` 到 `<!-- PRAXIS_DEVOS_END -->` 之间的托管区，不会覆盖区块外的人工内容。
 
+另外，Praxis 约定 `/change` 为显式提案主入口，`/proposal` 为兼容别名。它们的语义是“进入提案通道”，不是“直接开始实现”；如果需求不明确，应先进入 `brainstorming`，再决定完整提案或轻量提案。
+
 ## CLI
 
 以下示例假定 `praxis-devos` 已可直接调用；在当前未发布到 npm 的阶段，请将其替换为：

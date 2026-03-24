@@ -138,6 +138,8 @@ That compiled rules artifact also includes a dependency gate summary, so agents 
 
 If `AGENTS.md` or `CLAUDE.md` already exists, Praxis only appends or refreshes the managed block between `<!-- PRAXIS_DEVOS_START -->` and `<!-- PRAXIS_DEVOS_END -->`. User-owned content outside that block is preserved.
 
+Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. Those commands mean "enter the proposal path", not "start implementation immediately"; if the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
+
 ## CLI
 
 The examples below assume `praxis-devos` is directly available; while the package is unpublished on npm, replace it with:
