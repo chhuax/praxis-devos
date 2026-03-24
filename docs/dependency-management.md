@@ -7,6 +7,14 @@ Praxis DevOS 强依赖两类外部能力：
 
 这两类依赖的管理方式不同，不能混在一起处理。
 
+> 当前 `praxis-devos` 还未发布到 npm registry。
+>
+> 在正式发布前，文档里的 `praxis-devos ...` 命令都应通过 Git URL 执行，例如：
+>
+> ```bash
+> npm exec --yes --package=git+https://github.com/chhuax/praxis-devos.git -- praxis-devos doctor
+> ```
+
 ## 依赖分层
 
 ### OpenSpec
@@ -22,6 +30,12 @@ Praxis DevOS 强依赖两类外部能力：
 - 用途：提供 TDD、调试、验证、计划、子代理等能力
 - 特征：安装方式因 agent 不同而不同
 - 当前策略：按 agent 分别检测与引导安装
+
+说明：
+
+- Praxis 依赖的是 Superpowers 提供的执行能力集合
+- 其中 `verification-before-completion` 是框架硬要求
+- `test-driven-development` 是高风险变更的优先策略，但不是所有场景的强制要求
 
 ## 为什么不能把 Superpowers 放进 `.praxis/`
 

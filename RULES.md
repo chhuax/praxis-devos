@@ -2,7 +2,7 @@
 
 # Praxis DevOS 框架规则
 
-本项目强制执行 **OpenSpec (规范驱动开发)** 和 **TDD (测试驱动开发)**。
+本项目强制执行 **OpenSpec (规范驱动开发)** 和 **Verification (完成前验证)**。
 
 ## 1. 意图门控 — 收到任务时必须过此决策
 
@@ -18,7 +18,7 @@
 │   └─ 【轻量提案】加载 openspec skill → 只需 proposal.md + spec delta
 │
 ├─ Bug修复 / 拼写 / 格式 / 注释 / 非破坏性配置？
-│   └─ 【直接实现】加载 test-driven-development skill
+│   └─ 【直接实现】选择合适的验证策略 → 低风险可直接实现
 │
 └─ 不确定？ → 创建提案（更安全）
 ```
@@ -32,7 +32,7 @@
 | 需求模糊、方案探索 | `brainstorming` | SuperPowers |
 | 提案 / 规范 / 变更 / 归档 | `openspec` | 插件内置 |
 | 多步骤任务 → 生成计划 | `writing-plans` | SuperPowers |
-| **编写代码（强制）** | `test-driven-development` | SuperPowers |
+| 高风险代码变更 / 先写失败用例更划算 | `test-driven-development` | SuperPowers |
 | Bug / 测试失败 / 异常 | `systematic-debugging` | SuperPowers |
 | 多个独立子任务可并行 | `subagent-driven-development` | SuperPowers |
 | **即将完成（强制）** | `verification-before-completion` | SuperPowers |
@@ -42,13 +42,53 @@
 | 隔离工作区 | `using-git-worktrees` | SuperPowers |
 | 技术栈领域（数据库等） | 栈专属 skills（如 java-database） | 技术栈 |
 
-> **标记「强制」的 skill** 不可跳过：写代码 MUST 加载 TDD skill，标记完成 MUST 加载验证 skill。
+> **标记「强制」的 skill** 不可跳过：标记完成 MUST 加载验证 skill。TDD 是高价值策略，但不是全局硬门槛。
 
 ### Skill 优先级
 
 RULES.md 规则 > OpenSpec 工作流 > SuperPowers skills > 技术栈领域 skills
 
-## 3. 完成门控
+## 3. 测试策略选择
+
+写代码时，MUST 选择与风险相匹配的验证策略，而不是无差别强制 TDD。
+
+### 低风险变更
+
+- 文档、注释、格式调整
+- 小型非破坏性配置修改
+- 明确无业务逻辑变化的微调
+
+处理方式：
+
+- 可直接实现
+- 完成前执行最小必要验证
+
+### 中风险变更
+
+- 单模块逻辑调整
+- 非破坏性功能增强
+- 一般接口行为修改
+
+处理方式：
+
+- 应补充或更新测试
+- 是否采用 TDD，由上下文和收益决定
+- 完成前必须验证
+
+### 高风险变更
+
+- 核心业务逻辑
+- 回归风险高的 bug 修复
+- 边界条件复杂的改动
+- 跨模块行为变化
+
+处理方式：
+
+- SHOULD 优先使用 `test-driven-development`
+- 至少先构造失败用例、复现步骤或其他可重复验证手段
+- 完成前必须验证
+
+## 4. 完成门控
 
 即将标记任务完成时，MUST 加载 `verification-before-completion` skill 执行通用验收流程后，再执行以下项目额外检查：
 
@@ -62,7 +102,7 @@ RULES.md 规则 > OpenSpec 工作流 > SuperPowers skills > 技术栈领域 skil
 - [ ] 分支命名符合 `feature/` / `bugfix/` / `hotfix/` 规范
 - [ ] `git diff --check` 无冲突标记
 
-## 4. 沟通约定
+## 5. 沟通约定
 
 - 代码标识符：**英文**
 - 文档 / 注释 / 反馈：**中文**
