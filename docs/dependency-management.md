@@ -41,8 +41,8 @@ npx praxis-devos setup --agent codex --stack java-spring
 
 当前发布支持范围：
 
-- 发布支持：macOS、Linux
-- Windows：后续版本补齐，目前仍缺本地 OpenSpec runtime 与 Codex bootstrap 的专用处理
+- 发布支持：macOS、Linux、Windows PowerShell
+- Windows 下推荐通过 PowerShell 执行 `setup` / `bootstrap`，尤其是 Codex 的 SuperPowers junction 创建步骤
 
 ## 为什么不能把 Superpowers 放进 `.praxis/`
 
@@ -109,6 +109,11 @@ npx praxis-devos bootstrap --agent claude
 - `codex`：输出官方安装步骤
 - `claude`：输出官方 marketplace 安装命令
 
+而 `setup` 与 `bootstrap` 的区别是：
+
+- `setup`：会先检查，再实际执行 OpenSpec 安装、OpenCode 配置和 Codex SuperPowers 安装
+- `bootstrap`：只输出底层依赖引导，适合排障和手工修复
+
 ## OpenSpec
 
 OpenSpec 是 Praxis DevOS 的硬依赖，不再提供“无 OpenSpec 的降级初始化”。
@@ -131,6 +136,8 @@ npx praxis-devos openspec archive <change-id> --yes
 ```bash
 npm install -D @fission-ai/openspec
 ```
+
+但对大多数用户，这一步不需要单独执行，因为 `npx praxis-devos setup ...` 会先检查，缺失时再自动安装项目本地 OpenSpec。
 
 全局安装只作为兼容兜底：
 
@@ -155,13 +162,22 @@ OpenCode 当前采用项目级插件配置。`bootstrap --agent opencode` 会把
 
 ## Codex
 
-Codex 当前采用本地 clone + skills symlink 方式。
+Codex 当前采用本地 clone + skills link 方式。
 
-Praxis 的 `bootstrap --agent codex` 会输出官方推荐步骤：
+Praxis 的 `bootstrap --agent codex` 会按当前平台输出官方推荐步骤：
+
+### macOS / Linux
 
 1. clone superpowers 仓库到 `~/.codex/superpowers`
-2. 创建 `~/.agents/skills/superpowers` 指向其 `skills/`
+2. 创建 `~/.agents/skills/superpowers` 指向其 `skills/` 的 symlink
 3. 重启 Codex
+
+### Windows PowerShell
+
+1. clone superpowers 仓库到 `$HOME/.codex/superpowers`
+2. 创建 `$HOME/.agents/skills`
+3. 用 `New-Item -ItemType Junction` 建立 `$HOME/.agents/skills/superpowers`
+4. 重启 Codex
 
 参考：
 

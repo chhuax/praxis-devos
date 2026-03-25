@@ -22,6 +22,7 @@ export const PRAXIS_COMPILED_RULES = 'compiled-rules.md';
 export const PRAXIS_SKILLS_INDEX = 'INDEX.md';
 export const SUPERPOWERS_OPENCODE_PLUGIN = 'superpowers@git+https://github.com/obra/superpowers.git';
 export const PRAXIS_OPENCODE_PLUGIN = 'praxis-devos@git+https://github.com/chhuax/praxis-devos.git';
+const SUPERPOWERS_GIT_URL = 'https://github.com/obra/superpowers.git';
 export const OPENSPEC_PACKAGE = '@fission-ai/openspec';
 
 const SUPERPOWERS_DOCS = {
@@ -117,15 +118,20 @@ export const listDirs = (dirPath) => {
   }
 };
 
-export const commandExists = (cmd) => {
+const findCommandPath = (cmd) => {
   try {
     const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-    execFileSync(whichCmd, [cmd], { stdio: 'ignore' });
-    return true;
+    const stdout = execFileSync(whichCmd, [cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) || null;
   } catch {
-    return false;
+    return null;
   }
 };
+
+export const commandExists = (cmd) => Boolean(findCommandPath(cmd));
 
 const localExecutablePath = (projectDir, executable) => {
   const fileName = process.platform === 'win32' ? `${executable}.cmd` : executable;
@@ -143,12 +149,13 @@ const resolveOpenSpecRuntime = (projectDir) => {
     };
   }
 
-  if (commandExists('openspec')) {
+  const globalPath = findCommandPath('openspec');
+  if (globalPath) {
     return {
       status: 'ok',
       source: 'global',
-      command: 'openspec',
-      detail: 'OpenSpec CLI is available on PATH',
+      command: globalPath,
+      detail: `OpenSpec CLI is available on PATH via ${globalPath}`,
     };
   }
 
@@ -169,14 +176,43 @@ const run = (cmd, opts = {}) => {
   }
 };
 
+const isWindowsBatchScript = (cmd) => process.platform === 'win32'
+  && ['.cmd', '.bat'].includes(path.extname(cmd).toLowerCase());
+
+const quoteWindowsCmdArg = (value) => {
+  if (value.length === 0) {
+    return '""';
+  }
+
+  const escaped = value.replace(/"/g, '""');
+  return /[\s"&()<>^|]/.test(value) ? `"${escaped}"` : escaped;
+};
+
+const buildWindowsBatchCommand = (cmd, args) => [
+  quoteWindowsCmdArg(cmd),
+  ...args.map((arg) => quoteWindowsCmdArg(String(arg))),
+].join(' ');
+
 const runFile = (cmd, args, opts = {}) => {
   try {
-    const stdout = execFileSync(cmd, args, { encoding: 'utf8', timeout: 120_000, ...opts });
+    const execOpts = { encoding: 'utf8', timeout: 120_000, ...opts };
+    const stdout = isWindowsBatchScript(cmd)
+      ? execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', buildWindowsBatchCommand(cmd, args)], execOpts)
+      : execFileSync(cmd, args, execOpts);
     return { ok: true, stdout: stdout.trim(), stderr: '' };
   } catch (err) {
     return { ok: false, stdout: '', stderr: err.stderr?.trim() || err.message };
   }
 };
+
+const codexSuperpowersPaths = () => ({
+  skillsPath: path.join(os.homedir(), '.agents', 'skills', 'superpowers'),
+  skillsParent: path.join(os.homedir(), '.agents', 'skills'),
+  clonePath: path.join(os.homedir(), '.codex', 'superpowers'),
+  cloneParent: path.join(os.homedir(), '.codex'),
+});
+
+const resolveCommandForExecution = (cmd) => findCommandPath(cmd) || cmd;
 
 const ensureDir = (dirPath) => {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -878,9 +914,9 @@ export const setupProject = ({ projectDir, stackName = null, agents = SUPPORTED_
   const selectedAgents = uniqueAgents(agents);
   const outputs = [];
 
-  outputs.push(bootstrapOpenSpec({ projectDir }));
+  outputs.push(ensureOpenSpecRuntime(projectDir));
   outputs.push('');
-  outputs.push(bootstrapProject({ projectDir, agents: selectedAgents }));
+  outputs.push(ensureRuntimeDependencies({ projectDir, agents: selectedAgents }));
   outputs.push('');
 
   if (!isProjectInitialized(projectDir)) {
@@ -1252,9 +1288,58 @@ const detectOpenCodeSuperpowers = (projectDir) => {
     : { status: 'missing', detail: 'superpowers plugin not declared in opencode.json' };
 };
 
+const ensureOpenSpecRuntime = (projectDir) => {
+  const logs = [];
+  const current = resolveOpenSpecRuntime(projectDir);
+
+  if (current.status === 'ok') {
+    logs.push(`== openspec ==`);
+    logs.push(`⊘ OpenSpec already available (${current.source})`);
+    logs.push(`- ${current.detail}`);
+    return logs.join('\n');
+  }
+
+  if (!commandExists('npm')) {
+    throw new Error('npm is required to install OpenSpec automatically. Install npm, then rerun `npx praxis-devos setup --agent <name>`.');
+  }
+
+  const npmCommand = resolveCommandForExecution('npm');
+  const installResult = runFile(npmCommand, ['install', '-D', OPENSPEC_PACKAGE], {
+    cwd: projectDir,
+  });
+  if (!installResult.ok) {
+    throw new Error(`Automatic OpenSpec install failed: ${installResult.stderr}`);
+  }
+
+  const next = resolveOpenSpecRuntime(projectDir);
+  if (next.status !== 'ok') {
+    throw new Error(`OpenSpec install completed but runtime is still unavailable: ${next.detail}`);
+  }
+
+  logs.push('== openspec ==');
+  logs.push(`✓ Installed OpenSpec locally with npm (${OPENSPEC_PACKAGE})`);
+  logs.push(`- ${next.detail}`);
+  return logs.join('\n');
+};
+
+const ensureOpenCodeSuperpowers = (projectDir) => {
+  const paths = projectPaths(projectDir);
+  const config = readProjectJson(paths.opencodeConfigPath) || {};
+  const next = {
+    ...config,
+    plugin: [...new Set([
+      ...(Array.isArray(config.plugin) ? config.plugin : []),
+      PRAXIS_OPENCODE_PLUGIN,
+      SUPERPOWERS_OPENCODE_PLUGIN,
+    ])],
+  };
+
+  writeProjectJson(paths.opencodeConfigPath, next);
+  return `Configured OpenCode plugins in ${paths.opencodeConfigPath}`;
+};
+
 const detectCodexSuperpowers = () => {
-  const skillsPath = path.join(os.homedir(), '.agents', 'skills', 'superpowers');
-  const clonePath = path.join(os.homedir(), '.codex', 'superpowers');
+  const { skillsPath, clonePath } = codexSuperpowersPaths();
 
   if (fs.existsSync(skillsPath)) {
     return {
@@ -1276,10 +1361,89 @@ const detectCodexSuperpowers = () => {
   };
 };
 
+const ensureCodexSuperpowers = () => {
+  const { skillsPath, skillsParent, clonePath, cloneParent } = codexSuperpowersPaths();
+  const logs = [];
+
+  const current = detectCodexSuperpowers();
+  if (current.status === 'ok') {
+    logs.push(`⊘ Codex SuperPowers already installed at ${skillsPath}`);
+    return logs.join('\n');
+  }
+
+  if (!commandExists('git')) {
+    throw new Error('Git is required to install Codex SuperPowers automatically. Install Git, then rerun `npx praxis-devos setup --agent codex`.');
+  }
+
+  ensureDir(cloneParent);
+  ensureDir(skillsParent);
+
+  if (!fs.existsSync(clonePath)) {
+    const cloneResult = runFile('git', ['clone', SUPERPOWERS_GIT_URL, clonePath]);
+    if (!cloneResult.ok) {
+      throw new Error(`Automatic Codex SuperPowers clone failed: ${cloneResult.stderr}`);
+    }
+    logs.push(`✓ Cloned Codex SuperPowers to ${clonePath}`);
+  } else {
+    logs.push(`⊘ Codex SuperPowers clone already exists at ${clonePath}`);
+  }
+
+  const targetPath = path.join(clonePath, 'skills');
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`Codex SuperPowers clone is incomplete: missing ${targetPath}`);
+  }
+
+  if (!fs.existsSync(skillsPath)) {
+    try {
+      fs.symlinkSync(targetPath, skillsPath, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (err) {
+      throw new Error(`Automatic Codex SuperPowers link creation failed: ${err.message}`);
+    }
+    logs.push(`✓ Linked Codex SuperPowers skills at ${skillsPath}`);
+  } else {
+    logs.push(`⊘ Codex SuperPowers skills link already exists at ${skillsPath}`);
+  }
+
+  const next = detectCodexSuperpowers();
+  if (next.status !== 'ok') {
+    throw new Error(`Codex SuperPowers installation did not validate: ${next.detail}`);
+  }
+
+  return logs.join('\n');
+};
+
 const detectClaudeSuperpowers = () => ({
   status: 'unknown',
   detail: 'Claude marketplace installations are not portably detectable from the project workspace',
 });
+
+const ensureRuntimeDependencies = ({ projectDir, agents }) => {
+  const logs = [];
+  const selectedAgents = uniqueAgents(agents);
+
+  for (const agent of selectedAgents) {
+    if (agent === 'opencode') {
+      logs.push(`== ${agent} ==`);
+      logs.push(ensureOpenCodeSuperpowers(projectDir));
+      continue;
+    }
+
+    if (agent === 'codex') {
+      logs.push(`== ${agent} ==`);
+      logs.push(ensureCodexSuperpowers());
+      continue;
+    }
+
+    if (agent === 'claude') {
+      logs.push(`== ${agent} ==`);
+      logs.push('Claude Code SuperPowers cannot be installed automatically from Praxis.');
+      logs.push(renderBootstrapInstructions({ projectDir, agent }));
+      continue;
+    }
+  }
+
+  return logs.join('\n');
+};
 
 const detectSuperpowersForAgent = (projectDir, agent) => {
   if (agent === 'opencode') {
@@ -1335,6 +1499,21 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
   }
 
   if (agent === 'codex') {
+    if (process.platform === 'win32') {
+      return [
+        'Follow the official Codex installation steps for Superpowers (PowerShell):',
+        `- Reference: ${SUPERPOWERS_DOCS.codex}`,
+        '- Clone the repo:',
+        '  git clone https://github.com/obra/superpowers.git "$HOME/.codex/superpowers"',
+        '- Create the skills directory:',
+        '  New-Item -ItemType Directory -Force "$HOME/.agents/skills" | Out-Null',
+        '- Link the skills directory (junction avoids Windows symlink privilege issues):',
+        '  New-Item -ItemType Junction -Path "$HOME/.agents/skills/superpowers" -Target "$HOME/.codex/superpowers/skills"',
+        '- Restart Codex',
+        '- Optional: enable multi-agent in Codex config if you want subagent skills',
+      ].join('\n');
+    }
+
     return [
       'Follow the official Codex installation steps for Superpowers:',
       `- Reference: ${SUPERPOWERS_DOCS.codex}`,

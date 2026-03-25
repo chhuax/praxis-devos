@@ -79,8 +79,8 @@ Read Quick Start by scenario, not by internal command layering.
 
 Current release target:
 
-- Supported for release: macOS, Linux
-- Windows support is being tracked as a follow-up release because local OpenSpec runtime execution and Codex bootstrap guidance still need Windows-specific handling
+- Supported for release: macOS, Linux, Windows PowerShell
+- On Windows, use PowerShell for Codex bootstrap so the generated SuperPowers junction commands work as documented
 
 ### 1. New project, Codex + Java Spring
 
@@ -117,6 +117,12 @@ npx praxis-devos setup --agent claude
 npx praxis-devos doctor --strict
 ```
 
+Claude Code still requires one manual marketplace step after `setup`:
+
+```text
+/plugin install superpowers@claude-plugins-official
+```
+
 ### 5. Multi-agent from day one
 
 ```bash
@@ -128,7 +134,8 @@ What `setup` does:
 
 - create or refresh `openspec/`
 - create canonical `.praxis/`
-- install or repair dependency guidance for OpenSpec and the selected agents
+- install or reuse OpenSpec
+- auto-configure or auto-install supported runtime dependencies for the selected agents
 - copy customizable skills into `.praxis/skills/`
 - mirror framework gates into `.praxis/framework-rules.md`
 - sync adapters for the selected agents
@@ -142,7 +149,7 @@ Important command roles:
 - `bootstrap` remains available as an advanced repair/debug command
 - `sync` remains available when you want to refresh adapters explicitly after manual edits
 
-`setup` is the recommended onboarding command, but it does not fully automate every runtime install. For Codex and Claude Code, it prepares the project, prints the required SuperPowers installation steps, and then `doctor --strict` verifies what still needs manual confirmation.
+`setup` is the recommended onboarding command. It auto-configures OpenCode, auto-installs Codex SuperPowers, and leaves only Claude Code on a manual marketplace path that still needs user confirmation.
 
 ### 2. Fill in project context
 

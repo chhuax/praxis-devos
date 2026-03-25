@@ -40,6 +40,35 @@ const withTempPath = (binDir, fn) => {
   }
 };
 
+const withPlatform = (platform, fn) => {
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: platform });
+  try {
+    return fn();
+  } finally {
+    Object.defineProperty(process, 'platform', descriptor);
+  }
+};
+
+const withEnv = (name, value, fn) => {
+  const previous = process.env[name];
+  if (value == null) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+
+  try {
+    return fn();
+  } finally {
+    if (previous == null) {
+      delete process.env[name];
+    } else {
+      process.env[name] = previous;
+    }
+  }
+};
+
 const installFakeOpenSpec = (projectDir) => {
   const binDir = path.join(projectDir, 'fake-bin');
   const scriptPath = path.join(binDir, 'openspec');
@@ -77,6 +106,130 @@ echo "${label}:$*"
   );
   fs.chmodSync(scriptPath, 0o755);
   return scriptPath;
+};
+
+const installFakeWindowsOpenSpec = (projectDir, location = 'local') => {
+  const baseDir = location === 'local'
+    ? path.join(projectDir, 'node_modules', '.bin')
+    : path.join(projectDir, 'fake-win-bin');
+  const scriptPath = path.join(baseDir, 'openspec.cmd');
+  fs.mkdirSync(baseDir, { recursive: true });
+  fs.writeFileSync(scriptPath, '@echo off\r\n');
+  return scriptPath;
+};
+
+const installFakeWhere = (projectDir, resolvedPath) => {
+  const binDir = path.join(projectDir, 'fake-where-bin');
+  const scriptPath = path.join(binDir, 'where');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "openspec" ]; then
+  printf '%s\\n' "${resolvedPath}"
+  exit 0
+fi
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return binDir;
+};
+
+const installFakeWhich = (projectDir, openspecPath = null) => {
+  const binDir = path.join(projectDir, 'fake-which-bin');
+  const scriptPath = path.join(binDir, 'which');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "openspec" ]; then
+  if [ -n "${openspecPath || ''}" ]; then
+    printf '%s\\n' "${openspecPath || ''}"
+    exit 0
+  fi
+  exit 1
+fi
+/usr/bin/which "$@"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return binDir;
+};
+
+const installFakeCmdShell = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-cmd-bin');
+  const scriptPath = path.join(binDir, 'cmd-shim');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+printf '%s' "$4"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
+const installFakeGit = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-git-bin');
+  const scriptPath = path.join(binDir, 'git');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "clone" ]; then
+  target="$3"
+  mkdir -p "$target/skills"
+  exit 0
+fi
+echo "unsupported git invocation: $*" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return binDir;
+};
+
+const installFakeNpm = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-npm-bin');
+  const scriptPath = path.join(binDir, 'npm');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
+  mkdir -p "$PWD/node_modules/.bin"
+  cat > "$PWD/node_modules/.bin/openspec" <<'EOF'
+#!/bin/sh
+set -eu
+cmd="$1"
+target="$2"
+if [ "$cmd" = "init" ]; then
+  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
+  exit 0
+fi
+echo "LOCAL:$*"
+EOF
+  chmod +x "$PWD/node_modules/.bin/openspec"
+  exit 0
+fi
+echo "unsupported npm invocation: $*" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return binDir;
 };
 
 const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -256,26 +409,72 @@ test('useStackProject applies a stack after framework init', () => {
   });
 });
 
-test('setupProject bootstraps, initializes, and applies a requested stack', () => {
+test('setupProject installs Codex superpowers, initializes, and applies a requested stack', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-'));
 
-  withTempPath(fakeBinDir, () => {
+  withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
     const output = setupProject({
       projectDir,
       stackName: 'java-spring',
-      agents: ['opencode'],
+      agents: ['opencode', 'codex'],
     });
 
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const codexSkillsPath = path.join(fakeHomeDir, '.agents', 'skills', 'superpowers');
+
     assert.match(output, /== openspec ==/);
     assert.match(output, /== opencode ==/);
+    assert.match(output, /Configured OpenCode plugins/);
+    assert.match(output, /== codex ==/);
+    assert.match(output, /Cloned Codex SuperPowers/);
+    assert.match(output, /Linked Codex SuperPowers skills/);
     assert.match(output, /== setup ==/);
     assert.match(output, /Dependency doctor:/);
     assert.equal(manifest.selectedStack, 'java-spring');
     assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
-  });
+    assert.ok(fs.existsSync(codexSkillsPath));
+    assert.doesNotMatch(output, /\[MISSING\] superpowers:codex/);
+  })));
+});
+
+test('setupProject installs OpenSpec locally when runtime is missing', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-install-openspec-'));
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeWhichDir = installFakeWhich(projectDir, null);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-install-'));
+
+  withTempPath(fakeWhichDir, () => withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec')));
+  }))));
+});
+
+test('setupProject skips OpenSpec install when project-local runtime already exists', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-existing-openspec-'));
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-existing-'));
+  installFakeProjectLocalOpenSpec(projectDir, 'LOCAL');
+
+  withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /OpenSpec already available \(project-local\)/);
+    assert.doesNotMatch(output, /Installed OpenSpec locally with npm/);
+  })));
 });
 
 test('initProject repairs incomplete skill directories instead of skipping them', () => {
@@ -409,6 +608,21 @@ test('bootstrapProject updates opencode config and prints agent-specific guidanc
   assert.match(output, /\/plugin install superpowers@claude-plugins-official/);
 });
 
+test('bootstrapProject prints PowerShell Codex guidance on Windows', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bootstrap-win-'));
+
+  withPlatform('win32', () => {
+    const output = bootstrapProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /PowerShell/);
+    assert.match(output, /New-Item -ItemType Junction/);
+    assert.doesNotMatch(output, /ln -s ~\/\.codex\/superpowers\/skills/);
+  });
+});
+
 test('bootstrapOpenSpec reports project-local runtime when available', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-bootstrap-'));
   installFakeProjectLocalOpenSpec(projectDir);
@@ -417,6 +631,18 @@ test('bootstrapOpenSpec reports project-local runtime when available', () => {
   assert.match(output, /OpenSpec already available \(project-local\)/);
   assert.match(output, /npx praxis-devos openspec list --specs/);
   assert.match(output, /praxis-devos openspec list --specs/);
+});
+
+test('bootstrapOpenSpec reports Windows project-local cmd runtime when available', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win local-'));
+
+  withPlatform('win32', () => {
+    const scriptPath = installFakeWindowsOpenSpec(projectDir, 'local');
+    const output = bootstrapOpenSpec({ projectDir });
+
+    assert.match(output, /OpenSpec already available \(project-local\)/);
+    assert.match(output, new RegExp(scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  });
 });
 
 test('runOpenSpecCommand prefers project-local runtime over PATH', () => {
@@ -431,6 +657,43 @@ test('runOpenSpecCommand prefers project-local runtime over PATH', () => {
     });
 
     assert.equal(output, 'LOCAL:list --specs');
+  });
+});
+
+test('runOpenSpecCommand uses cmd wrapper for Windows project-local openspec.cmd', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win run-'));
+
+  withPlatform('win32', () => {
+    const scriptPath = installFakeWindowsOpenSpec(projectDir, 'local');
+    const cmdShell = installFakeCmdShell(projectDir);
+
+    withEnv('ComSpec', cmdShell, () => {
+      const output = runOpenSpecCommand({
+        projectDir,
+        args: ['list', '--specs'],
+      });
+
+      assert.match(output, new RegExp(`"${scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" list --specs`));
+    });
+  });
+});
+
+test('runOpenSpecCommand uses resolved PATH batch runtime on Windows', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win path-'));
+
+  withPlatform('win32', () => {
+    const globalCmdPath = installFakeWindowsOpenSpec(projectDir, 'global');
+    const whereBin = installFakeWhere(projectDir, globalCmdPath);
+    const cmdShell = installFakeCmdShell(projectDir);
+
+    withTempPath(whereBin, () => withEnv('ComSpec', cmdShell, () => {
+      const output = runOpenSpecCommand({
+        projectDir,
+        args: ['validate', 'add-auth', '--strict'],
+      });
+
+      assert.match(output, new RegExp(`"${globalCmdPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" validate add-auth --strict`));
+    }));
   });
 });
 

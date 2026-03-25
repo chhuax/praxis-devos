@@ -59,6 +59,23 @@ node bin/praxis-devos.js sync
 - **Commit Messages**: Conventional Commits, e.g. `feat(cli): add migrate command`
 - **Focus**: Keep pull requests granular
 
+### CLI Product Contract
+
+Contributors changing onboarding, dependency handling, or CLI UX must preserve these rules:
+
+1. Strong dependencies that Praxis can install automatically must be installed automatically
+2. Manual user actions must appear in the main README path, not be hidden behind a later `doctor` run
+3. `setup` is the user-facing onboarding contract and must not pretend a runtime is ready if Praxis only printed instructions
+4. `doctor` is for verification and debugging, not for revealing the first critical missing step
+5. If a runtime still requires manual action, `setup` output must say so explicitly
+
+Current expectation:
+
+- OpenSpec: automatic
+- Codex SuperPowers: automatic
+- OpenCode project config: automatic
+- Claude Code marketplace install: manual, but documented and explicitly surfaced
+
 ## Pull Request Process
 
 1. Fork the repository

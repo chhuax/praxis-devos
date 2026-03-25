@@ -11,6 +11,23 @@
 - `bootstrap` 保留为高级 / 修复命令，不再作为 Quick Start 主入口
 - README 第一屏按场景给命令，不按内部依赖分层给命令
 
+## 产品契约
+
+所有面向用户的命令设计，都必须遵守下面这组产品契约：
+
+1. 能自动完成的强依赖，Praxis 必须直接完成，不要甩给用户
+2. 不能自动完成的步骤，必须出现在 README 的主路径里，而不是让用户跑完以后再靠 `doctor` 才知道
+3. `setup` 必须优先承担 onboarding 责任，不能只是打印一堆底层命令然后假装“已完成安装”
+4. `doctor` 的职责是验证和排障，不是第一次揭示关键缺口
+5. 如果某个 runtime 只能手工完成安装，`setup` 结束时必须显式输出 `Manual action required`
+
+当前命令面的具体要求：
+
+- `OpenSpec`：强依赖，Praxis 直接安装或直接调用，不要求用户单独理解
+- `Codex SuperPowers`：强依赖，Praxis 直接安装
+- `OpenCode` 配置：Praxis 直接写入
+- `Claude Code` marketplace 安装：保留为手工步骤，但必须在 README 和命令输出中明确写出
+
 ## 用户可见命令
 
 ### 主入口

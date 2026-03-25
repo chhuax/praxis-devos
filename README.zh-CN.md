@@ -79,8 +79,8 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCo
 
 当前这个发布版本的支持范围：
 
-- 发布支持：macOS、Linux
-- Windows 作为后续版本补齐，因为本地 OpenSpec runtime 调用和 Codex bootstrap 还需要补 Windows 专用处理
+- 发布支持：macOS、Linux、Windows PowerShell
+- Windows 下如果要接入 Codex，请优先使用 PowerShell，以便直接执行生成的 SuperPowers junction 指令
 
 ### 1. 全新项目，Codex + Java Spring，一次接入
 
@@ -117,6 +117,12 @@ npx praxis-devos setup --agent claude
 npx praxis-devos doctor --strict
 ```
 
+Claude Code 在 `setup` 之后仍然需要补一条 marketplace 手工步骤：
+
+```text
+/plugin install superpowers@claude-plugins-official
+```
+
 ### 5. 从第一天就启用多 agent
 
 ```bash
@@ -128,7 +134,8 @@ npx praxis-devos doctor --strict
 
 - 创建或刷新 `openspec/`
 - 创建 canonical `.praxis/`
-- 安装或修复 OpenSpec 与所选 agent 的依赖引导
+- 安装或复用 OpenSpec
+- 自动配置或自动安装所选 agent 可自动处理的 runtime 依赖
 - 把可自定义 skills 安装到 `.praxis/skills/`
 - 把框架门控规则写入 `.praxis/framework-rules.md`
 - 同步所选 agent 的适配入口
@@ -142,7 +149,7 @@ npx praxis-devos doctor --strict
 - `bootstrap` 保留为高级修复 / 调试命令
 - `sync` 保留为手工调整后刷新 adapters 的命令
 
-`setup` 是推荐 onboarding 命令，但它并不等于“所有 runtime 都能一条命令全自动装完”。对 Codex 和 Claude Code，它会把项目侧准备好，输出 SuperPowers 安装指引，再由 `doctor --strict` 暴露仍需人工确认的缺口。
+`setup` 是推荐 onboarding 命令。它会自动配置 OpenCode、自动安装 Codex SuperPowers，只有 Claude Code 仍然保留为需要用户在 marketplace 手工确认的路径。
 
 ### 2. 补充项目上下文
 
