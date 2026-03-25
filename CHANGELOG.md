@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-03-25
+
+### Added
+- `praxis-devos validate-session` for evidence-based transcript validation against Praxis event hooks
+- Transcript fixtures and regression coverage for both passing and missing-hook session flows
+- Dedicated release notes for the new SuperPowers hook and transcript validation workflow
+
+### Changed
+- Managed AI entry blocks are now rendered from an external template instead of hardcoded JS text
+- Proposal routing now uses a lightweight `Proposal Intake` step before escalating to `brainstorming`
+- Framework rules now model SuperPowers as event-driven hooks for planning, debugging, parallel work, and completion verification
+- User-facing command examples are normalized to `npx praxis-devos ...` so local CLI usage is the documented default
+
+### Fixed
+- `init` now repairs incomplete `.praxis/skills/` installs instead of skipping pre-existing empty skill directories
+- Documentation no longer implies that bare `praxis-devos ...` commands work without a global install
+
 ## [0.2.5] - 2026-03-25
 
 ### Changed
