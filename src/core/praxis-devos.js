@@ -559,6 +559,7 @@ const renderProjectSkillsSection = (projectDir) => {
     '## 项目 Skills',
     '',
     '- canonical source: `.praxis/skills/`',
+    '- `.opencode/skills/` 可作为 OpenCode supplemental layer，但不属于 canonical project state',
     '- 完整索引：`.praxis/skills/INDEX.md`',
     '',
     '当前已安装 skills：',
@@ -568,10 +569,8 @@ const renderProjectSkillsSection = (projectDir) => {
   return lines.join('\n');
 };
 
-function renderDependencyGateSummary(projectDir, entryAgent = null) {
+function renderDependencyGateSummary(projectDir) {
   const openspecRuntime = resolveOpenSpecRuntime(projectDir);
-  const currentAgent = entryAgent && SUPPORTED_AGENTS.includes(entryAgent) ? entryAgent : null;
-  const currentAgentDetection = currentAgent ? detectSuperpowersForAgent(projectDir, currentAgent) : null;
 
   const lines = [
     '## 全局硬门禁',
@@ -581,23 +580,16 @@ function renderDependencyGateSummary(projectDir, entryAgent = null) {
       : '- OpenSpec 不可用；先执行 `npx praxis-devos bootstrap --openspec`，不要直接进入提案、校验或归档。',
   ];
 
-  if (currentAgent && currentAgentDetection) {
-    if (currentAgentDetection.status === 'ok') {
-      lines.push(`- 当前入口按 \`${currentAgent}\` 处理；Superpowers 已可用。`);
-    } else {
-      lines.push(`- 当前入口按 \`${currentAgent}\` 处理；若要继续工作，先执行 \`npx praxis-devos bootstrap --agent ${currentAgent}\`\u3002`);
-    }
-  } else {
-    lines.push('- 若当前运行环境缺少所需 Superpowers，先执行 `npx praxis-devos bootstrap --agent <current-agent>`，再继续工作。');
-  }
-
-  lines.push('- 缺少当前运行环境所需依赖时，先停止实现并完成 bootstrap。');
+  lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
+  lines.push('- Codex：`npx praxis-devos bootstrap --agent codex`');
+  lines.push('- Claude Code：`npx praxis-devos bootstrap --agent claude`');
+  lines.push('- OpenCode：`npx praxis-devos bootstrap --agent opencode`');
   lines.push('- 标记完成前，必须执行验证门控；若当前任务属于 OpenSpec change，还必须执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`。');
 
   return lines.join('\n');
 }
 
-const renderManagedRulesBlock = (projectDir, entryAgent = null) => {
+const renderManagedRulesBlock = (projectDir) => {
   const paths = projectPaths(projectDir);
 
   const sections = [
@@ -607,7 +599,8 @@ const renderManagedRulesBlock = (projectDir, entryAgent = null) => {
     '## AI Dispatch',
     '',
     '- 你当前位于一个由 Praxis DevOS 管理的项目中。',
-    '- canonical project state 只认 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 私有目录视为事实来源。',
+    '- 项目 canonical source 位于 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 适配目录视为规范事实来源。',
+    '- `.opencode/skills/` 仍可作为 OpenCode supplemental layer，但它不是项目规范的 canonical source。',
     '- 先决定当前任务属于 proposal、implementation、review 中的哪一条流程，不要直接开始实现。',
     '',
     '## Flow Selection',
@@ -623,7 +616,7 @@ const renderManagedRulesBlock = (projectDir, entryAgent = null) => {
     '- implementation flow: 先读取 `.praxis/rules.md`；需要项目 skill 时，先读取 `.praxis/skills/INDEX.md`，再打开对应 `SKILL.md`。',
     '- review flow: 先读取 `.praxis/rules.md`；如涉及评审流程或提案关联，再读取对应 skill 与 OpenSpec 文件。',
     '',
-    renderDependencyGateSummary(projectDir, entryAgent),
+    renderDependencyGateSummary(projectDir),
     '',
     renderProjectSkillsSection(projectDir),
     '',
@@ -681,7 +674,7 @@ const syncCodexAdapter = ({ projectDir, log }) => {
     paths.rootAgentsMd,
     AGENTS_MANAGED_START,
     AGENTS_MANAGED_END,
-    renderManagedRulesBlock(projectDir, 'codex'),
+    renderManagedRulesBlock(projectDir),
     AGENTS_MD_TEMPLATE,
   );
 
@@ -694,7 +687,7 @@ const syncClaudeAdapter = ({ projectDir, log }) => {
     paths.rootClaudeMd,
     CLAUDE_MANAGED_START,
     CLAUDE_MANAGED_END,
-    renderManagedRulesBlock(projectDir, 'claude'),
+    renderManagedRulesBlock(projectDir),
     CLAUDE_MD_TEMPLATE,
   );
 
