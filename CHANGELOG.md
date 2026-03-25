@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-03-25
+
+### Changed
+- Shrunk the Praxis-managed block in `AGENTS.md` / `CLAUDE.md` into a routing summary instead of inlining full framework and stack rule bodies
+- Tightened gate semantics so proposal work must read `openspec/AGENTS.md`, code work must read `.praxis/rules.md`, and skill selection must read `.praxis/skills/INDEX.md`
+
+### Fixed
+- Downstream projects no longer get several-hundred-line managed blocks filled with full stack rule text such as Spring Boot conventions
+
 ## [0.2.3] - 2026-03-25
 
 ### Added
