@@ -228,6 +228,7 @@ The documentation system should separate product entrypoints from internal archi
   - workflow model
   - evidence model
   - native projection model
+  - workflow routing model
 
 - future `docs/security/`
   - automatic installs
