@@ -6,5 +6,5 @@
 
 ## 2. 验证与检查
 - [ ] 2.1 [特定功能验证步骤]
-- [ ] 2.2 运行 `praxis-devos openspec validate [change-id] --strict` 验证提案格式
+- [ ] 2.2 运行 `npx praxis-devos openspec validate [change-id] --strict` 验证提案格式
 - [ ] 2.3 检查 `lsp_diagnostics` 确保无新增 IDE 错误

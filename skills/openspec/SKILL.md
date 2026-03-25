@@ -31,20 +31,21 @@ triggers:
 
 - `/change` 是显式提案主入口，`/proposal` 是兼容别名
 - 这两个入口表示“进入提案通道”，不是“直接开始实现”
-- 所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`
+- 进入提案通道后，MUST 显式加载本 `openspec` skill，而不是只依赖 `openspec/AGENTS.md` 的最小规则文本
+- 所有 OpenSpec 命令统一使用 `npx praxis-devos openspec ...`
 - 不要直接调用裸 `openspec ...`
 - 提案是否需要，按变更风险判断
-- 框架层强制的是规范治理和完成前验证，不强制所有代码改动都走 TDD
+- 框架层强制的是规范治理、关键管控 skill 加载和完成前验证；技术栈 skill 继续按需加载，不强制所有代码改动都走 TDD
 
 ## 快速参考
 
 ```bash
-praxis-devos change --title "Add two factor auth" --capability auth
-praxis-devos openspec list
-praxis-devos openspec list --specs
-praxis-devos openspec show <id>
-praxis-devos openspec validate <id> --strict --no-interactive
-praxis-devos openspec archive <id> --yes
+npx praxis-devos change --title "Add two factor auth" --capability auth
+npx praxis-devos openspec list
+npx praxis-devos openspec list --specs
+npx praxis-devos openspec show <id>
+npx praxis-devos openspec validate <id> --strict --no-interactive
+npx praxis-devos openspec archive <id> --yes
 ```
 
 ## 使用步骤
@@ -55,17 +56,23 @@ praxis-devos openspec archive <id> --yes
 
 1. 立即切换到提案模式
 2. 禁止直接进入实现
-3. 如果需求不明确，先加载 `brainstorming`
-4. 如果需求明确，可直接运行 `praxis-devos change --title ... --capability ...`
-5. 或手工创建 proposal / spec delta
-6. 提案获批后，才进入实现和 Git 分支阶段
+3. 先做一次轻量 `Proposal Intake`，优先基于现有上下文提取，不要一上来机械盘问用户
+4. `Proposal Intake` 至少要收敛出：
+   - `change target`
+   - `intended behavior`
+   - `scope/risk`
+   - `open questions`
+5. 如果 `open questions` 为空或不阻塞提案，可直接运行 `npx praxis-devos change --title ... --capability ...`
+6. 如果 `open questions` 仍阻塞提案，或存在多种可行方案 / 架构分歧，再升级加载 `brainstorming`
+7. 或手工创建 proposal / spec delta
+8. 提案获批后，才进入实现和 Git 分支阶段；若当前已在该 change 的专用实现分支，可继续复用，否则再创建 / 切换
 
 ### 1. 实现前先核查
 
 在编写任何非平凡代码之前，按顺序执行：
 
-1. `praxis-devos openspec list --specs`
-2. `praxis-devos openspec list`
+1. `npx praxis-devos openspec list --specs`
+2. `npx praxis-devos openspec list`
 3. 阅读 `openspec/project.md`
 4. 如已有相关规范，优先修改现有能力，不要创建重复能力
 
@@ -82,6 +89,22 @@ praxis-devos openspec archive <id> --yes
 └─ 不确定？
     └─ 按完整提案处理
 ```
+
+### Proposal Intake 协议
+
+proposal 模式下，先执行轻量 intake，而不是立刻提一串问题。AI 应先根据用户原话和已有上下文自行提取：
+
+1. `change target`：本次变更作用到哪个 capability / 模块 / API
+2. `intended behavior`：预期新增、修改或移除什么行为
+3. `scope/risk`：影响范围、非目标、约束、潜在风险
+4. `open questions`：仍然阻塞提案创建的关键缺口或分歧
+
+处理规则：
+
+- 如果前 3 项足以支撑提案，且 `open questions` 不阻塞提案创建，可直接继续
+- 如果 `open questions` 为空，不需要额外追问用户
+- 如果 `open questions` 存在阻塞性缺口，应先用最少问题补齐
+- 如果问题已不是单点缺口，而是涉及多种可行方案、边界取舍或架构分歧，再升级进入 `brainstorming`
 
 ### 3. 创建提案
 
@@ -152,13 +175,13 @@ openspec/changes/<change-id>/
 
 1. 阅读 `proposal.md`
 2. 阅读 `design.md`（如有）
-3. 如提案已批准并准备实现，加载 `git-workflow` 并创建实现分支
+3. 如提案已批准并准备实现，先检查当前 Git 分支；若已在该 change 的专用实现分支，可直接继续，否则加载 `git-workflow` 并创建实现分支
 4. 如存在 `tasks.md`，按任务顺序实施
 5. 多步骤任务可加载 `writing-plans`
 6. Bug 或测试失败时加载 `systematic-debugging`
 7. 多个独立子任务可加载 `subagent-driven-development`
 
-提案创建本身不强制立刻创建 Git 分支；更合理的边界是“提案批准后、开始实现前”再开分支。分支名 SHOULD 优先复用 `change-id`，例如 `feature/add-two-factor-auth`。
+提案创建本身不强制立刻创建 Git 分支；更合理的边界是“提案批准后、开始实现前”再开分支。若用户已经在与当前 change 对应的专用实现分支，则 SHOULD 直接复用该分支，而不是重复切分支。分支名 SHOULD 优先复用 `change-id`，例如 `feature/add-two-factor-auth`。
 
 测试策略按风险选择：
 
@@ -173,7 +196,7 @@ openspec/changes/<change-id>/
 请求批准前或准备进入实现前，执行：
 
 ```bash
-praxis-devos openspec validate <change-id> --strict --no-interactive
+npx praxis-devos openspec validate <change-id> --strict --no-interactive
 ```
 
 常见错误：
@@ -188,7 +211,7 @@ praxis-devos openspec validate <change-id> --strict --no-interactive
 需要排查 delta 解析时：
 
 ```bash
-praxis-devos openspec show <change-id> --json --deltas-only
+npx praxis-devos openspec show <change-id> --json --deltas-only
 ```
 
 ### 7. 归档
@@ -196,7 +219,7 @@ praxis-devos openspec show <change-id> --json --deltas-only
 实现完成并部署后，执行：
 
 ```bash
-praxis-devos openspec archive <change-id> --yes
+npx praxis-devos openspec archive <change-id> --yes
 ```
 
 归档通常应发生在代码已经合并之后，而不是提案刚写完或 PR 尚未合并时。

@@ -5,6 +5,8 @@ import os from 'os';
 import path from 'path';
 
 import {
+  PRAXIS_ROOT,
+  analyzeSessionTranscript,
   bootstrapOpenSpec,
   bootstrapProject,
   collectSkillsPaths,
@@ -17,6 +19,7 @@ import {
   runCli,
   statusProject,
   syncProject,
+  validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
 
 const makeTempProject = () => {
@@ -80,6 +83,7 @@ test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
   assert.match(help, /change\s+Create an OpenSpec change scaffold/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
+  assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
 });
 
 test('createChangeScaffold creates a full change by default', () => {
@@ -165,14 +169,41 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(agentsMd, /implementation flow/);
     assert.match(agentsMd, /review flow/);
     assert.match(agentsMd, /OpenSpec 命令统一通过 `npx praxis-devos openspec/);
-    assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`/);
-    assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`/);
+    assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`，然后必须加载 `openspec` skill/);
+    assert.match(agentsMd, /先做轻量 `Proposal Intake`/);
+    assert.match(agentsMd, /`change target`、`intended behavior`、`scope\/risk`、`open questions`/);
+    assert.match(agentsMd, /才升级进入 `brainstorming`/);
+    assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`；如果当前工作来自已批准 proposal/);
+    assert.match(agentsMd, /技术栈 skill 保持按需加载/);
+    assert.match(agentsMd, /`openspec`、`git-workflow`、`verification-before-completion` 是硬门禁/);
+    assert.match(agentsMd, /`brainstorming`、`writing-plans`、`systematic-debugging`、`subagent-driven-development` 则由/);
     assert.match(agentsMd, /`\.opencode\/skills\/` 仍可作为 OpenCode supplemental layer/);
     assert.match(agentsMd, /Codex：`npx praxis-devos bootstrap --agent codex`/);
     assert.match(agentsMd, /Claude Code：`npx praxis-devos bootstrap --agent claude`/);
     assert.match(agentsMd, /OpenCode：`npx praxis-devos bootstrap --agent opencode`/);
     assert.doesNotMatch(agentsMd, /当前入口按 `codex` 处理/);
     assert.doesNotMatch(agentsMd, /Spring Boot 代码组织/);
+  });
+});
+
+test('initProject repairs incomplete skill directories instead of skipping them', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-repair-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  fs.mkdirSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow'), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, '.praxis', 'skills', 'java-security'), { recursive: true });
+
+  withTempPath(fakeBinDir, () => {
+    const output = initProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['codex'],
+    });
+
+    assert.match(output, /repaired from framework defaults/);
+    assert.match(output, /repaired from java-spring/);
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
   });
 });
 
@@ -318,4 +349,44 @@ test('collectSkillsPaths still supports legacy opencode-only projects', () => {
 
   const paths = collectSkillsPaths(projectDir);
   assert.ok(paths.includes(path.join(projectDir, '.opencode', 'skills')));
+});
+
+test('analyzeSessionTranscript recognizes SuperPowers event-hook evidence', () => {
+  const fixturePath = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'valid-session.md');
+  const result = analyzeSessionTranscript(fs.readFileSync(fixturePath, 'utf8'));
+
+  assert.equal(result.status, 'pass');
+  assert.equal(result.findings.length, 0);
+  assert.deepEqual(
+    result.triggered.map((hook) => hook.id),
+    [
+      'proposal-flow',
+      'proposal-ambiguity',
+      'implementation-branch-gate',
+      'multi-step-work',
+      'bug-debugging',
+      'parallel-work',
+      'completion-gate',
+    ],
+  );
+});
+
+test('validateSessionTranscript reports missing event-hook evidence', () => {
+  const fixturePath = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'missing-hooks-session.md');
+  const report = validateSessionTranscript({ filePath: fixturePath });
+
+  assert.match(report, /status: needs-attention/);
+  assert.match(report, /Missing Proposal Intake evidence after proposal flow signal/);
+  assert.match(report, /Missing git-workflow \/ branch check evidence after approved proposal implementation signal/);
+  assert.match(report, /Missing systematic-debugging evidence after bug \/ failure debugging signal/);
+  assert.match(report, /Missing verification-before-completion evidence after completion gate signal/);
+});
+
+test('runCli validate-session --strict fails when transcript evidence is incomplete', () => {
+  const fixturePath = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'missing-hooks-session.md');
+
+  assert.throws(
+    () => runCli(['validate-session', '--file', fixturePath, '--strict']),
+    /Missing Proposal Intake evidence after proposal flow signal/,
+  );
 });

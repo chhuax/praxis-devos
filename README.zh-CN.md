@@ -133,7 +133,7 @@ npx praxis-devos sync --agent opencode
 
 框架级门控规则的源文件仍然是仓库里的 `RULES.md`，但安装到项目时会镜像为 `.praxis/framework-rules.md`。
 
-随后由 `praxis-devos sync` 统一分发：
+随后由 `npx praxis-devos sync` 统一分发：
 
 - OpenCode：通过插件注入 system prompt
 - Codex：写入 `AGENTS.md` 的受管控区块
@@ -145,21 +145,23 @@ npx praxis-devos sync --agent opencode
 
 如果项目原本已经有 `AGENTS.md` 或 `CLAUDE.md`，Praxis 只会追加或刷新 `<!-- PRAXIS_DEVOS_START -->` 到 `<!-- PRAXIS_DEVOS_END -->` 之间的托管区，不会覆盖区块外的人工内容。
 
-另外，Praxis 约定 `/change` 为显式提案主入口，`/proposal` 为兼容别名。它们的语义是“进入提案通道”，不是“直接开始实现”；如果需求不明确，应先进入 `brainstorming`，再决定完整提案或轻量提案。
+另外，Praxis 约定 `/change` 为显式提案主入口，`/proposal` 为兼容别名。这里说的是“文本语义入口”，不是保证所有 agent 平台都会原生注册同名 slash 命令；在 Codex / Claude 里，它表示“进入提案通道”的受管控语义，而真正可执行的脚手架命令仍然是 `npx praxis-devos change` / `npx praxis-devos proposal`。如果需求不明确，应先进入 `brainstorming`，再决定完整提案或轻量提案。
+
+下方所有命令示例默认都按项目本地 CLI 通过 `npx` 调用，不要求用户全局安装。
 
 ## CLI
 
 ```bash
-praxis-devos init --stack java-spring
-praxis-devos sync --agents opencode,codex,claude
-praxis-devos migrate
-praxis-devos change --title "Add two factor auth" --capability auth
-praxis-devos status
-praxis-devos doctor --strict
-praxis-devos bootstrap --openspec
-praxis-devos bootstrap --agent opencode
+npx praxis-devos init --stack java-spring
+npx praxis-devos sync --agents opencode,codex,claude
+npx praxis-devos migrate
+npx praxis-devos change --title "Add two factor auth" --capability auth
+npx praxis-devos status
+npx praxis-devos doctor --strict
+npx praxis-devos bootstrap --openspec
+npx praxis-devos bootstrap --agent opencode
 npx praxis-devos openspec list --specs
-praxis-devos list-stacks
+npx praxis-devos list-stacks
 ```
 
 说明：
@@ -175,15 +177,15 @@ Praxis DevOS 强依赖：
 - `openspec`：CLI 依赖
 - `superpowers`：agent runtime 依赖
 
-其中 OpenSpec 现在统一通过 `praxis-devos openspec ...` 调用，优先使用项目本地安装，找不到时才回退到全局安装。
+其中 OpenSpec 现在统一通过 `npx praxis-devos openspec ...` 调用，优先使用项目本地安装，找不到时才回退到全局安装。
 
 由于 `superpowers` 在 OpenCode、Codex、Claude Code 下的安装方式不同，Praxis 不会把它复制到 `.praxis/`，而是通过依赖管理命令处理：
 
 ```bash
-praxis-devos doctor
-praxis-devos bootstrap --openspec
-praxis-devos bootstrap --agent codex
-praxis-devos bootstrap --agent claude
+npx praxis-devos doctor
+npx praxis-devos bootstrap --openspec
+npx praxis-devos bootstrap --agent codex
+npx praxis-devos bootstrap --agent claude
 ```
 
 ## Skills
@@ -224,7 +226,7 @@ stacks/{栈名}/
 历史上只支持 OpenCode 的项目可以原地迁移：
 
 ```bash
-praxis-devos migrate
+npx praxis-devos migrate
 ```
 
 该命令会把旧的 `.opencode` 项目资产迁移到 `.praxis/`，然后重新生成适配输出。

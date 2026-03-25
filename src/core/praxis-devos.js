@@ -11,6 +11,7 @@ export const SKILLS_DIR = path.join(PRAXIS_ROOT, 'skills');
 export const STACKS_DIR = path.join(PRAXIS_ROOT, 'stacks');
 export const FRAMEWORK_RULES_MD = path.join(PRAXIS_ROOT, 'RULES.md');
 export const PACKAGE_JSON = path.join(PRAXIS_ROOT, 'package.json');
+export const MANAGED_ENTRY_TEMPLATE = path.join(PRAXIS_ROOT, 'src', 'templates', 'managed-entry.md');
 
 export const PRAXIS_DIRNAME = '.praxis';
 export const PRAXIS_MANIFEST = 'manifest.json';
@@ -204,10 +205,45 @@ const syncDirRecursive = (src, dst) => {
   }
 };
 
+const syncMissingFilesRecursive = (src, dst) => {
+  ensureDir(dst);
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const dstPath = path.join(dst, entry.name);
+    if (entry.isDirectory()) {
+      syncMissingFilesRecursive(srcPath, dstPath);
+      continue;
+    }
+    if (!fs.existsSync(dstPath)) {
+      copyFile(srcPath, dstPath);
+    }
+  }
+};
+
 const copyDirIfMissing = (src, dst) => {
   if (!fs.existsSync(dst)) {
     syncDirRecursive(src, dst);
   }
+};
+
+const sourceSkillLooksIncomplete = (src, dst) => {
+  const srcSkillMd = path.join(src, 'SKILL.md');
+  const dstSkillMd = path.join(dst, 'SKILL.md');
+  return fs.existsSync(srcSkillMd) && !fs.existsSync(dstSkillMd);
+};
+
+const ensureDirSeeded = (src, dst) => {
+  if (!fs.existsSync(dst)) {
+    syncDirRecursive(src, dst);
+    return 'created';
+  }
+
+  if (sourceSkillLooksIncomplete(src, dst)) {
+    syncMissingFilesRecursive(src, dst);
+    return 'repaired';
+  }
+
+  return 'skipped';
 };
 
 const removePathIfExists = (targetPath) => {
@@ -502,11 +538,13 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
     const skillSrc = path.join(SKILLS_DIR, skillName);
     const skillDst = path.join(paths.praxisSkillsDir, skillName);
     if (fs.existsSync(skillSrc)) {
-      if (fs.existsSync(skillDst)) {
-        log(`⊘ .praxis/skills/${skillName}/ already exists, skipped`);
-      } else {
-        copyDirIfMissing(skillSrc, skillDst);
+      const status = ensureDirSeeded(skillSrc, skillDst);
+      if (status === 'created') {
         log(`✓ .praxis/skills/${skillName}/ copied (customizable)`);
+      } else if (status === 'repaired') {
+        log(`✓ .praxis/skills/${skillName}/ repaired from framework defaults`);
+      } else {
+        log(`⊘ .praxis/skills/${skillName}/ already exists, skipped`);
       }
     }
   }
@@ -523,11 +561,13 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
       if (!entry.isDirectory()) continue;
       const skillSrc = path.join(stackSkillsSrc, entry.name);
       const skillDst = path.join(paths.praxisSkillsDir, entry.name);
-      if (fs.existsSync(skillDst)) {
-        log(`⊘ .praxis/skills/${entry.name}/ already exists, skipped`);
-      } else {
-        copyDirIfMissing(skillSrc, skillDst);
+      const status = ensureDirSeeded(skillSrc, skillDst);
+      if (status === 'created') {
         log(`✓ .praxis/skills/${entry.name}/ copied (from ${stackName})`);
+      } else if (status === 'repaired') {
+        log(`✓ .praxis/skills/${entry.name}/ repaired from ${stackName}`);
+      } else {
+        log(`⊘ .praxis/skills/${entry.name}/ already exists, skipped`);
       }
     }
   }
@@ -584,52 +624,25 @@ function renderDependencyGateSummary(projectDir) {
   lines.push('- Codex：`npx praxis-devos bootstrap --agent codex`');
   lines.push('- Claude Code：`npx praxis-devos bootstrap --agent claude`');
   lines.push('- OpenCode：`npx praxis-devos bootstrap --agent opencode`');
+  lines.push('- 框架管控中，`openspec`、`git-workflow`、`verification-before-completion` 是硬门禁；`brainstorming`、`writing-plans`、`systematic-debugging`、`subagent-driven-development` 则由 Proposal Intake、实现复杂度、故障信号和并行拆分信号触发。');
   lines.push('- 标记完成前，必须执行验证门控；若当前任务属于 OpenSpec change，还必须执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`。');
 
   return lines.join('\n');
 }
 
+const renderManagedEntryTemplate = (projectDir) => {
+  const template = readFile(MANAGED_ENTRY_TEMPLATE);
+  if (!template) {
+    throw new Error(`Managed entry template is missing: ${MANAGED_ENTRY_TEMPLATE}`);
+  }
+
+  return template
+    .replace('{{dependency_gate_summary}}', renderDependencyGateSummary(projectDir))
+    .replace('{{project_skills_section}}', renderProjectSkillsSection(projectDir));
+};
+
 const renderManagedRulesBlock = (projectDir) => {
-  const paths = projectPaths(projectDir);
-
-  const sections = [
-    '> AI 入口区块：以下内容由 Praxis DevOS 自动维护。',
-    '> 先按本区块分流，再读取后续项目上下文；执行 `praxis-devos sync` 时，此区块会被刷新。',
-    '',
-    '## AI Dispatch',
-    '',
-    '- 你当前位于一个由 Praxis DevOS 管理的项目中。',
-    '- 项目 canonical source 位于 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 适配目录视为规范事实来源。',
-    '- `.opencode/skills/` 仍可作为 OpenCode supplemental layer，但它不是项目规范的 canonical source。',
-    '- 先决定当前任务属于 proposal、implementation、review 中的哪一条流程，不要直接开始实现。',
-    '',
-    '## Flow Selection',
-    '',
-    '- proposal flow: 用户显式输入 `/change` 或 `/proposal`，或者任务属于新功能、API 变更、架构重构、破坏性变更。此时禁止直接实现。',
-    '- implementation flow: 任务属于代码实现、测试、重构、调试、修缺陷。',
-    '- review flow: 用户要求 review、审查、排查回归风险、检查测试缺口。',
-    '- 如果任务意图不清晰，先澄清；不要在未分流前直接写代码。',
-    '',
-    '## Required Reads',
-    '',
-    '- proposal flow: 先读取 `openspec/AGENTS.md`，再按需读取 `openspec/project.md`；若需求仍不清晰，先进入 brainstorming，再决定 full / lite proposal。',
-    '- implementation flow: 先读取 `.praxis/rules.md`；需要项目 skill 时，先读取 `.praxis/skills/INDEX.md`，再打开对应 `SKILL.md`。',
-    '- review flow: 先读取 `.praxis/rules.md`；如涉及评审流程或提案关联，再读取对应 skill 与 OpenSpec 文件。',
-    '',
-    renderDependencyGateSummary(projectDir),
-    '',
-    renderProjectSkillsSection(projectDir),
-    '',
-    '## Canonical Sources',
-    '',
-    '- `.praxis/framework-rules.md`：完整框架门控规则',
-    '- `.praxis/rules.md`：完整技术栈 / 项目规则',
-    '- `.praxis/skills/INDEX.md`：当前项目可用 skills 摘要',
-    '- `openspec/AGENTS.md`：OpenSpec 规范驱动工作流',
-    '- `openspec/project.md`：项目规范上下文',
-  ].filter(Boolean);
-
-  return sections.join('\n');
+  return renderManagedEntryTemplate(projectDir);
 };
 
 const ensureProjectSkillsIndex = ({ projectDir, log }) => {
@@ -1313,6 +1326,7 @@ export const parseCliArgs = (argv) => {
     command: args.shift() || 'help',
     stack: null,
     agents: [],
+    file: null,
     projectDir: process.cwd(),
     strict: false,
     withOpenSpec: false,
@@ -1340,6 +1354,11 @@ export const parseCliArgs = (argv) => {
 
     if (token === '--project-dir') {
       parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
+      continue;
+    }
+
+    if (token === '--file') {
+      parsed.file = path.resolve(args.shift() || parsed.projectDir);
       continue;
     }
 
@@ -1446,6 +1465,298 @@ const parseChangeCliArgs = (argv) => {
   return parsed;
 };
 
+const normalizeTranscriptText = (input) => input
+  .replace(/\r\n/g, '\n')
+  .replace(/\r/g, '\n');
+
+const matchAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
+
+const SESSION_EVENT_RULES = [
+  {
+    id: 'proposal-flow',
+    label: 'proposal flow',
+    signal: [
+      /\/change\b/i,
+      /\/proposal\b/i,
+      /proposal flow/i,
+      /提案通道/,
+      /proposal\.md/i,
+      /spec delta/i,
+    ],
+    requirements: [
+      {
+        id: 'proposal-intake',
+        label: 'Proposal Intake',
+        patterns: [
+          /Proposal Intake/i,
+          /change target/i,
+          /intended behavior/i,
+          /scope\/risk/i,
+          /open questions/i,
+          /变更对象/,
+          /预期变化/,
+          /范围.*风险/,
+          /开放问题/,
+        ],
+      },
+      {
+        id: 'openspec',
+        label: 'openspec',
+        patterns: [
+          /openspec\/AGENTS\.md/i,
+          /praxis-devos openspec/i,
+          /\bopenspec\b/i,
+          /spec delta/i,
+        ],
+      },
+    ],
+  },
+  {
+    id: 'proposal-ambiguity',
+    label: 'proposal ambiguity',
+    signal: [
+      /open questions/i,
+      /阻塞缺口/,
+      /多种可行方案/,
+      /架构分歧/,
+      /边界分歧/,
+      /不确定/,
+      /方案探索/,
+    ],
+    requirements: [
+      {
+        id: 'brainstorming',
+        label: 'brainstorming',
+        patterns: [
+          /brainstorming/i,
+          /澄清范围/,
+          /澄清需求/,
+          /方案比较/,
+          /方案探索/,
+          /边界收敛/,
+        ],
+      },
+    ],
+  },
+  {
+    id: 'implementation-branch-gate',
+    label: 'approved proposal implementation',
+    signal: [
+      /已批准.*实现/,
+      /继续实现/,
+      /approved proposal/i,
+      /start implementation/i,
+      /implementation flow/i,
+    ],
+    requirements: [
+      {
+        id: 'git-workflow',
+        label: 'git-workflow / branch check',
+        patterns: [
+          /git-workflow/i,
+          /当前 Git 分支/,
+          /专用实现分支/,
+          /创建.*分支/,
+          /切换.*分支/,
+          /reuse.*branch/i,
+          /branch check/i,
+        ],
+      },
+    ],
+  },
+  {
+    id: 'multi-step-work',
+    label: 'multi-step work',
+    signal: [
+      /多步骤/,
+      /tasks\.md/i,
+      /实施计划/,
+      /分步/,
+      /步骤\s*[1-9]/,
+      /step 1/i,
+    ],
+    requirements: [
+      {
+        id: 'writing-plans',
+        label: 'writing-plans',
+        patterns: [
+          /writing-plans/i,
+          /实施计划/,
+          /执行计划/,
+          /分步计划/,
+          /step 1/i,
+          /1\.\s.+\n2\.\s/s,
+        ],
+      },
+    ],
+  },
+  {
+    id: 'bug-debugging',
+    label: 'bug / failure debugging',
+    signal: [
+      /\bbug\b/i,
+      /测试失败/,
+      /failing test/i,
+      /failed test/i,
+      /报错/,
+      /异常/,
+      /回归/,
+    ],
+    requirements: [
+      {
+        id: 'systematic-debugging',
+        label: 'systematic-debugging',
+        patterns: [
+          /systematic-debugging/i,
+          /复现步骤/,
+          /复现条件/,
+          /假设/,
+          /验证假设/,
+          /根因/,
+          /排查步骤/,
+        ],
+      },
+    ],
+  },
+  {
+    id: 'parallel-work',
+    label: 'parallelizable work',
+    signal: [
+      /并行/,
+      /parallel/i,
+      /多个独立子任务/,
+      /subagent/i,
+      /委派/,
+    ],
+    requirements: [
+      {
+        id: 'subagent-driven-development',
+        label: 'subagent-driven-development',
+        patterns: [
+          /subagent-driven-development/i,
+          /subagent/i,
+          /并行子任务/,
+          /并行拆分/,
+          /委派/,
+        ],
+      },
+    ],
+  },
+  {
+    id: 'completion-gate',
+    label: 'completion gate',
+    signal: [
+      /准备提交/,
+      /提交前/,
+      /即将完成/,
+      /准备合并/,
+      /\bPR\b/,
+      /merge/i,
+      /发布/,
+      /验证结果/,
+      /收尾/,
+    ],
+    requirements: [
+      {
+        id: 'verification-before-completion',
+        label: 'verification-before-completion',
+        patterns: [
+          /verification-before-completion/i,
+          /验证结果/,
+          /验收清单/,
+          /验证项/,
+          /npm test/i,
+          /git diff --check/i,
+          /openspec validate/i,
+        ],
+      },
+    ],
+  },
+];
+
+export const analyzeSessionTranscript = (transcriptText) => {
+  const text = normalizeTranscriptText(transcriptText);
+  const triggered = [];
+  const findings = [];
+
+  for (const rule of SESSION_EVENT_RULES) {
+    if (!matchAny(text, rule.signal)) {
+      continue;
+    }
+
+    const requirements = rule.requirements.map((requirement) => {
+      const ok = matchAny(text, requirement.patterns);
+      if (!ok) {
+        findings.push(`Missing ${requirement.label} evidence after ${rule.label} signal`);
+      }
+
+      return {
+        id: requirement.id,
+        label: requirement.label,
+        ok,
+      };
+    });
+
+    triggered.push({
+      id: rule.id,
+      label: rule.label,
+      requirements,
+    });
+  }
+
+  return {
+    status: findings.length === 0 ? 'pass' : 'needs-attention',
+    triggered,
+    findings,
+  };
+};
+
+export const validateSessionTranscript = ({ filePath, strict = false }) => {
+  if (!filePath) {
+    throw new Error('Missing transcript file. Use `praxis-devos validate-session --file <path>`.');
+  }
+
+  const transcriptText = readFile(filePath);
+  if (transcriptText == null) {
+    throw new Error(`Transcript file not found: ${filePath}`);
+  }
+
+  const result = analyzeSessionTranscript(transcriptText);
+  const lines = [
+    'Session transcript validation',
+    `file: ${filePath}`,
+    `status: ${result.status}`,
+  ];
+
+  if (result.triggered.length === 0) {
+    lines.push('triggered hooks: none');
+  } else {
+    lines.push('triggered hooks:');
+    for (const hook of result.triggered) {
+      lines.push(`- ${hook.label}`);
+      for (const requirement of hook.requirements) {
+        lines.push(`  - ${requirement.label}: ${requirement.ok ? 'ok' : 'missing'}`);
+      }
+    }
+  }
+
+  if (result.findings.length === 0) {
+    lines.push('findings: none');
+  } else {
+    lines.push('findings:');
+    for (const finding of result.findings) {
+      lines.push(`- ${finding}`);
+    }
+  }
+
+  const report = lines.join('\n');
+  if (strict && result.findings.length > 0) {
+    throw new Error(report);
+  }
+
+  return report;
+};
+
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
@@ -1458,6 +1769,7 @@ Commands:
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
   openspec       Run OpenSpec through the Praxis wrapper
+  validate-session  Validate a transcript against Praxis evidence hooks
   list-stacks    List available technology stacks
   help           Show this help
 
@@ -1466,6 +1778,7 @@ Options:
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
+  --file <path>          Transcript file for \`validate-session\`
   --title <text>         Change title for \`change\` / \`proposal\`
   --capability <name>    OpenSpec capability directory for \`change\`
   --change-id <id>       Explicit change-id for \`change\`
@@ -1536,6 +1849,13 @@ export const runCli = (argv) => {
     }
 
     return outputs.join('\n\n');
+  }
+
+  if (parsed.command === 'validate-session') {
+    return validateSessionTranscript({
+      filePath: parsed.file,
+      strict: parsed.strict,
+    });
   }
 
   if (parsed.command === 'init') {

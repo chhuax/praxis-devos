@@ -63,7 +63,7 @@ your-project/
 - 如果是旧项目且缺少 `.praxis/skills/`，仍然可以只依赖 `.opencode/skills/`
 - 注入框架 `RULES.md` 和项目 `.praxis/rules.md`
 - 同时可以复用 `.praxis/adapters/compiled-rules.md` 作为统一规则摘要
-- `praxis-devos sync --agent opencode` 只保留 `.opencode/` 最小兼容目录，不再镜像 canonical skills / stack / rules
+- `npx praxis-devos sync --agent opencode` 只保留 `.opencode/` 最小兼容目录，不再镜像 canonical skills / stack / rules
 
 ### Codex
 
@@ -72,6 +72,7 @@ your-project/
 - 受管控区块会包含项目 skills 摘要，完整索引位于 `.praxis/skills/INDEX.md`
 - 如果项目已经存在 `AGENTS.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
 - `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
+- 这属于受管控文本语义，不表示 Codex 平台一定原生注册了 `/change` slash 命令；真正可执行的脚手架入口仍然是 `npx praxis-devos change`
 - 不要求 Codex 使用专属项目目录
 
 ### Claude Code
@@ -81,6 +82,7 @@ your-project/
 - 受管控区块会包含项目 skills 摘要，完整索引位于 `.praxis/skills/INDEX.md`
 - 如果项目已经存在 `CLAUDE.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
 - `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
+- 这属于受管控文本语义，不表示 Claude Code 平台一定原生注册了 `/change` slash 命令；真正可执行的脚手架入口仍然是 `npx praxis-devos change`
 - 不把 canonical project state 放进 Claude 专属目录
 
 ## CLI 归属
@@ -88,21 +90,39 @@ your-project/
 所有初始化、同步、迁移动作都归属于外部 CLI，而不是某一个插件内部：
 
 ```bash
-praxis-devos init --stack java-spring
-praxis-devos sync --agents opencode,codex,claude
-praxis-devos migrate
-praxis-devos status
-praxis-devos list-stacks
+npx praxis-devos init --stack java-spring
+npx praxis-devos sync --agents opencode,codex,claude
+npx praxis-devos migrate
+npx praxis-devos status
+npx praxis-devos list-stacks
 ```
 
 补充说明：
 
 - 不带 `--agent` / `--agents` 时，默认处理 `opencode,codex,claude`
-- 如果项目当前只使用一个 agent，可以显式指定，例如 `praxis-devos init --stack java-spring --agents codex`
-- 后续增量启用其他 agent 时，执行 `praxis-devos sync --agent opencode`
+- 如果项目当前只使用一个 agent，可以显式指定，例如 `npx praxis-devos init --stack java-spring --agents codex`
+- 后续增量启用其他 agent 时，执行 `npx praxis-devos sync --agent opencode`
 - 已配置 agents 会写入 `.praxis/manifest.json`，后续同步时按并集累加，不会覆盖已有配置
 
 插件里保留的 `praxis-init`、`praxis-sync`、`praxis-migrate` 只是共享核心的薄封装，不能再拥有独立逻辑。
+
+## RULES.md 与托管区
+
+`RULES.md` 和 `AGENTS.md` / `CLAUDE.md` 里的托管区不是同一层资产。
+
+- `RULES.md` 是框架级完整规则源
+- 初始化项目后，这份规则会镜像到 `.praxis/framework-rules.md`
+- 托管区不是直接复制整份 `RULES.md`
+- 托管区使用独立模板生成，定位是给 AI 的入口摘要 / dispatch block
+- JS 核心只负责把模板与动态内容渲染到最终托管区，例如：
+  - 依赖门禁摘要
+  - 当前项目已安装 skills 摘要
+
+换句话说：
+
+- `RULES.md` = full framework policy
+- 托管区模板 = distilled AI entry block
+- `src/core/praxis-devos.js` = renderer，而不是托管区正文的主要事实来源
 
 ## 依赖管理
 
@@ -116,12 +136,12 @@ Praxis 强依赖：
 相关命令：
 
 ```bash
-praxis-devos doctor
-praxis-devos doctor --strict
-praxis-devos bootstrap --openspec
-praxis-devos bootstrap --agent opencode
-praxis-devos bootstrap --agent codex
-praxis-devos bootstrap --agent claude
+npx praxis-devos doctor
+npx praxis-devos doctor --strict
+npx praxis-devos bootstrap --openspec
+npx praxis-devos bootstrap --agent opencode
+npx praxis-devos bootstrap --agent codex
+npx praxis-devos bootstrap --agent claude
 npx praxis-devos openspec list --specs
 ```
 
@@ -154,7 +174,7 @@ Praxis 的设计就是：
 
 规则如下：
 
-- 标记内内容由 `praxis-devos sync` 自动刷新
+- 标记内内容由 `npx praxis-devos sync` 自动刷新
 - 标记外内容视为用户区，Praxis 不会主动覆盖
 - 如果目标文件原本不存在，Praxis 会先创建基础文件，再写入受管控区块
 
@@ -176,6 +196,20 @@ Praxis 的设计就是：
 
 注意：这里的“强制执行”指的是规范治理和完成前验证，不意味着所有代码变更都必须走 TDD。TDD 在框架层是风险驱动策略，不是全局硬门槛。
 
+## SuperPowers 触发方式
+
+Praxis 不把 SuperPowers 仅仅当成“可选 skill 列表”，而是把它们接到框架事件钩子上：
+
+- proposal 进入时先做 `Proposal Intake`
+- intake 暴露阻塞缺口、边界分歧或多方案取舍时，再升级 `brainstorming`
+- 已批准 proposal 开始实现时，先过 `git-workflow` / branch gate
+- 实施任务变成多步骤依赖时，判断 `writing-plans`
+- 出现 bug、失败测试、异常时，判断 `systematic-debugging`
+- 出现可并行子任务时，判断 `subagent-driven-development`
+- 完成前统一走 `verification-before-completion`
+
+这套机制的目标不是“证明模型内部加载了某个 skill”，而是要求会话里留下对应的最小证据，并允许通过 `npx praxis-devos validate-session` 做事后校验。
+
 随后再分发到：
 
 - OpenCode 的 prompt 注入
@@ -192,4 +226,4 @@ Praxis 的设计就是：
 4. 生成 `.praxis/manifest.json`
 5. 重新同步各 agent 的适配输出
 
-该流程由 `praxis-devos migrate` 实现。
+该流程由 `npx praxis-devos migrate` 实现。

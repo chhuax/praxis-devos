@@ -25,7 +25,7 @@
 在项目根目录执行：
 
 ```bash
-praxis-devos migrate
+npx praxis-devos migrate
 ```
 
 该命令会自动完成：
@@ -66,22 +66,22 @@ praxis-devos migrate
 ### 新项目初始化
 
 ```bash
-praxis-devos bootstrap --openspec
-praxis-devos init --stack java-spring
+npx praxis-devos bootstrap --openspec
+npx praxis-devos init --stack java-spring
 ```
 
 ### 当你修改了 `.praxis/` 下的内容
 
 ```bash
-praxis-devos sync
+npx praxis-devos sync
 ```
 
 ### 只刷新某一个 agent
 
 ```bash
-praxis-devos sync --agent opencode
-praxis-devos sync --agent codex
-praxis-devos sync --agent claude
+npx praxis-devos sync --agent opencode
+npx praxis-devos sync --agent codex
+npx praxis-devos sync --agent claude
 ```
 
 ## 常见问题
@@ -100,7 +100,7 @@ praxis-devos sync --agent claude
 
 ### 4. 如果我手动改了 `.opencode/`，会怎么样？
 
-下次执行 `praxis-devos sync --agent opencode` 时，这些兼容投影可能会被 canonical `.praxis/` 内容重新覆盖。应优先修改 `.praxis/`。
+下次执行 `npx praxis-devos sync --agent opencode` 时，这些兼容投影可能会被 canonical `.praxis/` 内容重新覆盖。应优先修改 `.praxis/`。
 
 ### 5. 如果我手动改了 `AGENTS.md` 或 `CLAUDE.md` 呢？
 
@@ -114,7 +114,7 @@ praxis-devos sync --agent claude
 <!-- PRAXIS_DEVOS_END -->
 ```
 
-那么下次执行 `praxis-devos sync` 时，这部分会被重新生成。
+那么下次执行 `npx praxis-devos sync` 时，这部分会被重新生成。
 
 ## 建议
 

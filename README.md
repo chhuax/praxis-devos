@@ -60,7 +60,7 @@ your-project/
         └── compiled-rules.md
 ```
 
-OpenCode compatibility is still supported. `praxis-devos sync --agent opencode` now keeps `.opencode/` as a minimal compatibility marker while the plugin prioritizes canonical assets from `.praxis/` and treats `.opencode/skills/` as an optional supplemental layer.
+OpenCode compatibility is still supported. `npx praxis-devos sync --agent opencode` now keeps `.opencode/` as a minimal compatibility marker while the plugin prioritizes canonical assets from `.praxis/` and treats `.opencode/skills/` as an optional supplemental layer.
 
 Detailed architecture and migration notes:
 
@@ -133,7 +133,7 @@ The plugin no longer owns initialization. It reads `.praxis/` and exposes thin w
 
 The framework source of truth for gating rules remains `RULES.md`, but each initialized project also gets `.praxis/framework-rules.md`.
 
-`praxis-devos sync` then distributes the same rule model through the best adapter for each runtime:
+`npx praxis-devos sync` then distributes the same rule model through the best adapter for each runtime:
 
 - OpenCode: system prompt injection
 - Codex: managed block in `AGENTS.md`
@@ -145,21 +145,23 @@ That compiled rules artifact also includes a dependency gate summary, so agents 
 
 If `AGENTS.md` or `CLAUDE.md` already exists, Praxis only appends or refreshes the managed block between `<!-- PRAXIS_DEVOS_START -->` and `<!-- PRAXIS_DEVOS_END -->`. User-owned content outside that block is preserved.
 
-Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. Those commands mean "enter the proposal path", not "start implementation immediately"; if the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
+Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. This is a text-level workflow convention, not a guarantee that every agent runtime exposes a native slash command with that exact name. In Codex and Claude, the managed block uses those tokens to mean "enter the proposal path", while the executable scaffold entrypoint remains `npx praxis-devos change` / `npx praxis-devos proposal`. If the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
+
+All command examples below assume project-local usage via `npx`; a global install is optional, not required.
 
 ## CLI
 
 ```bash
-praxis-devos init --stack java-spring
-praxis-devos sync --agents opencode,codex,claude
-praxis-devos migrate
-praxis-devos change --title "Add two factor auth" --capability auth
-praxis-devos status
-praxis-devos doctor --strict
-praxis-devos bootstrap --openspec
-praxis-devos bootstrap --agent opencode
+npx praxis-devos init --stack java-spring
+npx praxis-devos sync --agents opencode,codex,claude
+npx praxis-devos migrate
+npx praxis-devos change --title "Add two factor auth" --capability auth
+npx praxis-devos status
+npx praxis-devos doctor --strict
+npx praxis-devos bootstrap --openspec
+npx praxis-devos bootstrap --agent opencode
 npx praxis-devos openspec list --specs
-praxis-devos list-stacks
+npx praxis-devos list-stacks
 ```
 
 Notes:
@@ -175,15 +177,15 @@ Praxis DevOS has two hard dependencies:
 - `openspec` as a CLI dependency
 - `superpowers` as an agent runtime dependency
 
-OpenSpec is now invoked only through `praxis-devos openspec ...`, preferring a project-local installation and falling back to a global install only for compatibility.
+OpenSpec is now invoked only through `npx praxis-devos openspec ...`, preferring a project-local installation and falling back to a global install only for compatibility.
 
 Because Superpowers installs differently on OpenCode, Codex, and Claude Code, Praxis does not copy it into `.praxis/`. Instead it exposes dependency commands:
 
 ```bash
-praxis-devos doctor
-praxis-devos bootstrap --openspec
-praxis-devos bootstrap --agent codex
-praxis-devos bootstrap --agent claude
+npx praxis-devos doctor
+npx praxis-devos bootstrap --openspec
+npx praxis-devos bootstrap --agent codex
+npx praxis-devos bootstrap --agent claude
 ```
 
 ## Skills
@@ -224,7 +226,7 @@ Create a new stack by copying `stacks/starter/`.
 Older OpenCode-only projects can migrate in place:
 
 ```bash
-praxis-devos migrate
+npx praxis-devos migrate
 ```
 
 This copies legacy `.opencode` project assets into `.praxis/` and then regenerates adapters.

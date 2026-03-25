@@ -8,16 +8,23 @@
 
 - 用户输入 `/change` 时，表示**进入提案通道**，而不是直接进入实现。
 - `/proposal` 是兼容别名，语义与 `/change` 相同。
-- 如果需求仍不明确，先加载 `brainstorming` 澄清范围、风险和提案级别。
-- 如果需求已经明确，再进入 OpenSpec 提案脚手架。
+- 进入提案通道后，MUST 先做一次轻量 `Proposal Intake`，先基于现有上下文自行提取，而不是立刻盘问用户。
+- `Proposal Intake` 至少要收敛出 4 项：
+  - `change target`：本次变更作用到哪个 capability / 模块 / API
+  - `intended behavior`：预期新增、修改或移除什么行为
+  - `scope/risk`：影响范围、约束、潜在风险
+  - `open questions`：仍然阻塞提案的缺口或分歧
+- 若 `open questions` 为空或不阻塞提案创建，可直接进入 OpenSpec 提案脚手架。
+- 若 `open questions` 仍阻塞提案，或存在多种可行方案 / 架构分歧，再升级加载 `brainstorming`。
 - `/change` 或 `/proposal` 都**不应直接触发实现**，也**不应自动创建 Git 分支**。
+- 提案获批并进入实现前，MUST 先检查当前 Git 分支；如果用户已经位于与该 change 对应的专用实现分支，可继续复用，否则先加载 `git-workflow` 并创建 / 切换分支。
 
 ## 1. 意图门控 — 收到任务时必须过此决策
 
 ```
 收到任务
 ├─ 用户显式输入 `/change` 或 `/proposal`？
-│   └─ 进入提案通道；如需求不清晰先加载 brainstorming，再决定完整提案 / 轻量提案
+│   └─ 进入提案通道；先做 Proposal Intake；若仍有阻塞缺口或多方案分歧，再升级到 brainstorming
 │
 ├─ 任务模糊或有多种解读？
 │   └─ 加载 brainstorming skill → 明确需求后再分流
@@ -36,12 +43,12 @@
 
 ## 2. Skill 触发表 — 按意图 / 阶段加载
 
-**规则**：多个 skill 可同时加载。涉及代码编写时，始终叠加当前技术栈的领域 skills。
-**命令面**：所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`，不要直接调用裸 `openspec`。
+**规则**：多个 skill 可同时加载。框架管控 skill 必须按阶段显式加载；技术栈领域 skills 保持按需加载，不做全局强制。
+**命令面**：所有 OpenSpec 命令统一使用 `npx praxis-devos openspec ...`，不要直接调用裸 `openspec`。
 
 | 意图 / 阶段 | 加载 Skill | 来源 |
 |---|---|---|
-| 需求模糊、方案探索 | `brainstorming` | SuperPowers |
+| 提案入口出现阻塞缺口 / 方案分歧、需求模糊、方案探索 | `brainstorming` | SuperPowers |
 | 提案 / 规范 / 变更 / 归档 | `openspec` | 插件内置 |
 | 多步骤任务 → 生成计划 | `writing-plans` | SuperPowers |
 | 高风险代码变更 / 先写失败用例更划算 | `test-driven-development` | SuperPowers |
@@ -54,11 +61,25 @@
 | 隔离工作区 | `using-git-worktrees` | SuperPowers |
 | 技术栈领域（数据库等） | 栈专属 skills（如 java-database） | 技术栈 |
 
-> **标记「强制」的 skill** 不可跳过：框架层唯一全局强制的 SuperPowers skill 是 `verification-before-completion`。TDD 是高价值策略，但不是全局硬门槛。
+> **标记「强制」的 skill** 不可跳过：`openspec`（提案 / 规范 / 归档）、`git-workflow`（已批准提案进入实现且当前分支不可直接复用时）、`verification-before-completion`（完成前）都属于框架层强制 skill。`brainstorming` 不再作为每个 proposal 的默认硬门槛，而是在 Proposal Intake 暴露阻塞缺口、范围分歧或多方案选择时强制升级。TDD 是高价值策略，但不是全局硬门槛；技术栈 skill 继续按需触发。
 
 ### Skill 优先级
 
 RULES.md 规则 > OpenSpec 工作流 > SuperPowers skills > 技术栈领域 skills
+
+## 2.1 SuperPowers 事件钩子
+
+不要只把 SuperPowers 当成“可选工具列表”。收到以下事件信号时，MUST 至少显式判断一次是否进入对应能力，并在会话中留下证据：
+
+| 事件信号 | 必须判断的能力 | 最小证据 |
+|---|---|---|
+| 进入 proposal flow | `Proposal Intake` | `change target` / `intended behavior` / `scope/risk` / `open questions` |
+| Proposal Intake 暴露阻塞缺口、边界分歧、多方案取舍 | `brainstorming` | 澄清问题、方案比较或边界收敛记录 |
+| 已批准 proposal 开始实现 | `git-workflow` | 当前分支检查，或复用 / 创建实现分支的说明 |
+| 实施任务超过 3 个明确步骤、存在依赖关系 | `writing-plans` | 步骤化实施计划 |
+| 出现 bug、失败测试、异常、不可解释回归 | `systematic-debugging` | 复现条件、假设、验证结果 |
+| 多个独立子任务可并行推进 | `subagent-driven-development` | 并行拆分或委派记录 |
+| 即将完成、提 PR、准备合并 / 发布 | `verification-before-completion` | 验证项与实际结果 |
 
 ## 3. 测试策略选择
 
@@ -107,7 +128,7 @@ RULES.md 规则 > OpenSpec 工作流 > SuperPowers skills > 技术栈领域 skil
 ### 提案变更额外检查
 - [ ] 逐条验证 proposal 中每个 `#### Scenario:` 的预期行为
 - [ ] `tasks.md` 中每一项都标记为 `[x]`
-- [ ] `praxis-devos openspec validate <change-id> --strict --no-interactive` 通过
+- [ ] `npx praxis-devos openspec validate <change-id> --strict --no-interactive` 通过
 
 ### Git 提交前检查
 - [ ] 提交消息符合 Conventional Commits 格式
