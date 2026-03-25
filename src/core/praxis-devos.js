@@ -548,15 +548,6 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
   }
 };
 
-const renderRulesSection = (title, content) => {
-  const normalized = sanitizeMarkdownForEmbedding(content || '');
-  if (!normalized) {
-    return '';
-  }
-
-  return `## ${title}\n\n${normalized}`;
-};
-
 const renderProjectSkillsSection = (projectDir) => {
   const skills = listProjectSkillsDetailed(projectDir);
   if (skills.length === 0) {
@@ -608,21 +599,19 @@ function renderDependencyGateSummary(projectDir) {
 
 const renderManagedRulesBlock = (projectDir) => {
   const paths = projectPaths(projectDir);
-  const frameworkRules = readFile(paths.praxisFrameworkRulesMd) || readFile(FRAMEWORK_RULES_MD) || '';
-  const stackRules = readFile(paths.praxisRulesMd) || '';
 
   const sections = [
     '> 以下区块由 Praxis DevOS 自动维护。',
     '> 请把人工编写的项目说明保留在该区块之外；执行 `praxis-devos sync` 时，此区块会被刷新。',
     '',
-    '## Praxis DevOS 运行约定',
+    '## Praxis DevOS 入口约定',
     '',
-    '- 规范层资产统一保存在 `.praxis/`，不要把 `.opencode/` 视为事实来源。',
-    '- 门控规则的 canonical source 是 `.praxis/framework-rules.md`。',
-    '- 技术栈和项目编码规则位于 `.praxis/rules.md`。',
-    '- 规范驱动开发统一遵循 `openspec/AGENTS.md` 与 `openspec/project.md`。',
-    '- OpenCode、Codex、Claude Code 的入口文件都由 `praxis-devos sync` 同步。',
-    '- 项目级 skills 的 canonical source 位于 `.praxis/skills/`，摘要索引位于 `.praxis/skills/INDEX.md`。',
+    '- canonical project state 位于 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 私有目录视为事实来源。',
+    '- 框架门控规则：`.praxis/framework-rules.md`',
+    '- 技术栈 / 项目规则：`.praxis/rules.md`',
+    '- OpenSpec 工作流：`openspec/AGENTS.md` 与 `openspec/project.md`',
+    '- 项目 skills：`.praxis/skills/`，摘要索引见 `.praxis/skills/INDEX.md`',
+    '- 这些入口文件由 `praxis-devos sync` 维护；需要细节时，继续读取上述原始文件，不要只依赖当前托管区。',
     '',
     '## 强制执行摘要',
     '',
@@ -630,15 +619,22 @@ const renderManagedRulesBlock = (projectDir) => {
     '- `/change` / `/proposal` 不是直接实现命令；若需求不清晰，先进入 brainstorming，再决定提案级别。',
     '- 任务意图不清晰时，先澄清，再决定是否进入提案或实现。',
     '- 新功能、API 变更、架构重构、破坏性变更，必须先走 OpenSpec 提案。',
-    '- 涉及代码编写时，必须遵循风险驱动的测试策略与对应技术栈规则。',
+    '- 进入提案、规范变更、提案校验或归档前，先读取 `openspec/AGENTS.md`。',
+    '- 涉及代码编写、测试、重构、调试前，先读取 `.praxis/rules.md` 与相关 skill 文件。',
+    '- 选择或调用项目 skill 前，先读取 `.praxis/skills/INDEX.md`，再打开对应 `SKILL.md`。',
     '- 标记完成前，必须执行验证门控与 OpenSpec 校验。',
     '',
     renderDependencyGateSummary(projectDir),
     '',
     renderProjectSkillsSection(projectDir),
     '',
-    renderRulesSection('框架门控规则', frameworkRules),
-    stackRules ? renderRulesSection('技术栈 / 项目规则', stackRules) : '',
+    '## 继续读取这些文件',
+    '',
+    '- `.praxis/framework-rules.md`：完整框架门控规则；当需要解释门禁来源或优先级时读取',
+    '- `.praxis/rules.md`：完整技术栈 / 项目规则；所有代码实现、测试、重构、调试前先读取',
+    '- `.praxis/skills/INDEX.md`：当前项目可用 skills 摘要；选择 skill 前先读取',
+    '- `openspec/AGENTS.md`：OpenSpec 规范驱动工作流；所有提案相关操作前先读取',
+    '- `openspec/project.md`：项目规范上下文；提案或规范变更需要项目背景时读取',
   ].filter(Boolean);
 
   return sections.join('\n');
