@@ -123,8 +123,18 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'INDEX.md')));
     assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
     assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
+
+    const skillsIndex = fs.readFileSync(path.join(projectDir, '.praxis', 'skills', 'INDEX.md'), 'utf8');
+    const agentsMd = fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8');
+
+    assert.match(skillsIndex, /java-security/);
+    assert.match(skillsIndex, /Project Skills Index/);
+    assert.match(skillsIndex, /Java \+ Spring Boot 安全编码规范/);
+    assert.match(agentsMd, /项目 Skills/);
+    assert.match(agentsMd, /java-security/);
   });
 });
 
@@ -147,6 +157,7 @@ test('statusProject summarizes initialized project state', () => {
     });
 
     assert.match(output, /initialized: yes/);
+    assert.match(output, /skills index: present/);
     assert.match(output, /selected stack: java-spring/);
     assert.match(output, /configured agents: codex, claude/);
     assert.match(output, /active changes: add-login-audit/);

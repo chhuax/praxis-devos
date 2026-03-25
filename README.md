@@ -179,6 +179,7 @@ Bundled with the framework:
 ### Project Skills
 
 Installed into `.praxis/skills/` during `init`. These are safe to customize in the target project.
+Praxis also generates `.praxis/skills/INDEX.md` so Codex / Claude managed blocks can surface the currently installed project skills instead of only relying on raw file discovery.
 
 ### Stack Skills
 

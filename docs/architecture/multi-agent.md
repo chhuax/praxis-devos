@@ -58,6 +58,7 @@ your-project/
 
 - OpenCode 插件读取框架内置 `skills/`
 - 同时读取项目内 `.praxis/skills/`
+- `.praxis/skills/` 仍然是 canonical source，`.opencode/skills/` 只是兼容投影
 - 注入框架 `RULES.md` 和项目 `.praxis/rules.md`
 - 同时可以复用 `.praxis/adapters/compiled-rules.md` 作为统一规则摘要
 - `praxis-devos sync --agent opencode` 会生成 `.opencode/` 兼容投影
@@ -66,6 +67,7 @@ your-project/
 
 - Codex 读取仓库根目录 `AGENTS.md`
 - Praxis 在 `AGENTS.md` 中维护一段受管控区块，指向 `.praxis/` 和 `openspec/`
+- 受管控区块会包含项目 skills 摘要，完整索引位于 `.praxis/skills/INDEX.md`
 - 如果项目已经存在 `AGENTS.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
 - `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
 - 不要求 Codex 使用专属项目目录
@@ -74,6 +76,7 @@ your-project/
 
 - Claude Code 读取仓库根目录 `CLAUDE.md`
 - Praxis 在 `CLAUDE.md` 中维护一段受管控区块，指向 `.praxis/` 和 `openspec/`
+- 受管控区块会包含项目 skills 摘要，完整索引位于 `.praxis/skills/INDEX.md`
 - 如果项目已经存在 `CLAUDE.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
 - `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
 - 不把 canonical project state 放进 Claude 专属目录

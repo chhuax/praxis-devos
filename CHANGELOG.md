@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `praxis-devos status` for current project initialization, adapters, active changes, and dependency summary
 - OpenCode tool `praxis-status`
+- Generated `.praxis/skills/INDEX.md` for project-installed skill discovery across agents
 - Regression tests covering `initProject`, strict `doctor`, and project status output
 
 ### Changed
 - `0.2.x` verification now covers more of the real project lifecycle instead of only scaffold helpers
+- Codex / Claude managed blocks now include a summary of currently installed project skills
 
 ## [0.2.1] - 2026-03-25
 

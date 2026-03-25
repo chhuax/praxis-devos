@@ -179,6 +179,7 @@ praxis-devos bootstrap --agent claude
 ### 项目 Skills
 
 在 `init` 时安装到 `.praxis/skills/`，项目可以直接修改。
+Praxis 还会生成 `.praxis/skills/INDEX.md`，让 Codex / Claude 的托管区能直接看到当前项目已安装的 skills 摘要，而不是只依赖文件被动发现。
 
 ### 栈专属 Skills
 
