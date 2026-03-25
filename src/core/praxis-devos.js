@@ -212,7 +212,21 @@ const codexSuperpowersPaths = () => ({
   cloneParent: path.join(os.homedir(), '.codex'),
 });
 
-const resolveCommandForExecution = (cmd) => findCommandPath(cmd) || cmd;
+const resolveCommandForExecution = (cmd) => {
+  if (path.extname(cmd)) {
+    return findCommandPath(cmd) || cmd;
+  }
+
+  if (process.platform === 'win32') {
+    return findCommandPath(`${cmd}.cmd`)
+      || findCommandPath(`${cmd}.bat`)
+      || findCommandPath(`${cmd}.exe`)
+      || findCommandPath(cmd)
+      || cmd;
+  }
+
+  return findCommandPath(cmd) || cmd;
+};
 
 const ensureDir = (dirPath) => {
   fs.mkdirSync(dirPath, { recursive: true });

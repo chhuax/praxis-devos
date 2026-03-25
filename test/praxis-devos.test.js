@@ -118,18 +118,21 @@ const installFakeWindowsOpenSpec = (projectDir, location = 'local') => {
   return scriptPath;
 };
 
-const installFakeWhere = (projectDir, resolvedPath) => {
+const installFakeWhereWithMap = (projectDir, mappings) => {
   const binDir = path.join(projectDir, 'fake-where-bin');
   const scriptPath = path.join(binDir, 'where');
   fs.mkdirSync(binDir, { recursive: true });
+  const cases = Object.entries(mappings)
+    .map(([command, resolvedPath]) => `if [ "$1" = "${command}" ]; then
+  printf '%s\\n' "${resolvedPath}"
+  exit 0
+fi`)
+    .join('\n');
   fs.writeFileSync(
     scriptPath,
     `#!/bin/sh
 set -eu
-if [ "$1" = "openspec" ]; then
-  printf '%s\\n' "${resolvedPath}"
-  exit 0
-fi
+${cases}
 exit 1
 `,
     { mode: 0o755 },
@@ -137,6 +140,10 @@ exit 1
   fs.chmodSync(scriptPath, 0o755);
   return binDir;
 };
+
+const installFakeWhere = (projectDir, resolvedPath) => installFakeWhereWithMap(projectDir, {
+  openspec: resolvedPath,
+});
 
 const installFakeWhich = (projectDir, openspecPath = null) => {
   const binDir = path.join(projectDir, 'fake-which-bin');
@@ -170,6 +177,56 @@ const installFakeCmdShell = (projectDir) => {
     `#!/bin/sh
 set -eu
 printf '%s' "$4"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
+const installFakeCmdRunner = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-cmd-runner-bin');
+  const scriptPath = path.join(binDir, 'cmd-shim');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+eval "set -- $4"
+"$@"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
+const installFakeWindowsNpm = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-win-npm-bin');
+  const scriptPath = path.join(binDir, 'npm.cmd');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
+  mkdir -p "$PWD/node_modules/.bin"
+  cat > "$PWD/node_modules/.bin/openspec.cmd" <<'EOF'
+#!/bin/sh
+set -eu
+cmd="$1"
+target="$2"
+if [ "$cmd" = "init" ]; then
+  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
+  exit 0
+fi
+echo "LOCAL:$*"
+EOF
+  chmod +x "$PWD/node_modules/.bin/openspec.cmd"
+  exit 0
+fi
+echo "unsupported npm invocation: $*" >&2
+exit 1
 `,
     { mode: 0o755 },
   );
@@ -457,6 +514,28 @@ test('setupProject installs OpenSpec locally when runtime is missing', () => {
     assert.match(output, /Installed OpenSpec locally with npm/);
     assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec')));
   }))));
+});
+
+test('setupProject installs OpenSpec locally on Windows via npm.cmd when runtime is missing', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos setup win openspec-'));
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmPath = installFakeWindowsNpm(projectDir);
+  const fakeWhereDir = installFakeWhereWithMap(projectDir, {
+    npm: fakeNpmPath.replace(/\.cmd$/i, ''),
+    'npm.cmd': fakeNpmPath,
+  });
+  const fakeCmdShell = installFakeCmdRunner(projectDir);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-win-install-'));
+
+  withPlatform('win32', () => withTempPath(fakeWhereDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => withEnv('ComSpec', fakeCmdShell, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd')));
+  })))));
 });
 
 test('setupProject skips OpenSpec install when project-local runtime already exists', () => {
