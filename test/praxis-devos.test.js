@@ -157,10 +157,16 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(skillsIndex, /java-security/);
     assert.match(skillsIndex, /Project Skills Index/);
     assert.match(skillsIndex, /Java \+ Spring Boot 安全编码规范/);
+    assert.match(agentsMd, /^<!-- PRAXIS_DEVOS_START -->/);
     assert.match(agentsMd, /项目 Skills/);
     assert.match(agentsMd, /java-security/);
-    assert.match(agentsMd, /涉及代码编写、测试、重构、调试前，先读取 `\.praxis\/rules\.md`/);
-    assert.match(agentsMd, /所有提案相关操作前先读取/);
+    assert.match(agentsMd, /## AI Dispatch/);
+    assert.match(agentsMd, /proposal flow/);
+    assert.match(agentsMd, /implementation flow/);
+    assert.match(agentsMd, /review flow/);
+    assert.match(agentsMd, /OpenSpec 命令统一通过 `npx praxis-devos openspec/);
+    assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`/);
+    assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`/);
     assert.doesNotMatch(agentsMd, /Spring Boot 代码组织/);
   });
 });
@@ -216,6 +222,7 @@ test('syncProject preserves user content and refreshes opencode projection', () 
     const nextAgents = fs.readFileSync(agentsPath, 'utf8');
     assert.match(output, /OpenCode adapter synced to \.opencode\//);
     assert.match(output, /Codex adapter synced via AGENTS\.md/);
+    assert.match(nextAgents, /^<!-- PRAXIS_DEVOS_START -->/);
     assert.match(nextAgents, /Keep this section\./);
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode', 'SKILL.md')));

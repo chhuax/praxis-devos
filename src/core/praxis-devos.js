@@ -320,10 +320,6 @@ const renderProjectSkillsIndex = (projectDir) => {
   return lines.join('\n');
 };
 
-const sanitizeMarkdownForEmbedding = (content) => content
-  .replace(/<!--[\s\S]*?-->/g, '')
-  .trim();
-
 const uniqueAgents = (agents = []) => {
   const normalized = agents
     .flatMap((agent) => String(agent || '').split(','))
@@ -341,16 +337,19 @@ const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fall
 
   if (!existing) {
     const base = fallbackContent.trim();
-    const next = base ? `${base}\n\n${managedBlock}\n` : `${managedBlock}\n`;
+    const next = base ? `${managedBlock}\n\n${base}\n` : `${managedBlock}\n`;
     writeText(filePath, next);
     return 'created';
   }
 
   if (existing.includes(startMarker) && existing.includes(endMarker)) {
-    const next = existing.replace(
-      new RegExp(`${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`, 'm'),
-      managedBlock,
-    );
+    const withoutManagedBlock = existing.replace(
+      new RegExp(`${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}\\n?`, 'm'),
+      '',
+    ).trimStart();
+    const next = withoutManagedBlock
+      ? `${managedBlock}\n\n${withoutManagedBlock}`
+      : `${managedBlock}\n`;
 
     if (next !== existing) {
       writeText(filePath, next);
@@ -360,8 +359,10 @@ const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fall
     return 'unchanged';
   }
 
-  const separator = existing.endsWith('\n') ? '\n' : '\n\n';
-  writeText(filePath, `${existing}${separator}${managedBlock}\n`);
+  const next = existing.trim()
+    ? `${managedBlock}\n\n${existing}`
+    : `${managedBlock}\n`;
+  writeText(filePath, next);
   return 'appended';
 };
 
@@ -567,74 +568,72 @@ const renderProjectSkillsSection = (projectDir) => {
   return lines.join('\n');
 };
 
-function renderDependencyGateSummary(projectDir) {
+function renderDependencyGateSummary(projectDir, entryAgent = null) {
   const openspecRuntime = resolveOpenSpecRuntime(projectDir);
-  const agentChecks = SUPPORTED_AGENTS.map((agent) => ({
-    agent,
-    detection: detectSuperpowersForAgent(projectDir, agent),
-  }));
+  const currentAgent = entryAgent && SUPPORTED_AGENTS.includes(entryAgent) ? entryAgent : null;
+  const currentAgentDetection = currentAgent ? detectSuperpowersForAgent(projectDir, currentAgent) : null;
 
   const lines = [
-    '## 依赖门禁',
+    '## 全局硬门禁',
     '',
     openspecRuntime.status === 'ok'
-      ? `- [OK] \`openspec\` 已可用（${openspecRuntime.source}）。通过 \`praxis-devos openspec ...\` 调用。`
-      : '- [MISSING] `openspec` 不可用。继续执行规范初始化、校验、归档前，先执行 `praxis-devos bootstrap --openspec`。',
+      ? '- OpenSpec 已可用；所有 OpenSpec 命令统一通过 `npx praxis-devos openspec ...` 调用。'
+      : '- OpenSpec 不可用；先执行 `npx praxis-devos bootstrap --openspec`，不要直接进入提案、校验或归档。',
   ];
 
-  for (const { agent, detection } of agentChecks) {
-    const status = formatStatus(detection.status);
-    const guidance = detection.status === 'ok'
-      ? '可以使用对应的 Superpowers 能力。'
-      : '如果当前在该 agent 下工作，先执行 `praxis-devos bootstrap --agent ' + agent + '` 或按官方文档完成安装，再继续实现。';
-
-    lines.push(`- [${status}] \`superpowers:${agent}\` — ${detection.detail} ${guidance}`);
+  if (currentAgent && currentAgentDetection) {
+    if (currentAgentDetection.status === 'ok') {
+      lines.push(`- 当前入口按 \`${currentAgent}\` 处理；Superpowers 已可用。`);
+    } else {
+      lines.push(`- 当前入口按 \`${currentAgent}\` 处理；若要继续工作，先执行 \`npx praxis-devos bootstrap --agent ${currentAgent}\`\u3002`);
+    }
+  } else {
+    lines.push('- 若当前运行环境缺少所需 Superpowers，先执行 `npx praxis-devos bootstrap --agent <current-agent>`，再继续工作。');
   }
 
-  lines.push('');
-  lines.push('规则：缺少当前运行环境所需的 `superpowers` 或缺少 `openspec` 时，应先安装依赖，不要直接进入实现。所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`。');
+  lines.push('- 缺少当前运行环境所需依赖时，先停止实现并完成 bootstrap。');
+  lines.push('- 标记完成前，必须执行验证门控；若当前任务属于 OpenSpec change，还必须执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`。');
 
   return lines.join('\n');
 }
 
-const renderManagedRulesBlock = (projectDir) => {
+const renderManagedRulesBlock = (projectDir, entryAgent = null) => {
   const paths = projectPaths(projectDir);
 
   const sections = [
-    '> 以下区块由 Praxis DevOS 自动维护。',
-    '> 请把人工编写的项目说明保留在该区块之外；执行 `praxis-devos sync` 时，此区块会被刷新。',
+    '> AI 入口区块：以下内容由 Praxis DevOS 自动维护。',
+    '> 先按本区块分流，再读取后续项目上下文；执行 `praxis-devos sync` 时，此区块会被刷新。',
     '',
-    '## Praxis DevOS 入口约定',
+    '## AI Dispatch',
     '',
-    '- canonical project state 位于 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 私有目录视为事实来源。',
-    '- 框架门控规则：`.praxis/framework-rules.md`',
-    '- 技术栈 / 项目规则：`.praxis/rules.md`',
-    '- OpenSpec 工作流：`openspec/AGENTS.md` 与 `openspec/project.md`',
-    '- 项目 skills：`.praxis/skills/`，摘要索引见 `.praxis/skills/INDEX.md`',
-    '- 这些入口文件由 `praxis-devos sync` 维护；需要细节时，继续读取上述原始文件，不要只依赖当前托管区。',
+    '- 你当前位于一个由 Praxis DevOS 管理的项目中。',
+    '- canonical project state 只认 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 私有目录视为事实来源。',
+    '- 先决定当前任务属于 proposal、implementation、review 中的哪一条流程，不要直接开始实现。',
     '',
-    '## 强制执行摘要',
+    '## Flow Selection',
     '',
-    '- 用户显式输入 `/change` 时，表示进入提案通道；`/proposal` 是兼容别名。',
-    '- `/change` / `/proposal` 不是直接实现命令；若需求不清晰，先进入 brainstorming，再决定提案级别。',
-    '- 任务意图不清晰时，先澄清，再决定是否进入提案或实现。',
-    '- 新功能、API 变更、架构重构、破坏性变更，必须先走 OpenSpec 提案。',
-    '- 进入提案、规范变更、提案校验或归档前，先读取 `openspec/AGENTS.md`。',
-    '- 涉及代码编写、测试、重构、调试前，先读取 `.praxis/rules.md` 与相关 skill 文件。',
-    '- 选择或调用项目 skill 前，先读取 `.praxis/skills/INDEX.md`，再打开对应 `SKILL.md`。',
-    '- 标记完成前，必须执行验证门控与 OpenSpec 校验。',
+    '- proposal flow: 用户显式输入 `/change` 或 `/proposal`，或者任务属于新功能、API 变更、架构重构、破坏性变更。此时禁止直接实现。',
+    '- implementation flow: 任务属于代码实现、测试、重构、调试、修缺陷。',
+    '- review flow: 用户要求 review、审查、排查回归风险、检查测试缺口。',
+    '- 如果任务意图不清晰，先澄清；不要在未分流前直接写代码。',
     '',
-    renderDependencyGateSummary(projectDir),
+    '## Required Reads',
+    '',
+    '- proposal flow: 先读取 `openspec/AGENTS.md`，再按需读取 `openspec/project.md`；若需求仍不清晰，先进入 brainstorming，再决定 full / lite proposal。',
+    '- implementation flow: 先读取 `.praxis/rules.md`；需要项目 skill 时，先读取 `.praxis/skills/INDEX.md`，再打开对应 `SKILL.md`。',
+    '- review flow: 先读取 `.praxis/rules.md`；如涉及评审流程或提案关联，再读取对应 skill 与 OpenSpec 文件。',
+    '',
+    renderDependencyGateSummary(projectDir, entryAgent),
     '',
     renderProjectSkillsSection(projectDir),
     '',
-    '## 继续读取这些文件',
+    '## Canonical Sources',
     '',
-    '- `.praxis/framework-rules.md`：完整框架门控规则；当需要解释门禁来源或优先级时读取',
-    '- `.praxis/rules.md`：完整技术栈 / 项目规则；所有代码实现、测试、重构、调试前先读取',
-    '- `.praxis/skills/INDEX.md`：当前项目可用 skills 摘要；选择 skill 前先读取',
-    '- `openspec/AGENTS.md`：OpenSpec 规范驱动工作流；所有提案相关操作前先读取',
-    '- `openspec/project.md`：项目规范上下文；提案或规范变更需要项目背景时读取',
+    '- `.praxis/framework-rules.md`：完整框架门控规则',
+    '- `.praxis/rules.md`：完整技术栈 / 项目规则',
+    '- `.praxis/skills/INDEX.md`：当前项目可用 skills 摘要',
+    '- `openspec/AGENTS.md`：OpenSpec 规范驱动工作流',
+    '- `openspec/project.md`：项目规范上下文',
   ].filter(Boolean);
 
   return sections.join('\n');
@@ -682,7 +681,7 @@ const syncCodexAdapter = ({ projectDir, log }) => {
     paths.rootAgentsMd,
     AGENTS_MANAGED_START,
     AGENTS_MANAGED_END,
-    readFile(paths.praxisCompiledRulesMd) || renderManagedRulesBlock(projectDir),
+    renderManagedRulesBlock(projectDir, 'codex'),
     AGENTS_MD_TEMPLATE,
   );
 
@@ -695,7 +694,7 @@ const syncClaudeAdapter = ({ projectDir, log }) => {
     paths.rootClaudeMd,
     CLAUDE_MANAGED_START,
     CLAUDE_MANAGED_END,
-    readFile(paths.praxisCompiledRulesMd) || renderManagedRulesBlock(projectDir),
+    renderManagedRulesBlock(projectDir, 'claude'),
     CLAUDE_MD_TEMPLATE,
   );
 
