@@ -54,7 +54,10 @@ jobs:
         run: npm pack --json > pack.json
 
       - name: Export pack filename
-        run: node -e "const fs=require('node:fs'); const pack=JSON.parse(fs.readFileSync('pack.json','utf8'))[0].filename; fs.appendFileSync(process.env.GITHUB_ENV, `PACK_FILE=${pack}\n`);"
+        shell: bash
+        run: |
+          PACK_FILE="$(node -e "process.stdout.write(JSON.parse(require('node:fs').readFileSync('pack.json','utf8'))[0].filename)")"
+          echo "PACK_FILE=$PACK_FILE" >> "$GITHUB_ENV"
 
       - name: Run install smoke
         run: node scripts/install-smoke.mjs --package "${{ env.PACK_FILE }}" --scenario "${{ matrix.scenario }}"

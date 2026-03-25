@@ -118,18 +118,21 @@ const installFakeWindowsOpenSpec = (projectDir, location = 'local') => {
   return scriptPath;
 };
 
-const installFakeWhere = (projectDir, resolvedPath) => {
+const installFakeWhereWithMap = (projectDir, mappings) => {
   const binDir = path.join(projectDir, 'fake-where-bin');
   const scriptPath = path.join(binDir, 'where');
   fs.mkdirSync(binDir, { recursive: true });
+  const cases = Object.entries(mappings)
+    .map(([command, resolvedPath]) => `if [ "$1" = "${command}" ]; then
+  printf '%s\\n' "${resolvedPath}"
+  exit 0
+fi`)
+    .join('\n');
   fs.writeFileSync(
     scriptPath,
     `#!/bin/sh
 set -eu
-if [ "$1" = "openspec" ]; then
-  printf '%s\\n' "${resolvedPath}"
-  exit 0
-fi
+${cases}
 exit 1
 `,
     { mode: 0o755 },
@@ -137,6 +140,10 @@ exit 1
   fs.chmodSync(scriptPath, 0o755);
   return binDir;
 };
+
+const installFakeWhere = (projectDir, resolvedPath) => installFakeWhereWithMap(projectDir, {
+  openspec: resolvedPath,
+});
 
 const installFakeWhich = (projectDir, openspecPath = null) => {
   const binDir = path.join(projectDir, 'fake-which-bin');
@@ -177,6 +184,56 @@ printf '%s' "$4"
   return scriptPath;
 };
 
+const installFakeCmdRunner = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-cmd-runner-bin');
+  const scriptPath = path.join(binDir, 'cmd-shim');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+eval "set -- $4"
+"$@"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
+const installFakeWindowsNpm = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-win-npm-bin');
+  const scriptPath = path.join(binDir, 'npm.cmd');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
+  mkdir -p "$PWD/node_modules/.bin"
+  cat > "$PWD/node_modules/.bin/openspec.cmd" <<'EOF'
+#!/bin/sh
+set -eu
+cmd="$1"
+target="$2"
+if [ "$cmd" = "init" ]; then
+  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
+  exit 0
+fi
+echo "LOCAL:$*"
+EOF
+  chmod +x "$PWD/node_modules/.bin/openspec.cmd"
+  exit 0
+fi
+echo "unsupported npm invocation: $*" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
 const installFakeGit = (projectDir) => {
   const binDir = path.join(projectDir, 'fake-git-bin');
   const scriptPath = path.join(binDir, 'git');
@@ -187,7 +244,10 @@ const installFakeGit = (projectDir) => {
 set -eu
 if [ "$1" = "clone" ]; then
   target="$3"
-  mkdir -p "$target/skills"
+  mkdir -p "$target/skills/example-skill"
+  cat > "$target/skills/example-skill/SKILL.md" <<'EOF'
+# Example Skill
+EOF
   exit 0
 fi
 echo "unsupported git invocation: $*" >&2
@@ -233,6 +293,23 @@ exit 1
 };
 
 const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+const findSkillMarkdown = (rootDir) => {
+  const pending = [rootDir];
+  while (pending.length > 0) {
+    const currentDir = pending.pop();
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isFile() && entry.name === 'SKILL.md') {
+        return entryPath;
+      }
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+      }
+    }
+  }
+  return null;
+};
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
@@ -437,6 +514,7 @@ test('setupProject installs Codex superpowers, initializes, and applies a reques
     assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
     assert.ok(fs.existsSync(codexSkillsPath));
+    assert.ok(findSkillMarkdown(codexSkillsPath));
     assert.doesNotMatch(output, /\[MISSING\] superpowers:codex/);
   })));
 });
@@ -459,6 +537,28 @@ test('setupProject installs OpenSpec locally when runtime is missing', () => {
   }))));
 });
 
+test('setupProject installs OpenSpec locally on Windows via npm.cmd when runtime is missing', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos setup win openspec-'));
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmPath = installFakeWindowsNpm(projectDir);
+  const fakeWhereDir = installFakeWhereWithMap(projectDir, {
+    npm: fakeNpmPath.replace(/\.cmd$/i, ''),
+    'npm.cmd': fakeNpmPath,
+  });
+  const fakeCmdShell = installFakeCmdRunner(projectDir);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-win-install-'));
+
+  withPlatform('win32', () => withTempPath(fakeWhereDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => withEnv('ComSpec', fakeCmdShell, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd')));
+  })))));
+});
+
 test('setupProject skips OpenSpec install when project-local runtime already exists', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-existing-openspec-'));
   const fakeGitDir = installFakeGit(projectDir);
@@ -475,6 +575,24 @@ test('setupProject skips OpenSpec install when project-local runtime already exi
     assert.match(output, /OpenSpec already available \(project-local\)/);
     assert.doesNotMatch(output, /Installed OpenSpec locally with npm/);
   })));
+});
+
+test('doctor warns when Codex superpowers path has no skill content', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-codex-empty-'));
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-codex-empty-'));
+  const codexSkillsPath = path.join(fakeHomeDir, '.agents', 'skills', 'superpowers');
+
+  fs.mkdirSync(codexSkillsPath, { recursive: true });
+
+  withEnv('HOME', fakeHomeDir, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /\[WARN\] superpowers:codex/);
+    assert.match(output, /no SKILL\.md files were found/);
+  });
 });
 
 test('setupProject surfaces manual action required for claude', () => {
