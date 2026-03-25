@@ -159,6 +159,9 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(skillsIndex, /Java \+ Spring Boot 安全编码规范/);
     assert.match(agentsMd, /项目 Skills/);
     assert.match(agentsMd, /java-security/);
+    assert.match(agentsMd, /涉及代码编写、测试、重构、调试前，先读取 `\.praxis\/rules\.md`/);
+    assert.match(agentsMd, /所有提案相关操作前先读取/);
+    assert.doesNotMatch(agentsMd, /Spring Boot 代码组织/);
   });
 });
 
