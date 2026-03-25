@@ -70,6 +70,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `0.2.x` stability coverage now reaches adapter sync, migration, dependency bootstrap, and OpenSpec runtime resolution
 - OpenSpec bootstrap guidance now recommends `npx praxis-devos ...` for one-shot usage and only suggests bare `praxis-devos ...` when it is actually installed on PATH
 
+## [0.3.0] - 2026-03-25
+
+### Added
+- `praxis-devos setup` as the primary onboarding command for new projects, new machines, and add-agent repair flows
+- `praxis-devos use-stack <stack>` for applying a technology stack after framework initialization
+- Automatic OpenSpec installation during `setup` when neither a project-local nor global runtime is available
+- Automatic Codex SuperPowers installation during `setup`, including skills link/junction creation
+- Cross-platform install smoke CI covering Codex, OpenCode, and Claude scenarios, including Windows runners
+- Product contract documentation for CLI onboarding and manual-step disclosure in `docs/architecture/command-scenarios.md`
+
+### Changed
+- Quick Start documentation now follows scenario-based `setup` flows instead of low-level bootstrap-first instructions
+- `init` can now initialize the framework skeleton without requiring a stack up front
+- `doctor` now recommends `setup` as the primary fix path
+- OpenCode and Codex runtime setup now validate stronger post-install signals instead of only checking for a path
+- Windows command execution now resolves `npm.cmd`/batch wrappers correctly for OpenSpec setup flows
+
+### Fixed
+- Removed the no-op `--openspec` path from the main CLI surface
+- Fixed Windows OpenSpec invocation and automatic install flows
+- Fixed install smoke CI tarball resolution in temporary projects
+- Codex runtime validation now requires actual installed skill content instead of treating an empty skills path as healthy
+
 ## [0.2.2] - 2026-03-25
 
 ### Added
