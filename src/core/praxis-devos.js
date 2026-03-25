@@ -84,13 +84,15 @@ const CLAUDE_MD_TEMPLATE = `# Claude Code Project Memory
 
 const OPENCODE_ADAPTER_README = `# OpenCode Adapter Output
 
-This directory is a generated compatibility projection of the canonical Praxis state in \`.praxis/\`.
+This directory is a generated compatibility marker for OpenCode.
+Canonical project assets stay in \`.praxis/\`, and the Praxis OpenCode plugin reads them directly.
 
 - Edit project skills in \`.praxis/skills/\`
 - Edit stack metadata in \`.praxis/stack.md\`
 - Edit framework gates in \`.praxis/framework-rules.md\`
 - Compiled cross-agent rules live in \`.praxis/adapters/compiled-rules.md\`
 - Edit stack rules in \`.praxis/rules.md\`
+- \`.opencode/\` no longer mirrors skills, stack, or rules files by default
 - Re-run \`praxis-devos sync --agent opencode\` after changing canonical files
 `;
 
@@ -203,6 +205,12 @@ const syncDirRecursive = (src, dst) => {
 const copyDirIfMissing = (src, dst) => {
   if (!fs.existsSync(dst)) {
     syncDirRecursive(src, dst);
+  }
+};
+
+const removePathIfExists = (targetPath) => {
+  if (fs.existsSync(targetPath)) {
+    fs.rmSync(targetPath, { recursive: true, force: true });
   }
 };
 
@@ -700,22 +708,12 @@ const syncOpenCodeAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
 
   ensureDir(paths.legacyOpenCodeDir);
-  ensureDir(paths.legacyOpenCodeSkillsDir);
-
-  if (fs.existsSync(paths.praxisSkillsDir)) {
-    syncDirRecursive(paths.praxisSkillsDir, paths.legacyOpenCodeSkillsDir);
-  }
-
-  if (fs.existsSync(paths.praxisStackMd)) {
-    copyFile(paths.praxisStackMd, paths.legacyOpenCodeStackMd);
-  }
-
-  if (fs.existsSync(paths.praxisRulesMd)) {
-    copyFile(paths.praxisRulesMd, paths.legacyOpenCodeRulesMd);
-  }
+  removePathIfExists(paths.legacyOpenCodeSkillsDir);
+  removePathIfExists(paths.legacyOpenCodeStackMd);
+  removePathIfExists(paths.legacyOpenCodeRulesMd);
 
   writeText(path.join(paths.legacyOpenCodeDir, 'README.md'), `${OPENCODE_ADAPTER_README}\n`);
-  log('✓ OpenCode adapter synced to .opencode/');
+  log('✓ OpenCode adapter synced to .opencode/ (canonical assets remain in .praxis/)');
 };
 
 const syncAgent = ({ projectDir, agent, log }) => {
@@ -835,9 +833,7 @@ export const collectSkillsPaths = (projectDir) => {
 
   if (fs.existsSync(project.praxisSkillsDir)) {
     paths.push(project.praxisSkillsDir);
-  }
-
-  if (fs.existsSync(project.legacyOpenCodeSkillsDir)) {
+  } else if (fs.existsSync(project.legacyOpenCodeSkillsDir)) {
     paths.push(project.legacyOpenCodeSkillsDir);
   }
 

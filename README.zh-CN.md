@@ -60,7 +60,7 @@ your-project/
         └── compiled-rules.md
 ```
 
-OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `praxis-devos sync --agent opencode` 会生成或刷新它。
+OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCode 通过插件直接读取 `.praxis/`，不再默认镜像 skills、stack、rules 到 `.opencode/`。
 
 更详细的设计说明见：
 

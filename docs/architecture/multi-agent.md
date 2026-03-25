@@ -58,10 +58,11 @@ your-project/
 
 - OpenCode 插件读取框架内置 `skills/`
 - 同时读取项目内 `.praxis/skills/`
-- `.praxis/skills/` 仍然是 canonical source，`.opencode/skills/` 只是兼容投影
+- `.praxis/skills/` 是唯一 canonical source
+- 只有旧项目缺少 `.praxis/skills/` 时，才回退读取 `.opencode/skills/`
 - 注入框架 `RULES.md` 和项目 `.praxis/rules.md`
 - 同时可以复用 `.praxis/adapters/compiled-rules.md` 作为统一规则摘要
-- `praxis-devos sync --agent opencode` 会生成 `.opencode/` 兼容投影
+- `praxis-devos sync --agent opencode` 只保留 `.opencode/` 最小兼容目录，不再镜像 skills / stack / rules
 
 ### Codex
 
