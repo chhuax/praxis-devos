@@ -17,8 +17,10 @@ import {
   renderHelp,
   runOpenSpecCommand,
   runCli,
+  setupProject,
   statusProject,
   syncProject,
+  useStackProject,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
 
@@ -81,9 +83,12 @@ const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'))
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
+  assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files/);
   assert.match(help, /change\s+Create an OpenSpec change scaffold/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
+  assert.match(help, /use-stack\s+Apply a technology stack to an initialized project/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
+  assert.doesNotMatch(help, /--openspec/);
 });
 
 test('createChangeScaffold creates a full change by default', () => {
@@ -135,6 +140,16 @@ test('doctor strict fails when openspec is missing', () => {
   );
 });
 
+test('doctor output recommends setup as the primary fix path', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-output-'));
+  const output = doctorProject({ projectDir, agents: ['opencode', 'codex', 'claude'] });
+
+  assert.match(output, /Recommended next step:/);
+  assert.match(output, /- npx praxis-devos setup --agents opencode,codex,claude/);
+  assert.match(output, /Advanced repair command:/);
+  assert.match(output, /- npx praxis-devos bootstrap --agents opencode,codex,claude/);
+});
+
 test('initProject creates canonical assets and managed adapters', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -183,6 +198,83 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(agentsMd, /OpenCode：`npx praxis-devos bootstrap --agent opencode`/);
     assert.doesNotMatch(agentsMd, /当前入口按 `codex` 处理/);
     assert.doesNotMatch(agentsMd, /Spring Boot 代码组织/);
+  });
+});
+
+test('initProject can initialize framework files without applying a stack', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-nostack-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    const output = initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /No stack selected during init/);
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'manifest.json')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'framework-rules.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const stackMd = fs.readFileSync(path.join(projectDir, '.praxis', 'stack.md'), 'utf8');
+    const rulesMd = fs.readFileSync(path.join(projectDir, '.praxis', 'rules.md'), 'utf8');
+
+    assert.equal(manifest.selectedStack, null);
+    assert.match(stackMd, /No Stack Selected/);
+    assert.match(rulesMd, /No Stack Rules Installed/);
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow', 'SKILL.md')));
+  });
+});
+
+test('useStackProject applies a stack after framework init', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-use-stack-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const output = useStackProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['codex'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const stackMd = fs.readFileSync(path.join(projectDir, '.praxis', 'stack.md'), 'utf8');
+    const rulesMd = fs.readFileSync(path.join(projectDir, '.praxis', 'rules.md'), 'utf8');
+
+    assert.match(output, /Applying stack: java-spring/);
+    assert.equal(manifest.selectedStack, 'java-spring');
+    assert.match(stackMd, /Java \+ Spring Boot/);
+    assert.match(rulesMd, /Spring Boot/);
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
+  });
+});
+
+test('setupProject bootstraps, initializes, and applies a requested stack', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    const output = setupProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['opencode'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    assert.match(output, /== openspec ==/);
+    assert.match(output, /== opencode ==/);
+    assert.match(output, /== setup ==/);
+    assert.match(output, /Dependency doctor:/);
+    assert.equal(manifest.selectedStack, 'java-spring');
+    assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
   });
 });
 
@@ -388,5 +480,19 @@ test('runCli validate-session --strict fails when transcript evidence is incompl
   assert.throws(
     () => runCli(['validate-session', '--file', fixturePath, '--strict']),
     /Missing Proposal Intake evidence after proposal flow signal/,
+  );
+});
+
+test('runCli use-stack requires a stack name', () => {
+  assert.throws(
+    () => runCli(['use-stack']),
+    /Stack name is required/,
+  );
+});
+
+test('runCli rejects removed --openspec flag with migration guidance', () => {
+  assert.throws(
+    () => runCli(['bootstrap', '--openspec']),
+    /`--openspec` has been removed/,
   );
 });

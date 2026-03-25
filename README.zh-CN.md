@@ -65,6 +65,7 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCo
 更详细的设计说明见：
 
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md)
+- [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md)
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
@@ -74,36 +75,74 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCo
 
 ## 快速开始
 
-### 1. 在 agent 之外初始化项目
+快速开始要按场景读，而不是按框架内部命令分层来读。
+
+当前这个发布版本的支持范围：
+
+- 发布支持：macOS、Linux
+- Windows 作为后续版本补齐，因为本地 OpenSpec runtime 调用和 Codex bootstrap 还需要补 Windows 专用处理
+
+### 1. 全新项目，Codex + Java Spring，一次接入
 
 ```bash
-npx praxis-devos bootstrap --openspec
-npx praxis-devos init --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos doctor --strict
 ```
 
-该命令会：
+### 2. 全新项目，先只把框架搭起来，稍后再选 stack
+
+```bash
+npx praxis-devos setup --agent codex
+npx praxis-devos doctor --strict
+```
+
+等你准备好再应用技术栈：
+
+```bash
+npx praxis-devos use-stack java-spring
+npx praxis-devos doctor --strict
+```
+
+### 3. 仓库已经初始化过，但这是你的新电脑
+
+```bash
+npx praxis-devos setup --agent codex
+npx praxis-devos doctor --strict
+```
+
+### 4. 现有项目后续补一个 agent
+
+```bash
+npx praxis-devos setup --agent claude
+npx praxis-devos doctor --strict
+```
+
+### 5. 从第一天就启用多 agent
+
+```bash
+npx praxis-devos setup --agents opencode,codex,claude --stack java-spring
+npx praxis-devos doctor --strict
+```
+
+`setup` 会：
 
 - 创建或刷新 `openspec/`
 - 创建 canonical `.praxis/`
+- 安装或修复 OpenSpec 与所选 agent 的依赖引导
 - 把可自定义 skills 安装到 `.praxis/skills/`
 - 把框架门控规则写入 `.praxis/framework-rules.md`
-- 把技术栈工具链写入 `.praxis/stack.md`
-- 把技术栈规则写入 `.praxis/rules.md`
-- 同步 OpenCode、Codex、Claude Code 的适配入口
+- 同步所选 agent 的适配入口
+- 如果带了 `--stack`，顺手应用对应技术栈
 
-如果你当前只打算使用某一个 agent，也可以显式指定：
+命令职责建议这样理解：
 
-```bash
-npx praxis-devos init --stack java-spring --agents codex
-```
+- `setup` 是用户主入口
+- `init` 是底层框架骨架初始化命令
+- `use-stack` 用于在框架初始化后补上技术栈
+- `bootstrap` 保留为高级修复 / 调试命令
+- `sync` 保留为手工调整后刷新 adapters 的命令
 
-后续如果团队里有人想补用其他 agent，再增量同步即可：
-
-```bash
-npx praxis-devos sync --agent opencode
-```
-
-如果当前环境还没有 OpenSpec，`init` 会直接失败，不再降级为手工脚手架模式。
+`setup` 是推荐 onboarding 命令，但它并不等于“所有 runtime 都能一条命令全自动装完”。对 Codex 和 Claude Code，它会把项目侧准备好，输出 SuperPowers 安装指引，再由 `doctor --strict` 暴露仍需人工确认的缺口。
 
 ### 2. 补充项目上下文
 
@@ -152,20 +191,24 @@ npx praxis-devos sync --agent opencode
 ## CLI
 
 ```bash
-npx praxis-devos init --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos use-stack java-spring
+npx praxis-devos init
 npx praxis-devos sync --agents opencode,codex,claude
 npx praxis-devos migrate
 npx praxis-devos change --title "Add two factor auth" --capability auth
 npx praxis-devos status
 npx praxis-devos doctor --strict
-npx praxis-devos bootstrap --openspec
-npx praxis-devos bootstrap --agent opencode
+npx praxis-devos bootstrap --agents codex
 npx praxis-devos openspec list --specs
 npx praxis-devos list-stacks
 ```
 
 说明：
 
+- `setup` 是 onboarding、修复依赖、补 agent 的推荐入口
+- `init` 是底层框架初始化命令
+- `use-stack` 用于在框架初始化后应用技术栈
 - 不带 `--agent` / `--agents` 时，默认会处理 `opencode,codex,claude`
 - 可以只指定单个 agent，例如 `--agents codex`
 - 后续增量扩展不会覆盖已有配置，`sync --agent opencode` 会把 `opencode` 合并进当前项目的已配置 agents
@@ -182,10 +225,10 @@ Praxis DevOS 强依赖：
 由于 `superpowers` 在 OpenCode、Codex、Claude Code 下的安装方式不同，Praxis 不会把它复制到 `.praxis/`，而是通过依赖管理命令处理：
 
 ```bash
+npx praxis-devos setup --agent codex
 npx praxis-devos doctor
-npx praxis-devos bootstrap --openspec
-npx praxis-devos bootstrap --agent codex
-npx praxis-devos bootstrap --agent claude
+npx praxis-devos bootstrap --agents codex
+npx praxis-devos bootstrap --agents claude
 ```
 
 ## Skills

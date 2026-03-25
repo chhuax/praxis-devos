@@ -65,6 +65,7 @@ OpenCode compatibility is still supported. `npx praxis-devos sync --agent openco
 Detailed architecture and migration notes:
 
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md)
+- [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md)
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
@@ -74,36 +75,74 @@ Detailed architecture and migration notes:
 
 ## Quick Start
 
-### 1. Initialize the project outside any agent runtime
+Read Quick Start by scenario, not by internal command layering.
+
+Current release target:
+
+- Supported for release: macOS, Linux
+- Windows support is being tracked as a follow-up release because local OpenSpec runtime execution and Codex bootstrap guidance still need Windows-specific handling
+
+### 1. New project, Codex + Java Spring
 
 ```bash
-npx praxis-devos bootstrap --openspec
-npx praxis-devos init --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos doctor --strict
 ```
 
-This will:
+### 2. New project, framework first, stack later
+
+```bash
+npx praxis-devos setup --agent codex
+npx praxis-devos doctor --strict
+```
+
+When you are ready to apply a stack:
+
+```bash
+npx praxis-devos use-stack java-spring
+npx praxis-devos doctor --strict
+```
+
+### 3. Existing initialized project, new machine
+
+```bash
+npx praxis-devos setup --agent codex
+npx praxis-devos doctor --strict
+```
+
+### 4. Existing project, add another agent later
+
+```bash
+npx praxis-devos setup --agent claude
+npx praxis-devos doctor --strict
+```
+
+### 5. Multi-agent from day one
+
+```bash
+npx praxis-devos setup --agents opencode,codex,claude --stack java-spring
+npx praxis-devos doctor --strict
+```
+
+What `setup` does:
 
 - create or refresh `openspec/`
 - create canonical `.praxis/`
+- install or repair dependency guidance for OpenSpec and the selected agents
 - copy customizable skills into `.praxis/skills/`
 - mirror framework gates into `.praxis/framework-rules.md`
-- copy stack metadata into `.praxis/stack.md`
-- copy stack rules into `.praxis/rules.md`
-- sync adapters for OpenCode, Codex, and Claude Code
+- sync adapters for the selected agents
+- optionally apply the chosen stack if `--stack` is provided
 
-If you only want one agent at first, target it explicitly:
+Important command roles:
 
-```bash
-npx praxis-devos init --stack java-spring --agents codex
-```
+- `setup` is the user-facing entrypoint
+- `init` is the lower-level framework skeleton command
+- `use-stack` applies a stack after framework initialization
+- `bootstrap` remains available as an advanced repair/debug command
+- `sync` remains available when you want to refresh adapters explicitly after manual edits
 
-If a teammate later wants another agent, just add it incrementally:
-
-```bash
-npx praxis-devos sync --agent opencode
-```
-
-If OpenSpec is not available, `init` now fails directly instead of falling back to a manual scaffold.
+`setup` is the recommended onboarding command, but it does not fully automate every runtime install. For Codex and Claude Code, it prepares the project, prints the required SuperPowers installation steps, and then `doctor --strict` verifies what still needs manual confirmation.
 
 ### 2. Fill in project context
 
@@ -152,20 +191,24 @@ All command examples below assume project-local usage via `npx`; a global instal
 ## CLI
 
 ```bash
-npx praxis-devos init --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos use-stack java-spring
+npx praxis-devos init
 npx praxis-devos sync --agents opencode,codex,claude
 npx praxis-devos migrate
 npx praxis-devos change --title "Add two factor auth" --capability auth
 npx praxis-devos status
 npx praxis-devos doctor --strict
-npx praxis-devos bootstrap --openspec
-npx praxis-devos bootstrap --agent opencode
+npx praxis-devos bootstrap --agents codex
 npx praxis-devos openspec list --specs
 npx praxis-devos list-stacks
 ```
 
 Notes:
 
+- `setup` is the recommended entrypoint for onboarding, repair, and add-agent scenarios
+- `init` is the lower-level framework initialization command
+- `use-stack` applies a stack after framework initialization
 - Without `--agent` / `--agents`, Praxis defaults to `opencode,codex,claude`
 - You can target a single agent, for example `--agents codex`
 - Later expansion is additive: `sync --agent opencode` merges `opencode` into the project's configured agents instead of replacing the existing ones
@@ -182,10 +225,10 @@ OpenSpec is now invoked only through `npx praxis-devos openspec ...`, preferring
 Because Superpowers installs differently on OpenCode, Codex, and Claude Code, Praxis does not copy it into `.praxis/`. Instead it exposes dependency commands:
 
 ```bash
+npx praxis-devos setup --agent codex
 npx praxis-devos doctor
-npx praxis-devos bootstrap --openspec
-npx praxis-devos bootstrap --agent codex
-npx praxis-devos bootstrap --agent claude
+npx praxis-devos bootstrap --agents codex
+npx praxis-devos bootstrap --agents claude
 ```
 
 ## Skills
