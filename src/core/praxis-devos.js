@@ -1212,6 +1212,7 @@ const renderFoundationReadme = (definition) => {
   const overlayList = Array.isArray(definition.overlays) && definition.overlays.length > 0
     ? definition.overlays.map((name) => `- \`${name}\``).join('\n')
     : '- none';
+  const profileSeed = definition.profile || 'unknown';
 
   return `# Runtime Foundation
 
@@ -1227,12 +1228,20 @@ This project uses the built-in \`${definition.name}\` foundation.
 
 ${overlayList}
 
+## Built-in baseline conventions
+
+- branch workflow: \`.praxis/foundation/profile/branch-workflow.md\`
+- verification expectations: \`.praxis/foundation/profile/verification.md\`
+- default operating agreements: \`.praxis/foundation/profile/operating-agreements.md\`
+
 ## Operating model
 
 - Treat this foundation as the runtime base for day-to-day AI engineering workflows.
 - Keep \`.praxis/foundation/profile/\` as the local, editable profile baseline.
+- Start from the built-in baseline in \`.praxis/foundation/profile/\`, then tighten it locally when a project needs stricter conventions.
 - Keep \`.praxis/overlays/\` as extension seams for future internal MCP, docs, commands, hooks, rules, and skills.
 - Use OpenSpec when the work needs governance, proposal review, or controlled change records. It is available, but it is not the required front door for every daily task.
+- Current profile seed: \`${profileSeed}\`.
 `;
 };
 
@@ -1337,6 +1346,7 @@ const renderFoundationSection = (projectDir) => {
   lines.push(`- profile seed: \`${foundationManifest.profile || 'unknown'}\``);
   lines.push(`- applied overlays: ${(foundationManifest.overlays || []).map((name) => `\`${name}\``).join(', ') || 'none'}`);
   lines.push('- daily implementation should read `.praxis/foundation/README.md` before reaching for governance docs.');
+  lines.push('- built-in conventions live in `.praxis/foundation/profile/branch-workflow.md`, `.praxis/foundation/profile/verification.md`, and `.praxis/foundation/profile/operating-agreements.md`.');
   lines.push('- OpenSpec remains available for proposal and governance work, but it is not the mandatory front door for daily execution.');
   return lines.join('\n');
 };
