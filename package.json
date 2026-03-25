@@ -1,6 +1,6 @@
 {
   "name": "praxis-devos",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "AI-Native Development Framework — OpenSpec Governance + SuperPowers Execution + Pluggable Stacks",
   "type": "module",
   "main": "opencode-plugin.js",
