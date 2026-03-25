@@ -802,8 +802,8 @@ function renderDependencyGateSummary(projectDir) {
     '## 全局硬门禁',
     '',
     openspecRuntime.status === 'ok'
-      ? '- OpenSpec 已可用；治理 / proposal 场景统一通过 `npx praxis-devos openspec ...` 调用。'
-      : '- OpenSpec 当前不可用；日常实现可继续沿用 foundation + stack 基线，但 proposal / validate / archive 流程必须先执行 `npx praxis-devos setup --agent <name>`。',
+      ? '- OpenSpec 已可用；当任务需要提案、校验或归档治理时，统一通过 `npx praxis-devos openspec ...` 调用。'
+      : '- OpenSpec 当前不可用；日常实现可继续沿用已安装的项目基线，但 proposal / validate / archive 之前必须先执行 `npx praxis-devos setup --agent <name>`。',
   ];
 
   lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
@@ -1213,9 +1213,11 @@ const renderFoundationReadme = (definition) => {
     ? definition.overlays.map((name) => `- \`${name}\``).join('\n')
     : '- none';
 
-  return `# Runtime Foundation
+  return `# Runtime Baseline
 
-This project uses the built-in \`${definition.name}\` foundation.
+This project already has the built-in \`${definition.name}\` runtime baseline installed.
+
+You usually do not need to work in this directory during normal onboarding or everyday implementation.
 
 ## Summary
 
@@ -1229,9 +1231,9 @@ ${overlayList}
 
 ## Operating model
 
-- Treat this foundation as the runtime base for day-to-day AI engineering workflows.
-- Keep \`.praxis/foundation/profile/\` as the local, editable profile baseline.
-- Keep \`.praxis/overlays/\` as extension seams for future internal MCP, docs, commands, hooks, rules, and skills.
+- Start day-to-day work from \`.praxis/rules.md\`, \`.praxis/stack.md\`, and installed project skills.
+- Use \`.praxis/foundation/profile/\` when you need to inspect or adjust runtime workflow conventions.
+- Use \`.praxis/overlays/\` when you need advanced extension seams for runtime behavior.
 - Use OpenSpec when the work needs governance, proposal review, or controlled change records. It is available, but it is not the required front door for every daily task.
 `;
 };
@@ -1322,21 +1324,22 @@ const renderFoundationSection = (projectDir) => {
   const foundationManifest = readJson(paths.praxisFoundationManifestPath);
 
   const lines = [
-    '## Runtime Foundation',
+    '## Runtime Baseline',
     '',
   ];
 
   if (!foundationManifest) {
-    lines.push('- selected foundation: none');
-    lines.push('- daily workflows can still run on the stack/runtime defaults, but no built-in ECC foundation overlay has been applied yet.');
+    lines.push('- built-in runtime baseline: not applied');
+    lines.push('- daily workflows can still run on stack/runtime defaults, but no built-in baseline package has been applied yet.');
     return lines.join('\n');
   }
 
-  lines.push(`- selected foundation: \`${foundationManifest.foundation || 'unknown'}\``);
+  lines.push(`- built-in runtime baseline: \`${foundationManifest.foundation || 'unknown'}\``);
   lines.push(`- runtime base: \`${foundationManifest.runtimeBase || 'unknown'}\``);
   lines.push(`- profile seed: \`${foundationManifest.profile || 'unknown'}\``);
   lines.push(`- applied overlays: ${(foundationManifest.overlays || []).map((name) => `\`${name}\``).join(', ') || 'none'}`);
-  lines.push('- daily implementation should read `.praxis/foundation/README.md` before reaching for governance docs.');
+  lines.push('- daily implementation should usually start from `.praxis/rules.md` and installed stack skills.');
+  lines.push('- read `.praxis/foundation/README.md` only when the task touches runtime conventions, agent workflow behavior, or advanced troubleshooting.');
   lines.push('- OpenSpec remains available for proposal and governance work, but it is not the mandatory front door for daily execution.');
   return lines.join('\n');
 };
@@ -2421,28 +2424,28 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-  setup          Bootstrap dependencies, initialize framework files, apply the built-in runtime foundation, and optionally apply a stack
-  init           Initialize the framework skeleton and built-in runtime foundation in the current project
-  use-stack      Apply a technology stack to an initialized project
-  use-foundation Advanced: apply or re-apply a built-in runtime foundation profile
+  setup          Recommended first command: install dependencies, initialize project files, sync agents, and optionally apply a stack
+  init           Advanced: initialize project files and the built-in runtime baseline directly
+  use-stack      Apply a technology stack after setup or init
+  use-foundation Advanced: apply or re-apply a built-in runtime baseline profile
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
-  change         Create an OpenSpec change scaffold from the explicit proposal path
+  change         Create an OpenSpec change scaffold for governance-oriented work
   proposal       Compatibility alias of \`change\`
   status         Show current project initialization and dependency state
-  doctor         Check required openspec/superpowers dependencies
-  bootstrap      Print or apply dependency bootstrap steps for each agent
-  openspec       Run OpenSpec through the Praxis wrapper
+  doctor         Verify this machine is ready to work in the current project
+  bootstrap      Advanced repair: print or apply dependency bootstrap steps
+  openspec       Run governance-oriented OpenSpec commands through the Praxis wrapper
   validate-session  Validate a transcript against Praxis evidence hooks
   list-stacks    List available technology stacks
-  list-foundations List available built-in runtime foundations
+  list-foundations List available built-in runtime baseline bundles
   help           Show this help
 
 Options:
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
-  --foundation <name>    Advanced override for the built-in runtime foundation on setup/init, or pass it positionally to use-foundation
-  --agent <name>         Sync one agent adapter (repeatable)
-  --agents a,b,c         Sync multiple agent adapters
+  --foundation <name>    Advanced override for the built-in runtime baseline on setup/init, or pass it positionally to use-foundation
+  --agent <name>         Target one agent
+  --agents a,b,c         Target multiple agents
   --project-dir <path>   Project directory (defaults to cwd)
   --file <path>          Transcript file for \`validate-session\`
   --title <text>         Change title for \`change\` / \`proposal\`

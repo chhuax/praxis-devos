@@ -1,306 +1,169 @@
 # praxis-devos
 
-> The AI-Native Development Framework — Runtime Foundations + [OpenSpec](https://github.com/Fission-AI/OpenSpec) Governance + [SuperPowers](https://github.com/obra/superpowers) Execution + Pluggable Stacks
+> Productized project bootstrap for Codex, Claude Code, and OpenCode.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-## What is this?
+## What It Does
 
-Praxis DevOS is a framework for AI coding agents such as OpenCode, Codex, and Claude Code. It combines:
+Praxis DevOS prepares an AI-friendly project workspace with:
 
-- **Runtime foundations** for the AI engineering operating model
-- **OpenSpec** for change governance
-- **SuperPowers** for execution quality
-- **Pluggable stacks** for technology-specific standards
+- a canonical `.praxis/` directory for shared project rules and skills
+- agent adapters such as `AGENTS.md` and `CLAUDE.md`
+- an optional technology stack baseline such as `java-spring`
+- OpenSpec available for proposal and governance workflows when you need it
 
-At the framework layer, Praxis treats the runtime foundation and stack as the default daily execution base. OpenSpec remains available for governance and controlled change flows, but it is not the mandatory front door for every task. Testing strategy is chosen based on change risk.
-
-The framework is now designed as a **multi-agent system**. Project state no longer belongs to one runtime like OpenCode. Instead, Praxis keeps canonical assets in `.praxis/` and syncs agent-specific adapters as needed.
-
-## Why praxis-devos?
-
-| Capability | OpenSpec | SuperPowers | Praxis DevOS |
-|---|---|---|---|
-| Runtime foundation | ❌ | ❌ | ✅ |
-| Specification governance | ✅ | ❌ | ✅ |
-| Execution skills | ❌ | ✅ | ✅ |
-| Stack standards | ❌ | ❌ | ✅ |
-| Multi-agent project layout | ❌ | ❌ | ✅ |
-
-Praxis DevOS = Foundations (BASE) + OpenSpec (GOVERNANCE) + SuperPowers (HOW) + Pluggable Stacks (STANDARD).
-
-## Architecture
-
-Canonical project state lives in `.praxis/`. Agent adapters are projections, not the source of truth.
-
-```text
-┌────────────────────────────────────────────────────────────┐
-│                      Canonical Layer                        │
-│     AGENTS.md + CLAUDE.md + openspec/ + .praxis/           │
-├───────────────────────────────┬────────────────────────────┤
-│ Runtime Adapters              │ Framework Engine           │
-│ OpenCode / Codex / Claude     │ RULES.md + stacks + skills │
-└───────────────────────────────┴────────────────────────────┘
-```
-
-Project layout after initialization:
-
-```text
-your-project/
-├── AGENTS.md                  # Universal project context, used by Codex
-├── CLAUDE.md                  # Claude Code memory file
-├── openspec/                  # OpenSpec structure
-└── .praxis/                   # Canonical Praxis state
-    ├── manifest.json
-    ├── foundation/
-    │   ├── README.md
-    │   └── profile/
-    ├── framework-rules.md
-    ├── overlays/
-    ├── stack.md
-    ├── rules.md
-    ├── skills/
-    └── adapters/
-        └── compiled-rules.md
-```
-
-OpenCode compatibility is still supported. `npx praxis-devos sync --agent opencode` now keeps `.opencode/` as a minimal compatibility marker while the plugin prioritizes canonical assets from `.praxis/` and treats `.opencode/skills/` as an optional supplemental layer.
-
-Detailed architecture and migration notes:
-
-- [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md)
-- [docs/architecture/foundation-overlays.md](docs/architecture/foundation-overlays.md)
-- [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md)
-- [docs/dependency-management.md](docs/dependency-management.md)
-- [docs/migration-guide.md](docs/migration-guide.md)
-- [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
-- [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
-- [docs/releases/v0.2.2.md](docs/releases/v0.2.2.md)
-- [docs/releases/v0.2.3.md](docs/releases/v0.2.3.md)
+The default install path is simple: run `setup`, confirm with `doctor`, add a small amount of project context, and start working with your agent. You do not need to understand foundations, overlays, or ECC internals to get value on day one.
 
 ## Quick Start
 
-Read Quick Start by scenario, not by internal command layering.
+Prerequisites:
 
-Current release target:
+- Node.js `>= 20.19.0`
+- Git
+- one supported agent: OpenCode, Codex, or Claude Code
 
-- Supported for release: macOS, Linux, Windows PowerShell
-- On Windows, use PowerShell for Codex bootstrap so the generated SuperPowers junction commands work as documented
-
-### 1. New project, Codex + Java Spring
+### New repo or existing repo, Codex first
 
 ```bash
 npx praxis-devos setup --agent codex --stack java-spring
 npx praxis-devos doctor --strict
 ```
 
-### 2. New project, framework first, stack later
+If you want the framework first and will choose a stack later:
 
 ```bash
 npx praxis-devos setup --agent codex
 npx praxis-devos doctor --strict
 ```
 
-The built-in ECC-backed runtime foundation is applied automatically on the default path. Advanced foundation commands remain available when you explicitly need to inspect or re-apply runtime layers:
+Then add a stack when you are ready:
 
 ```bash
-npx praxis-devos list-foundations
-npx praxis-devos use-foundation ecc-foundation
 npx praxis-devos use-stack java-spring
-npx praxis-devos doctor --strict
 ```
 
-### 3. Existing initialized project, new machine
+### Existing Praxis project on a new machine
 
 ```bash
 npx praxis-devos setup --agent codex
 npx praxis-devos doctor --strict
 ```
 
-### 4. Existing project, add another agent later
+### Add another agent later
 
 ```bash
 npx praxis-devos setup --agent claude
 npx praxis-devos doctor --strict
 ```
 
-Claude Code still requires one manual marketplace step after `setup`:
+Claude Code still needs one manual marketplace step:
 
 ```text
 /plugin install superpowers@claude-plugins-official
 ```
 
-### 5. Multi-agent from day one
+## First Use
 
-```bash
-npx praxis-devos setup --agents opencode,codex,claude --stack java-spring
-npx praxis-devos doctor --strict
-```
+After `setup`, make two quick edits:
 
-What `setup` does:
+- `AGENTS.md`: project purpose, architecture, key commands, constraints
+- `openspec/project.md`: business context and governance context for changes that need a proposal trail
 
-- create or refresh `openspec/`
-- create canonical `.praxis/`
-- install or reuse OpenSpec
-- auto-configure or auto-install supported runtime dependencies for the selected agents
-- automatically apply the built-in ECC-backed runtime foundation on the default path
-- copy customizable skills into `.praxis/skills/`
-- mirror framework gates into `.praxis/framework-rules.md`
-- sync adapters for the selected agents
-- optionally apply the chosen stack if `--stack` is provided
+Then start your agent in the repo and work normally.
 
-Important command roles:
+For day-to-day implementation, debugging, and review, Praxis is designed to feel lightweight:
 
-- `setup` is the user-facing entrypoint
-- `init` is the lower-level framework skeleton command
-- `use-foundation` remains available as an advanced repair or re-apply command
-- `use-stack` applies a stack after framework initialization
-- `bootstrap` remains available as an advanced repair/debug command
-- `sync` remains available when you want to refresh adapters explicitly after manual edits
+- start with `setup`
+- follow `.praxis/rules.md` and any installed stack skills
+- use OpenSpec only when the work needs explicit proposal, review, validation, or archival governance
 
-`setup` is the recommended onboarding command. It auto-configures OpenCode, auto-installs Codex SuperPowers, and leaves only Claude Code on a manual marketplace path that still needs user confirmation.
+Detailed onboarding examples live in [docs/getting-started.md](docs/getting-started.md).
 
-### 2. Fill in project context
+## Daily Workflow
 
-Edit:
-
-- `AGENTS.md`
-- `openspec/project.md`
-
-### 3. Optional: install the OpenCode plugin
-
-Add to your project's `opencode.json`:
-
-```json
-{
-  "plugin": [
-    "praxis-devos",
-    "superpowers@git+https://github.com/obra/superpowers.git"
-  ]
-}
-```
-
-Then restart OpenCode.
-
-The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, `praxis-change`, `praxis-status`, and `praxis-openspec`.
-
-## How Rule Gating Works
-
-The framework source of truth for gating rules remains `RULES.md`, but each initialized project also gets `.praxis/framework-rules.md`.
-
-`npx praxis-devos sync` then distributes the same rule model through the best adapter for each runtime:
-
-- OpenCode: system prompt injection
-- Codex: managed block in `AGENTS.md`
-- Claude Code: managed block in `CLAUDE.md`
-
-Before that distribution step, Praxis generates a shared intermediate artifact at `.praxis/adapters/compiled-rules.md`.
-
-That compiled rules artifact also includes a dependency gate summary, so agents can see when `openspec` or the current runtime's `superpowers` installation is missing and stop before implementation.
-
-If `AGENTS.md` or `CLAUDE.md` already exists, Praxis only appends or refreshes the managed block between `<!-- PRAXIS_DEVOS_START -->` and `<!-- PRAXIS_DEVOS_END -->`. User-owned content outside that block is preserved.
-
-Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. This is a text-level workflow convention, not a guarantee that every agent runtime exposes a native slash command with that exact name. In Codex and Claude, the managed block uses those tokens to mean "enter the proposal path", while the executable scaffold entrypoint remains `npx praxis-devos change` / `npx praxis-devos proposal`. If the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
-
-All command examples below assume project-local usage via `npx`; a global install is optional, not required.
-
-## CLI
+Most teams will mainly use these commands:
 
 ```bash
 npx praxis-devos setup --agent codex --stack java-spring
-npx praxis-devos setup --agent codex
-npx praxis-devos use-stack java-spring
-npx praxis-devos init
-npx praxis-devos sync --agents opencode,codex,claude
-npx praxis-devos migrate
-npx praxis-devos change --title "Add two factor auth" --capability auth
-npx praxis-devos status
 npx praxis-devos doctor --strict
-npx praxis-devos bootstrap --agents codex
-npx praxis-devos openspec list --specs
-npx praxis-devos list-foundations
-npx praxis-devos list-stacks
+npx praxis-devos status
+npx praxis-devos use-stack java-spring
 ```
 
-Notes:
+`setup` is the primary entrypoint for:
 
-- `setup` is the recommended entrypoint for onboarding, repair, and add-agent scenarios
-- `init` is the lower-level framework initialization command and also applies the built-in default runtime foundation
-- `use-foundation` is an advanced command for re-applying or inspecting non-default runtime foundation flows
-- `use-stack` applies a stack after framework initialization
-- Without `--agent` / `--agents`, Praxis defaults to `opencode,codex,claude`
-- You can target a single agent, for example `--agents codex`
-- Later expansion is additive: `sync --agent opencode` merges `opencode` into the project's configured agents instead of replacing the existing ones
+- first-time onboarding
+- setting up a new machine
+- adding another agent
+- repairing missing OpenSpec or SuperPowers dependencies
 
-## Dependency Management
+`bootstrap`, `init`, and `use-foundation` still exist, but they are advanced repair or internal-facing commands.
 
-Praxis DevOS has two runtime dependencies:
+## OpenSpec Is Optional For Daily Work
 
-- `openspec` as a CLI dependency
-- `superpowers` as an agent runtime dependency
+Praxis installs and wraps OpenSpec because some teams want proposal-driven governance. That does not mean every task starts in OpenSpec.
 
-OpenSpec is invoked through `npx praxis-devos openspec ...`, preferring a project-local installation and falling back to a global install only for compatibility. In the ECC foundation direction, OpenSpec is positioned as a governance layer, not as the default front door for daily implementation work.
+Use normal implementation flow for:
 
-Because Superpowers installs differently on OpenCode, Codex, and Claude Code, Praxis does not copy it into `.praxis/`. Instead it exposes dependency commands:
+- bug fixes
+- agreed feature work
+- refactors within an approved scope
+- routine review and validation
+
+Use OpenSpec when you need:
+
+- a formal proposal or change record
+- spec deltas for behavior changes
+- explicit validation or archive steps
+- governance-heavy review flows
+
+Examples:
 
 ```bash
-npx praxis-devos setup --agent codex
-npx praxis-devos doctor
-npx praxis-devos bootstrap --agents codex
-npx praxis-devos bootstrap --agents claude
+npx praxis-devos change --title "Add two factor auth" --capability auth
+npx praxis-devos openspec validate <change-id> --strict --no-interactive
 ```
 
-## Runtime Foundations
+## Project Layout
 
-Built-in runtime foundations live in `foundations/`, `profiles/`, and `overlays/`.
-
-- A foundation declares a runtime operating model such as `ecc-foundation`
-- A profile seeds `.praxis/foundation/profile/`
-- Overlays seed `.praxis/overlays/` with extension seams
-
-The first milestone ships `ecc-foundation`, which:
-
-- treats ECC as the runtime base concept
-- keeps all internal capabilities as non-proprietary placeholders
-- reserves extension seams for future internal MCP, docs, commands, hooks, rules, and skills
-- keeps OpenSpec available for governance without making it the mandatory daily workflow path
-
-Stage 1 applies that built-in foundation automatically during `setup` and `init`, so users do not need to choose a foundation on the default install path.
-
-## Skills
-
-### Framework Skills
-
-Bundled with the framework:
-
-- `openspec`: governance workflow skill
-- `git-workflow`: customizable Git lifecycle guidance
-- `code-review`: customizable review process
-
-### Project Skills
-
-Installed into `.praxis/skills/` during `init`. These are safe to customize in the target project.
-Praxis also generates `.praxis/skills/INDEX.md` so Codex / Claude managed blocks can surface the currently installed project skills instead of only relying on raw file discovery.
-
-### Stack Skills
-
-Each stack can provide domain-specific skills such as database, security, error handling, or testing guidance. These are also installed into `.praxis/skills/`.
-Those stack assets are intended as initial baselines. After installation, teams are expected to keep adapting `.praxis/rules.md` and `.praxis/skills/` to their own company or project conventions.
-
-## Stacks
-
-Available stacks live in `stacks/`.
+After setup, the main files are:
 
 ```text
-stacks/{stack-name}/
-├── stack.md
-├── rules.md
-└── skills/
+your-project/
+├── AGENTS.md
+├── CLAUDE.md
+├── openspec/
+└── .praxis/
+    ├── manifest.json
+    ├── framework-rules.md
+    ├── stack.md
+    ├── rules.md
+    ├── skills/
+    └── adapters/
 ```
 
-Create a new stack by copying `stacks/starter/`.
+`.praxis/` is the canonical project layer. Agent-specific directories are generated adapters, not the source of truth.
+
+## Focused Docs
+
+- [docs/getting-started.md](docs/getting-started.md): install, first use, and common onboarding scenarios
+- [docs/dependency-management.md](docs/dependency-management.md): what `setup`, `doctor`, and `bootstrap` handle
+- [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md): command design model
+- [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md): canonical layout and adapter model
+- [docs/migration-guide.md](docs/migration-guide.md): migrating older OpenCode-only projects
+
+## Advanced Internals
+
+Praxis automatically applies its built-in runtime baseline on the default path. If you need to inspect that layer, the advanced references are:
+
+- [foundations/README.md](foundations/README.md)
+- [profiles/README.md](profiles/README.md)
+- [overlays/README.md](overlays/README.md)
+
+Most users do not need these docs to get started.
 
 ## Migration
 
@@ -310,19 +173,9 @@ Older OpenCode-only projects can migrate in place:
 npx praxis-devos migrate
 ```
 
-This copies legacy `.opencode` project assets into `.praxis/` and then regenerates adapters.
-
-## Prerequisites
-
-| Requirement | Version | Description |
-| :--- | :--- | :--- |
-| Node.js | >= 20.19.0 | Runtime for the CLI |
-| Git | Any | Repository management |
-| AI Agent | Latest | OpenCode, Codex, or Claude Code |
-
 ## Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Sponsor
 
