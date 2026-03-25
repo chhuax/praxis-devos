@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-03-25
+
+### Added
+- `praxis-devos setup` as the user-facing onboarding, repair, and add-agent entrypoint
+- `praxis-devos use-stack <name>` so framework initialization and stack application can happen in two explicit phases
+- Scenario-driven command documentation in `docs/architecture/command-scenarios.md`
+
+### Changed
+- Quick Start now routes users by scenario instead of exposing the old `bootstrap` + `init` layering first
+- `init` can now initialize the framework skeleton without immediately applying a stack
+- `doctor` now recommends `setup` as the primary fix path and keeps `bootstrap` as an advanced repair command
+- Current release guidance now explicitly targets macOS and Linux first, with Windows tracked as follow-up compatibility work
+
+### Fixed
+- `bootstrap --openspec` is no longer accepted as a dead parameter; `bootstrap` now always includes OpenSpec and reports a migration error if the removed flag is used
+
 ## [0.2.6] - 2026-03-25
 
 ### Added
