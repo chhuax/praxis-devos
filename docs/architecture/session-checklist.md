@@ -6,14 +6,15 @@
 
 - [ ] 用户输入属于 `/change`、`/proposal`，或明显是新功能 / API 变更 / 架构变更
 - [ ] agent 明确进入 proposal flow，而不是直接开始实现
-- [ ] 若需求仍不明确，先进入 `brainstorming`
+- [ ] proposal 阶段先做了 `Proposal Intake`，而不是一上来直接盘问用户或直接写代码
+- [ ] 若进入 `brainstorming`，能看到 intake 暴露出的阻塞缺口、边界分歧或多方案依据
 - [ ] agent 读取 `openspec/AGENTS.md`
 - [ ] agent 显式加载 `openspec` skill，而不是只停留在最小规则文本
 
 ## 2. Proposal Preparation
 
-- [ ] 执行或等价完成 `praxis-devos openspec list --specs`
-- [ ] 执行或等价完成 `praxis-devos openspec list`
+- [ ] 执行或等价完成 `npx praxis-devos openspec list --specs`
+- [ ] 执行或等价完成 `npx praxis-devos openspec list`
 - [ ] 阅读 `openspec/project.md`
 - [ ] 明确判断是“新 capability”还是“修改现有 capability”
 - [ ] 选择合法的 `change-id`（kebab-case，动词前缀）
@@ -28,7 +29,7 @@
 
 ## 4. Proposal Validation
 
-- [ ] 执行 `praxis-devos openspec validate <change-id> --strict --no-interactive`
+- [ ] 执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`
 - [ ] validate 通过后，再进入“等待批准”或“请求继续”
 - [ ] proposal 阶段没有因为 `/change` 自动创建 Git 分支
 
@@ -43,7 +44,8 @@
 ## 6. Framework Skill Gate
 
 - [ ] proposal / spec / archive 场景能看到 `openspec` skill 的明确证据
-- [ ] 需求不明确时能看到 `brainstorming` 的明确证据
+- [ ] proposal 阶段能看到 `Proposal Intake` 的明确证据
+- [ ] 若存在阻塞缺口、边界分歧或多方案选择，能看到 `brainstorming` 的明确证据
 - [ ] 已批准 proposal 进入实现且当前分支不可直接复用时，能看到 `git-workflow` 的明确证据
 - [ ] 完成前能看到 `verification-before-completion` 的明确证据
 - [ ] 会话不是只触发 OpenSpec，而是触发了框架层的管控 skill
@@ -58,7 +60,7 @@
 ## 8. Completion Gate
 
 - [ ] 完成前执行验证，不是只“代码写完”
-- [ ] 对 proposal change 执行 `praxis-devos openspec validate <change-id> --strict --no-interactive`
+- [ ] 对 proposal change 执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`
 - [ ] 核对 `tasks.md` 是否全部 `[x]`
 - [ ] 对照每个 `Scenario` 检查实现与测试
 
@@ -68,3 +70,14 @@
 - 命中 6-7 项：主路径正确，但存在门禁缺口
 - 命中 4-5 项：只触发了部分框架语义
 - 命中 ≤3 项：基本没有进入 Praxis 流程
+
+## 自动化校验
+
+可以先用本清单人工复盘，再用 CLI 做证据型自动化校验：
+
+```bash
+npx praxis-devos validate-session --file path/to/transcript.md
+npx praxis-devos validate-session --file path/to/transcript.md --strict
+```
+
+`--strict` 会在缺少关键事件钩子证据时返回非零退出码，适合接入 CI。

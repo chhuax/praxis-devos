@@ -1,5 +1,5 @@
 > AI 入口区块：以下内容由 Praxis DevOS 自动维护。
-> 先按本区块分流，再读取后续项目上下文；执行 `praxis-devos sync` 时，此区块会被刷新。
+> 先按本区块分流，再读取后续项目上下文；执行 `npx praxis-devos sync` 时，此区块会被刷新。
 
 ## AI Dispatch
 
@@ -17,9 +17,9 @@
 
 ## Required Reads
 
-- proposal flow: 先读取 `openspec/AGENTS.md`，然后必须加载 `openspec` skill；再按需读取 `openspec/project.md`；若需求仍不清晰，必须进入 `brainstorming`。
+- proposal flow: 先读取 `openspec/AGENTS.md`，然后必须加载 `openspec` skill；再按需读取 `openspec/project.md`；先做轻量 `Proposal Intake`，优先基于现有上下文提取 `change target`、`intended behavior`、`scope/risk`、`open questions`。只有当 `open questions` 仍阻塞提案，或存在多种可行方案 / 架构分歧时，才升级进入 `brainstorming`。
 - implementation flow: 先读取 `.praxis/rules.md`；如果当前工作来自已批准 proposal，开始编码前先检查 Git 分支；若已位于与该 change 对应的专用实现分支，可继续复用，否则必须加载 `git-workflow` 并创建或切换到实现分支。
-- implementation flow: 技术栈 skill 保持按需加载；需要项目或技术栈 skill 时，再读取 `.praxis/skills/INDEX.md` 并打开对应 `SKILL.md`。
+- implementation flow: 技术栈 skill 保持按需加载；需要项目或技术栈 skill 时，再读取 `.praxis/skills/INDEX.md` 并打开对应 `SKILL.md`。若任务变成多步骤依赖、出现 bug / 失败测试、或存在可并行子任务，必须分别判断 `writing-plans`、`systematic-debugging`、`subagent-driven-development`。
 - review flow: 先读取 `.praxis/rules.md`；如涉及评审流程或提案关联，再读取对应 skill 与 OpenSpec 文件。
 
 {{dependency_gate_summary}}
