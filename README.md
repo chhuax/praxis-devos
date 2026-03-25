@@ -1,6 +1,6 @@
 # praxis-devos
 
-> The AI-Native Development Framework — [OpenSpec](https://github.com/Fission-AI/OpenSpec) Governance + [SuperPowers](https://github.com/obra/superpowers) Execution + Pluggable Stacks
+> The AI-Native Development Framework — Runtime Foundations + [OpenSpec](https://github.com/Fission-AI/OpenSpec) Governance + [SuperPowers](https://github.com/obra/superpowers) Execution + Pluggable Stacks
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -10,11 +10,12 @@
 
 Praxis DevOS is a framework for AI coding agents such as OpenCode, Codex, and Claude Code. It combines:
 
+- **Runtime foundations** for the AI engineering operating model
 - **OpenSpec** for change governance
 - **SuperPowers** for execution quality
 - **Pluggable stacks** for technology-specific standards
 
-At the framework layer, Praxis enforces governance and verification, not mandatory TDD for every code change. Testing strategy is chosen based on change risk.
+At the framework layer, Praxis treats the runtime foundation and stack as the default daily execution base. OpenSpec remains available for governance and controlled change flows, but it is not the mandatory front door for every task. Testing strategy is chosen based on change risk.
 
 The framework is now designed as a **multi-agent system**. Project state no longer belongs to one runtime like OpenCode. Instead, Praxis keeps canonical assets in `.praxis/` and syncs agent-specific adapters as needed.
 
@@ -22,12 +23,13 @@ The framework is now designed as a **multi-agent system**. Project state no long
 
 | Capability | OpenSpec | SuperPowers | Praxis DevOS |
 |---|---|---|---|
+| Runtime foundation | ❌ | ❌ | ✅ |
 | Specification governance | ✅ | ❌ | ✅ |
 | Execution skills | ❌ | ✅ | ✅ |
 | Stack standards | ❌ | ❌ | ✅ |
 | Multi-agent project layout | ❌ | ❌ | ✅ |
 
-Praxis DevOS = OpenSpec (WHAT) + SuperPowers (HOW) + Pluggable Stacks (STANDARD).
+Praxis DevOS = Foundations (BASE) + OpenSpec (GOVERNANCE) + SuperPowers (HOW) + Pluggable Stacks (STANDARD).
 
 ## Architecture
 
@@ -52,7 +54,11 @@ your-project/
 ├── openspec/                  # OpenSpec structure
 └── .praxis/                   # Canonical Praxis state
     ├── manifest.json
+    ├── foundation/
+    │   ├── README.md
+    │   └── profile/
     ├── framework-rules.md
+    ├── overlays/
     ├── stack.md
     ├── rules.md
     ├── skills/
@@ -65,6 +71,7 @@ OpenCode compatibility is still supported. `npx praxis-devos sync --agent openco
 Detailed architecture and migration notes:
 
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md)
+- [docs/architecture/foundation-overlays.md](docs/architecture/foundation-overlays.md)
 - [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md)
 - [docs/dependency-management.md](docs/dependency-management.md)
 - [docs/migration-guide.md](docs/migration-guide.md)
@@ -85,20 +92,22 @@ Current release target:
 ### 1. New project, Codex + Java Spring
 
 ```bash
-npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos setup --agent codex --foundation ecc-foundation --stack java-spring
 npx praxis-devos doctor --strict
 ```
 
 ### 2. New project, framework first, stack later
 
 ```bash
-npx praxis-devos setup --agent codex
+npx praxis-devos setup --agent codex --foundation ecc-foundation
 npx praxis-devos doctor --strict
 ```
 
-When you are ready to apply a stack:
+When you are ready to apply or inspect more runtime layers:
 
 ```bash
+npx praxis-devos list-foundations
+npx praxis-devos use-foundation ecc-foundation
 npx praxis-devos use-stack java-spring
 npx praxis-devos doctor --strict
 ```
@@ -136,6 +145,7 @@ What `setup` does:
 - create canonical `.praxis/`
 - install or reuse OpenSpec
 - auto-configure or auto-install supported runtime dependencies for the selected agents
+- optionally apply the chosen runtime foundation if `--foundation` is provided
 - copy customizable skills into `.praxis/skills/`
 - mirror framework gates into `.praxis/framework-rules.md`
 - sync adapters for the selected agents
@@ -145,6 +155,7 @@ Important command roles:
 
 - `setup` is the user-facing entrypoint
 - `init` is the lower-level framework skeleton command
+- `use-foundation` applies a runtime foundation after framework initialization
 - `use-stack` applies a stack after framework initialization
 - `bootstrap` remains available as an advanced repair/debug command
 - `sync` remains available when you want to refresh adapters explicitly after manual edits
@@ -198,7 +209,8 @@ All command examples below assume project-local usage via `npx`; a global instal
 ## CLI
 
 ```bash
-npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos setup --agent codex --foundation ecc-foundation --stack java-spring
+npx praxis-devos use-foundation ecc-foundation
 npx praxis-devos use-stack java-spring
 npx praxis-devos init
 npx praxis-devos sync --agents opencode,codex,claude
@@ -208,6 +220,7 @@ npx praxis-devos status
 npx praxis-devos doctor --strict
 npx praxis-devos bootstrap --agents codex
 npx praxis-devos openspec list --specs
+npx praxis-devos list-foundations
 npx praxis-devos list-stacks
 ```
 
@@ -215,6 +228,7 @@ Notes:
 
 - `setup` is the recommended entrypoint for onboarding, repair, and add-agent scenarios
 - `init` is the lower-level framework initialization command
+- `use-foundation` applies a runtime foundation profile and overlay set after framework initialization
 - `use-stack` applies a stack after framework initialization
 - Without `--agent` / `--agents`, Praxis defaults to `opencode,codex,claude`
 - You can target a single agent, for example `--agents codex`
@@ -222,12 +236,12 @@ Notes:
 
 ## Dependency Management
 
-Praxis DevOS has two hard dependencies:
+Praxis DevOS has two runtime dependencies:
 
 - `openspec` as a CLI dependency
 - `superpowers` as an agent runtime dependency
 
-OpenSpec is now invoked only through `npx praxis-devos openspec ...`, preferring a project-local installation and falling back to a global install only for compatibility.
+OpenSpec is invoked through `npx praxis-devos openspec ...`, preferring a project-local installation and falling back to a global install only for compatibility. In the ECC foundation direction, OpenSpec is positioned as a governance layer, not as the default front door for daily implementation work.
 
 Because Superpowers installs differently on OpenCode, Codex, and Claude Code, Praxis does not copy it into `.praxis/`. Instead it exposes dependency commands:
 
@@ -237,6 +251,21 @@ npx praxis-devos doctor
 npx praxis-devos bootstrap --agents codex
 npx praxis-devos bootstrap --agents claude
 ```
+
+## Runtime Foundations
+
+Built-in runtime foundations live in `foundations/`, `profiles/`, and `overlays/`.
+
+- A foundation declares a runtime operating model such as `ecc-foundation`
+- A profile seeds `.praxis/foundation/profile/`
+- Overlays seed `.praxis/overlays/` with extension seams
+
+The first milestone ships `ecc-foundation`, which:
+
+- treats ECC as the runtime base concept
+- keeps all internal capabilities as non-proprietary placeholders
+- reserves extension seams for future internal MCP, docs, commands, hooks, rules, and skills
+- keeps OpenSpec available for governance without making it the mandatory daily workflow path
 
 ## Skills
 
