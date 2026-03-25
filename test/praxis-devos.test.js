@@ -167,6 +167,11 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(agentsMd, /OpenSpec 命令统一通过 `npx praxis-devos openspec/);
     assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`/);
     assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`/);
+    assert.match(agentsMd, /`\.opencode\/skills\/` 仍可作为 OpenCode supplemental layer/);
+    assert.match(agentsMd, /Codex：`npx praxis-devos bootstrap --agent codex`/);
+    assert.match(agentsMd, /Claude Code：`npx praxis-devos bootstrap --agent claude`/);
+    assert.match(agentsMd, /OpenCode：`npx praxis-devos bootstrap --agent opencode`/);
+    assert.doesNotMatch(agentsMd, /当前入口按 `codex` 处理/);
     assert.doesNotMatch(agentsMd, /Spring Boot 代码组织/);
   });
 });
