@@ -91,6 +91,18 @@ This will:
 - copy stack rules into `.praxis/rules.md`
 - sync adapters for OpenCode, Codex, and Claude Code
 
+If you only want one agent at first, target it explicitly:
+
+```bash
+npx praxis-devos init --stack java-spring --agents codex
+```
+
+If a teammate later wants another agent, just add it incrementally:
+
+```bash
+npx praxis-devos sync --agent opencode
+```
+
 If OpenSpec is not available, `init` now fails directly instead of falling back to a manual scaffold.
 
 ### 2. Fill in project context
@@ -149,6 +161,12 @@ praxis-devos bootstrap --agent opencode
 npx praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
+
+Notes:
+
+- Without `--agent` / `--agents`, Praxis defaults to `opencode,codex,claude`
+- You can target a single agent, for example `--agents codex`
+- Later expansion is additive: `sync --agent opencode` merges `opencode` into the project's configured agents instead of replacing the existing ones
 
 ## Dependency Management
 

@@ -91,6 +91,18 @@ npx praxis-devos init --stack java-spring
 - 把技术栈规则写入 `.praxis/rules.md`
 - 同步 OpenCode、Codex、Claude Code 的适配入口
 
+如果你当前只打算使用某一个 agent，也可以显式指定：
+
+```bash
+npx praxis-devos init --stack java-spring --agents codex
+```
+
+后续如果团队里有人想补用其他 agent，再增量同步即可：
+
+```bash
+npx praxis-devos sync --agent opencode
+```
+
 如果当前环境还没有 OpenSpec，`init` 会直接失败，不再降级为手工脚手架模式。
 
 ### 2. 补充项目上下文
@@ -149,6 +161,12 @@ praxis-devos bootstrap --agent opencode
 npx praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
+
+说明：
+
+- 不带 `--agent` / `--agents` 时，默认会处理 `opencode,codex,claude`
+- 可以只指定单个 agent，例如 `--agents codex`
+- 后续增量扩展不会覆盖已有配置，`sync --agent opencode` 会把 `opencode` 合并进当前项目的已配置 agents
 
 ## 依赖管理
 

@@ -93,6 +93,13 @@ praxis-devos status
 praxis-devos list-stacks
 ```
 
+补充说明：
+
+- 不带 `--agent` / `--agents` 时，默认处理 `opencode,codex,claude`
+- 如果项目当前只使用一个 agent，可以显式指定，例如 `praxis-devos init --stack java-spring --agents codex`
+- 后续增量启用其他 agent 时，执行 `praxis-devos sync --agent opencode`
+- 已配置 agents 会写入 `.praxis/manifest.json`，后续同步时按并集累加，不会覆盖已有配置
+
 插件里保留的 `praxis-init`、`praxis-sync`、`praxis-migrate` 只是共享核心的薄封装，不能再拥有独立逻辑。
 
 ## 依赖管理
