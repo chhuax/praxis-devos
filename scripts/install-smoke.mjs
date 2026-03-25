@@ -106,9 +106,12 @@ const localOpenSpecPath = (projectDir) => path.join(
 
 const runSmoke = ({ packageFile, scenario }) => {
   const { agent, strictDoctor } = scenarioConfig(scenario);
+  const packagePath = path.resolve(packageFile);
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `praxis-devos-${scenario}-smoke-`));
   const projectDir = path.join(tempRoot, 'project');
   const fakeHome = path.join(tempRoot, 'home');
+
+  assert.ok(fs.existsSync(packagePath), `Package file not found: ${packagePath}`);
 
   fs.mkdirSync(projectDir, { recursive: true });
   fs.mkdirSync(fakeHome, { recursive: true });
@@ -123,7 +126,7 @@ const runSmoke = ({ packageFile, scenario }) => {
   const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
   runCommand(npmCmd, ['init', '-y'], { cwd: projectDir, env });
-  runCommand(npmCmd, ['install', '-D', packageFile], { cwd: projectDir, env });
+  runCommand(npmCmd, ['install', '-D', packagePath], { cwd: projectDir, env });
 
   const setupResult = runCommand(npxCmd, ['praxis-devos', 'setup', '--agent', agent, '--stack', 'java-spring'], {
     cwd: projectDir,
