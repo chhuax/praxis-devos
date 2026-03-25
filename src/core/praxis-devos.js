@@ -1436,7 +1436,7 @@ const ensureRuntimeDependencies = ({ projectDir, agents }) => {
 
     if (agent === 'claude') {
       logs.push(`== ${agent} ==`);
-      logs.push('Claude Code SuperPowers cannot be installed automatically from Praxis.');
+      logs.push('Manual action required: Claude Code SuperPowers cannot be installed automatically from Praxis.');
       logs.push(renderBootstrapInstructions({ projectDir, agent }));
       continue;
     }

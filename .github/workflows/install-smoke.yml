@@ -1,0 +1,56 @@
+name: Install Smoke
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+
+concurrency:
+  group: install-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            scenario: codex
+          - os: macos-latest
+            scenario: codex
+          - os: windows-latest
+            scenario: codex
+          - os: ubuntu-latest
+            scenario: opencode
+          - os: ubuntu-latest
+            scenario: claude
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Show tool versions
+        run: |
+          node --version
+          npm --version
+          git --version
+
+      - name: Pack tarball
+        run: npm pack --json > pack.json
+
+      - name: Export pack filename
+        run: node -e "const fs=require('node:fs'); const pack=JSON.parse(fs.readFileSync('pack.json','utf8'))[0].filename; fs.appendFileSync(process.env.GITHUB_ENV, `PACK_FILE=${pack}\n`);"
+
+      - name: Run install smoke
+        run: node scripts/install-smoke.mjs --package "${{ env.PACK_FILE }}" --scenario "${{ matrix.scenario }}"

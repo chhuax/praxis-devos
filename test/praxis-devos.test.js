@@ -477,6 +477,22 @@ test('setupProject skips OpenSpec install when project-local runtime already exi
   })));
 });
 
+test('setupProject surfaces manual action required for claude', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-claude-'));
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeWhichDir = installFakeWhich(projectDir, null);
+
+  withTempPath(fakeWhichDir, () => withTempPath(fakeNpmDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Manual action required: Claude Code SuperPowers cannot be installed automatically from Praxis/);
+    assert.match(output, /\/plugin install superpowers@claude-plugins-official/);
+  }));
+});
+
 test('initProject repairs incomplete skill directories instead of skipping them', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-repair-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
