@@ -92,18 +92,18 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCo
 ### 1. 全新项目，Codex + Java Spring，一次接入
 
 ```bash
-npx praxis-devos setup --agent codex --foundation ecc-foundation --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
 npx praxis-devos doctor --strict
 ```
 
 ### 2. 全新项目，先只把框架搭起来，稍后再选 stack
 
 ```bash
-npx praxis-devos setup --agent codex --foundation ecc-foundation
+npx praxis-devos setup --agent codex
 npx praxis-devos doctor --strict
 ```
 
-等你准备好再补上更多运行时层：
+默认 happy path 会自动应用内置的 ECC runtime foundation。只有在你明确要检查或补刷 runtime 层时，才需要用这些高级命令：
 
 ```bash
 npx praxis-devos list-foundations
@@ -145,7 +145,7 @@ npx praxis-devos doctor --strict
 - 创建 canonical `.praxis/`
 - 安装或复用 OpenSpec
 - 自动配置或自动安装所选 agent 可自动处理的 runtime 依赖
-- 如果带了 `--foundation`，顺手应用对应 runtime foundation
+- 在默认路径上自动应用内置 ECC runtime foundation
 - 把可自定义 skills 安装到 `.praxis/skills/`
 - 把框架门控规则写入 `.praxis/framework-rules.md`
 - 同步所选 agent 的适配入口
@@ -155,7 +155,7 @@ npx praxis-devos doctor --strict
 
 - `setup` 是用户主入口
 - `init` 是底层框架骨架初始化命令
-- `use-foundation` 用于在框架初始化后补上 runtime foundation
+- `use-foundation` 保留为高级修复 / 补刷 runtime foundation 的命令
 - `use-stack` 用于在框架初始化后补上技术栈
 - `bootstrap` 保留为高级修复 / 调试命令
 - `sync` 保留为手工调整后刷新 adapters 的命令
@@ -209,8 +209,8 @@ npx praxis-devos doctor --strict
 ## CLI
 
 ```bash
-npx praxis-devos setup --agent codex --foundation ecc-foundation --stack java-spring
-npx praxis-devos use-foundation ecc-foundation
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos setup --agent codex
 npx praxis-devos use-stack java-spring
 npx praxis-devos init
 npx praxis-devos sync --agents opencode,codex,claude
@@ -227,8 +227,8 @@ npx praxis-devos list-stacks
 说明：
 
 - `setup` 是 onboarding、修复依赖、补 agent 的推荐入口
-- `init` 是底层框架初始化命令
-- `use-foundation` 用于应用 runtime foundation profile 和 overlay 组合
+- `init` 是底层框架初始化命令，同时也会应用内置默认 runtime foundation
+- `use-foundation` 是高级命令，用于补刷或检查非默认 runtime foundation 流程
 - `use-stack` 用于在框架初始化后应用技术栈
 - 不带 `--agent` / `--agents` 时，默认会处理 `opencode,codex,claude`
 - 可以只指定单个 agent，例如 `--agents codex`
@@ -266,6 +266,8 @@ npx praxis-devos bootstrap --agents claude
 - 不引入任何私有公司集成
 - 预留 future internal MCP、docs、commands、hooks、rules、skills 的扩展占位
 - 保留 OpenSpec 的治理能力，但不把它设定为所有日常任务的必经路径
+
+Stage 1 会在 `setup` 和 `init` 时自动应用这个内置 foundation，所以默认安装路径不要求用户显式选择 foundation。
 
 ## Skills
 

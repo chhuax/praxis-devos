@@ -314,13 +314,14 @@ const findSkillMarkdown = (rootDir) => {
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
-  assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files/);
+  assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files, apply the built-in runtime foundation/);
   assert.match(help, /change\s+Create an OpenSpec change scaffold/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
-  assert.match(help, /use-foundation\s+Apply a built-in runtime foundation profile/);
+  assert.match(help, /use-foundation\s+Advanced: apply or re-apply a built-in runtime foundation profile/);
   assert.match(help, /use-stack\s+Apply a technology stack to an initialized project/);
   assert.match(help, /list-foundations\s+List available built-in runtime foundations/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
+  assert.match(help, /--foundation <name>\s+Advanced override for the built-in runtime foundation/);
   assert.doesNotMatch(help, /--openspec/);
 });
 
@@ -467,14 +468,13 @@ test('initProject can initialize framework files without applying a stack', () =
   });
 });
 
-test('initProject can apply a built-in foundation profile', () => {
+test('initProject applies the built-in foundation profile by default', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-foundation-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
 
   withTempPath(fakeBinDir, () => {
     const output = initProject({
       projectDir,
-      foundationName: 'ecc-foundation',
       agents: ['codex'],
     });
 
@@ -494,6 +494,25 @@ test('initProject can apply a built-in foundation profile', () => {
   });
 });
 
+test('initProject can skip the default foundation internally', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-no-foundation-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    const output = initProject({
+      projectDir,
+      agents: ['codex'],
+      applyDefaultFoundation: false,
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+
+    assert.doesNotMatch(output, /Applying foundation:/);
+    assert.equal(manifest.selectedFoundation, null);
+    assert.ok(!fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'manifest.json')));
+  });
+});
+
 test('useStackProject applies a stack after framework init', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-use-stack-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -502,6 +521,7 @@ test('useStackProject applies a stack after framework init', () => {
     initProject({
       projectDir,
       agents: ['codex'],
+      applyDefaultFoundation: false,
     });
 
     const output = useStackProject({
@@ -530,6 +550,7 @@ test('useFoundationProject applies overlays after framework init', () => {
     initProject({
       projectDir,
       agents: ['codex'],
+      applyDefaultFoundation: false,
     });
 
     const output = useFoundationProject({
@@ -548,7 +569,7 @@ test('useFoundationProject applies overlays after framework init', () => {
   });
 });
 
-test('setupProject installs Codex superpowers, initializes, and applies a requested stack', () => {
+test('setupProject installs Codex superpowers, initializes, applies the default foundation, and applies a requested stack', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-'));
   const fakeGitDir = installFakeGit(projectDir);
   const fakeNpmDir = installFakeNpm(projectDir);
@@ -571,13 +592,46 @@ test('setupProject installs Codex superpowers, initializes, and applies a reques
     assert.match(output, /Cloned Codex SuperPowers/);
     assert.match(output, /Linked Codex SuperPowers skills/);
     assert.match(output, /== setup ==/);
+    assert.match(output, /Applying foundation: ecc-foundation/);
     assert.match(output, /Dependency doctor:/);
+    assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.equal(manifest.selectedStack, 'java-spring');
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'manifest.json')));
     assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
     assert.ok(fs.existsSync(codexSkillsPath));
     assert.ok(findSkillMarkdown(codexSkillsPath));
     assert.doesNotMatch(output, /\[MISSING\] superpowers:codex/);
+  })));
+});
+
+test('setupProject applies the default foundation to an initialized project that does not have one yet', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-default-foundation-'));
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-default-foundation-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+      applyDefaultFoundation: false,
+    });
+  });
+
+  withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+
+    assert.match(output, /Project already initialized; refreshing selected agents and managed adapters\./);
+    assert.match(output, /\.praxis\/foundation\/profile\/ created from internal-base/);
+    assert.equal(manifest.selectedFoundation, 'ecc-foundation');
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'manifest.json')));
   })));
 });
 

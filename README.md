@@ -92,18 +92,18 @@ Current release target:
 ### 1. New project, Codex + Java Spring
 
 ```bash
-npx praxis-devos setup --agent codex --foundation ecc-foundation --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
 npx praxis-devos doctor --strict
 ```
 
 ### 2. New project, framework first, stack later
 
 ```bash
-npx praxis-devos setup --agent codex --foundation ecc-foundation
+npx praxis-devos setup --agent codex
 npx praxis-devos doctor --strict
 ```
 
-When you are ready to apply or inspect more runtime layers:
+The built-in ECC-backed runtime foundation is applied automatically on the default path. Advanced foundation commands remain available when you explicitly need to inspect or re-apply runtime layers:
 
 ```bash
 npx praxis-devos list-foundations
@@ -145,7 +145,7 @@ What `setup` does:
 - create canonical `.praxis/`
 - install or reuse OpenSpec
 - auto-configure or auto-install supported runtime dependencies for the selected agents
-- optionally apply the chosen runtime foundation if `--foundation` is provided
+- automatically apply the built-in ECC-backed runtime foundation on the default path
 - copy customizable skills into `.praxis/skills/`
 - mirror framework gates into `.praxis/framework-rules.md`
 - sync adapters for the selected agents
@@ -155,7 +155,7 @@ Important command roles:
 
 - `setup` is the user-facing entrypoint
 - `init` is the lower-level framework skeleton command
-- `use-foundation` applies a runtime foundation after framework initialization
+- `use-foundation` remains available as an advanced repair or re-apply command
 - `use-stack` applies a stack after framework initialization
 - `bootstrap` remains available as an advanced repair/debug command
 - `sync` remains available when you want to refresh adapters explicitly after manual edits
@@ -209,8 +209,8 @@ All command examples below assume project-local usage via `npx`; a global instal
 ## CLI
 
 ```bash
-npx praxis-devos setup --agent codex --foundation ecc-foundation --stack java-spring
-npx praxis-devos use-foundation ecc-foundation
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos setup --agent codex
 npx praxis-devos use-stack java-spring
 npx praxis-devos init
 npx praxis-devos sync --agents opencode,codex,claude
@@ -227,8 +227,8 @@ npx praxis-devos list-stacks
 Notes:
 
 - `setup` is the recommended entrypoint for onboarding, repair, and add-agent scenarios
-- `init` is the lower-level framework initialization command
-- `use-foundation` applies a runtime foundation profile and overlay set after framework initialization
+- `init` is the lower-level framework initialization command and also applies the built-in default runtime foundation
+- `use-foundation` is an advanced command for re-applying or inspecting non-default runtime foundation flows
 - `use-stack` applies a stack after framework initialization
 - Without `--agent` / `--agents`, Praxis defaults to `opencode,codex,claude`
 - You can target a single agent, for example `--agents codex`
@@ -266,6 +266,8 @@ The first milestone ships `ecc-foundation`, which:
 - keeps all internal capabilities as non-proprietary placeholders
 - reserves extension seams for future internal MCP, docs, commands, hooks, rules, and skills
 - keeps OpenSpec available for governance without making it the mandatory daily workflow path
+
+Stage 1 applies that built-in foundation automatically during `setup` and `init`, so users do not need to choose a foundation on the default install path.
 
 ## Skills
 

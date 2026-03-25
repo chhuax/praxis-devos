@@ -97,11 +97,14 @@ Those seams live in `overlays/internal-extension-points/` today and are scaffold
 
 ## CLI Surface
 
-This milestone adds a minimal, reviewable CLI surface:
+Stage 1 keeps the public path intentionally simple:
+
+- `npx praxis-devos setup` and `npx praxis-devos init` automatically apply the built-in `ecc-foundation`
+- `npx praxis-devos status` reports the selected foundation, profile, and overlays after scaffolding
+
+Advanced or secondary commands still exist for inspection and recovery:
 
 - `npx praxis-devos list-foundations`
 - `npx praxis-devos use-foundation ecc-foundation`
-- `npx praxis-devos setup --foundation ecc-foundation`
-- `npx praxis-devos status`
 
-`status` reports the selected foundation, profile, and overlays so the result is easy to inspect after scaffolding.
+That keeps the internal foundation architecture available without making users choose a foundation during the default onboarding flow.

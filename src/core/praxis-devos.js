@@ -532,6 +532,7 @@ export const detectProjectStack = (projectDir) => {
 };
 
 const resolveStackName = (projectDir, stackName) => stackName || detectProjectStack(projectDir);
+const DEFAULT_FOUNDATION_NAME = 'ecc-foundation';
 
 const NO_STACK_MARKER = '<!-- PRAXIS_NO_STACK -->';
 
@@ -941,12 +942,22 @@ export const syncProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   return logs.join('\n');
 };
 
-export const initProject = ({ projectDir, stackName, foundationName = null, agents = SUPPORTED_AGENTS }) => {
+export const initProject = ({
+  projectDir,
+  stackName,
+  foundationName = null,
+  agents = SUPPORTED_AGENTS,
+  applyDefaultFoundation = true,
+}) => {
   const logs = [];
   const log = (msg) => logs.push(msg);
 
   const resolvedStack = resolveStackName(projectDir, stackName);
   const selectedAgents = uniqueAgents(agents);
+  const existingManifest = readJson(projectPaths(projectDir).manifestPath) || {};
+  const resolvedFoundation = foundationName
+    ?? existingManifest.selectedFoundation
+    ?? (applyDefaultFoundation ? DEFAULT_FOUNDATION_NAME : null);
 
   ensureOpenSpecLayout({ projectDir, log });
   ensureFrameworkFiles({ projectDir, log });
@@ -962,11 +973,11 @@ export const initProject = ({ projectDir, stackName, foundationName = null, agen
 
   ensurePraxisManifest({ projectDir, stackName: resolvedStack, agents: selectedAgents });
 
-  if (foundationName) {
-    log(`⟳ Applying foundation: ${foundationName}`);
+  if (resolvedFoundation) {
+    log(`⟳ Applying foundation: ${resolvedFoundation}`);
     const foundationLogs = useFoundationProject({
       projectDir,
-      foundationName,
+      foundationName: resolvedFoundation,
       agents: selectedAgents,
     });
     if (foundationLogs) {
@@ -1028,6 +1039,7 @@ export const setupProject = ({
   foundationName = null,
   agents = SUPPORTED_AGENTS,
   strict = false,
+  applyDefaultFoundation = true,
 }) => {
   const selectedAgents = uniqueAgents(agents);
   const outputs = [];
@@ -1044,6 +1056,7 @@ export const setupProject = ({
       projectDir,
       foundationName,
       agents: selectedAgents,
+      applyDefaultFoundation,
     }));
   } else {
     outputs.push('== setup ==');
@@ -1051,11 +1064,15 @@ export const setupProject = ({
     outputs.push(syncProject({ projectDir, agents: selectedAgents }));
   }
 
-  if (foundationName && wasInitialized) {
+  const manifest = readJson(projectPaths(projectDir).manifestPath) || {};
+  const resolvedFoundation = foundationName
+    ?? (manifest.selectedFoundation ? null : (applyDefaultFoundation ? DEFAULT_FOUNDATION_NAME : null));
+
+  if (resolvedFoundation && wasInitialized) {
     outputs.push('');
     outputs.push(useFoundationProject({
       projectDir,
-      foundationName,
+      foundationName: resolvedFoundation,
       agents: selectedAgents,
     }));
   }
@@ -2404,10 +2421,10 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-  setup          Bootstrap dependencies, initialize framework files, and optionally apply a foundation or stack
-  init           Initialize the framework skeleton in the current project
+  setup          Bootstrap dependencies, initialize framework files, apply the built-in runtime foundation, and optionally apply a stack
+  init           Initialize the framework skeleton and built-in runtime foundation in the current project
   use-stack      Apply a technology stack to an initialized project
-  use-foundation Apply a built-in runtime foundation profile to an initialized project
+  use-foundation Advanced: apply or re-apply a built-in runtime foundation profile
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold from the explicit proposal path
@@ -2423,7 +2440,7 @@ Commands:
 
 Options:
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
-  --foundation <name>    Select a built-in runtime foundation for setup/init, or pass it positionally to use-foundation
+  --foundation <name>    Advanced override for the built-in runtime foundation on setup/init, or pass it positionally to use-foundation
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
