@@ -93,7 +93,7 @@ This directory is a generated compatibility marker for OpenCode.
 Canonical project assets stay in \`.praxis/\`, and the Praxis OpenCode plugin reads them directly.
 
 - Edit project skills in \`.praxis/skills/\`
-- Edit runtime foundation assets in \`.praxis/foundation/\`
+- Edit built-in runtime base assets in \`.praxis/foundation/\`
 - Edit runtime overlays in \`.praxis/overlays/\`
 - Edit stack metadata in \`.praxis/stack.md\`
 - Edit framework gates in \`.praxis/framework-rules.md\`
@@ -168,7 +168,7 @@ const resolveOpenSpecRuntime = (projectDir) => {
     status: 'missing',
     source: 'missing',
     command: null,
-    detail: 'OpenSpec CLI is missing. Install it with `npx praxis-devos setup --agent <name>` or `npx praxis-devos bootstrap --agents <name>`.',
+    detail: 'OpenSpec CLI is missing. Praxis can install it automatically during `npx praxis-devos init` or `npx praxis-devos setup --agent <name>`.',
   };
 };
 
@@ -533,6 +533,11 @@ export const detectProjectStack = (projectDir) => {
 
 const resolveStackName = (projectDir, stackName) => stackName || detectProjectStack(projectDir);
 const DEFAULT_FOUNDATION_NAME = 'ecc-foundation';
+const DEFAULT_RUNTIME_BASE_LABEL = 'built-in Praxis runtime base';
+
+const describeRuntimeBaseSelection = (foundationName) => foundationName === DEFAULT_FOUNDATION_NAME
+  ? DEFAULT_RUNTIME_BASE_LABEL
+  : `runtime base preset: ${foundationName}`;
 
 const NO_STACK_MARKER = '<!-- PRAXIS_NO_STACK -->';
 
@@ -803,7 +808,7 @@ function renderDependencyGateSummary(projectDir) {
     '',
     openspecRuntime.status === 'ok'
       ? '- OpenSpec 已可用；治理 / proposal 场景统一通过 `npx praxis-devos openspec ...` 调用。'
-      : '- OpenSpec 当前不可用；日常实现可继续沿用 foundation + stack 基线，但 proposal / validate / archive 流程必须先执行 `npx praxis-devos setup --agent <name>`。',
+      : '- OpenSpec 当前不可用；日常实现可继续沿用 runtime base + stack 基线，但 proposal / validate / archive 流程必须先执行 `npx praxis-devos setup --agent <name>`。',
   ];
 
   lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
@@ -948,6 +953,7 @@ export const initProject = ({
   foundationName = null,
   agents = SUPPORTED_AGENTS,
   applyDefaultFoundation = true,
+  ensureOpenSpecRuntimeInstalled = true,
 }) => {
   const logs = [];
   const log = (msg) => logs.push(msg);
@@ -958,6 +964,10 @@ export const initProject = ({
   const resolvedFoundation = foundationName
     ?? existingManifest.selectedFoundation
     ?? (applyDefaultFoundation ? DEFAULT_FOUNDATION_NAME : null);
+
+  if (ensureOpenSpecRuntimeInstalled) {
+    logs.push(ensureOpenSpecRuntime(projectDir));
+  }
 
   ensureOpenSpecLayout({ projectDir, log });
   ensureFrameworkFiles({ projectDir, log });
@@ -974,7 +984,7 @@ export const initProject = ({
   ensurePraxisManifest({ projectDir, stackName: resolvedStack, agents: selectedAgents });
 
   if (resolvedFoundation) {
-    log(`⟳ Applying foundation: ${resolvedFoundation}`);
+    log(`⟳ Applying ${describeRuntimeBaseSelection(resolvedFoundation)}`);
     const foundationLogs = useFoundationProject({
       projectDir,
       foundationName: resolvedFoundation,
@@ -1054,9 +1064,11 @@ export const setupProject = ({
     outputs.push('== setup ==');
     outputs.push(initProject({
       projectDir,
+      stackName,
       foundationName,
       agents: selectedAgents,
       applyDefaultFoundation,
+      ensureOpenSpecRuntimeInstalled: false,
     }));
   } else {
     outputs.push('== setup ==');
@@ -1070,6 +1082,7 @@ export const setupProject = ({
 
   if (resolvedFoundation && wasInitialized) {
     outputs.push('');
+    outputs.push(`⟳ Applying ${describeRuntimeBaseSelection(resolvedFoundation)}`);
     outputs.push(useFoundationProject({
       projectDir,
       foundationName: resolvedFoundation,
@@ -1077,7 +1090,7 @@ export const setupProject = ({
     }));
   }
 
-  if (stackName) {
+  if (stackName && wasInitialized) {
     outputs.push('');
     outputs.push(useStackProject({ projectDir, stackName, agents: selectedAgents }));
   }
@@ -1213,14 +1226,15 @@ const renderFoundationReadme = (definition) => {
     ? definition.overlays.map((name) => `- \`${name}\``).join('\n')
     : '- none';
 
-  return `# Runtime Foundation
+  return `# Praxis Runtime Base
 
-This project uses the built-in \`${definition.name}\` foundation.
+This project is provisioned with the ${DEFAULT_RUNTIME_BASE_LABEL}.
 
 ## Summary
 
-- runtime base: \`${definition.runtimeBase || 'unknown'}\`
-- profile seed: \`${definition.profile || 'unknown'}\`
+- runtime preset: \`${definition.name}\`
+- runtime engine: \`${definition.runtimeBase || 'unknown'}\`
+- runtime profile: \`${definition.profile || 'unknown'}\`
 - OpenSpec mode: \`${definition.openspec?.mode || 'unknown'}\`
 
 ## Applied overlays
@@ -1229,7 +1243,7 @@ ${overlayList}
 
 ## Operating model
 
-- Treat this foundation as the runtime base for day-to-day AI engineering workflows.
+- Treat this runtime base as the default baseline for day-to-day AI engineering workflows.
 - Keep \`.praxis/foundation/profile/\` as the local, editable profile baseline.
 - Keep \`.praxis/overlays/\` as extension seams for future internal MCP, docs, commands, hooks, rules, and skills.
 - Use OpenSpec when the work needs governance, proposal review, or controlled change records. It is available, but it is not the required front door for every daily task.
@@ -1247,7 +1261,7 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
   }
 
   if (!foundationName) {
-    throw new Error(`Foundation name is required. Use one of: ${listDirs(FOUNDATIONS_DIR).join(', ')}`);
+    throw new Error(`Runtime base preset name is required. Available: ${listDirs(FOUNDATIONS_DIR).join(', ')}`);
   }
 
   const definition = readFoundationDefinition(foundationName);
@@ -1257,8 +1271,8 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
 
   if (manifest?.selectedFoundation && manifest.selectedFoundation !== foundationName) {
     throw new Error(
-      `Switching foundations from "${manifest.selectedFoundation}" to "${foundationName}" is not automatic yet. ` +
-      'Review and clean existing foundation assets before applying a different foundation.',
+      `Switching runtime base presets from "${manifest.selectedFoundation}" to "${foundationName}" is not automatic yet. ` +
+      'Review and clean existing runtime base assets before applying a different preset.',
     );
   }
 
@@ -1322,20 +1336,21 @@ const renderFoundationSection = (projectDir) => {
   const foundationManifest = readJson(paths.praxisFoundationManifestPath);
 
   const lines = [
-    '## Runtime Foundation',
+    '## Praxis Runtime Base',
     '',
   ];
 
   if (!foundationManifest) {
-    lines.push('- selected foundation: none');
-    lines.push('- daily workflows can still run on the stack/runtime defaults, but no built-in ECC foundation overlay has been applied yet.');
+    lines.push('- runtime base: not applied');
+    lines.push('- daily workflows can still run on stack defaults, but the built-in runtime base assets have not been synced yet.');
     return lines.join('\n');
   }
 
-  lines.push(`- selected foundation: \`${foundationManifest.foundation || 'unknown'}\``);
-  lines.push(`- runtime base: \`${foundationManifest.runtimeBase || 'unknown'}\``);
-  lines.push(`- profile seed: \`${foundationManifest.profile || 'unknown'}\``);
-  lines.push(`- applied overlays: ${(foundationManifest.overlays || []).map((name) => `\`${name}\``).join(', ') || 'none'}`);
+  lines.push(`- runtime base: ${DEFAULT_RUNTIME_BASE_LABEL}`);
+  lines.push(`- runtime preset: \`${foundationManifest.foundation || 'unknown'}\``);
+  lines.push(`- runtime engine: \`${foundationManifest.runtimeBase || 'unknown'}\``);
+  lines.push(`- runtime profile: \`${foundationManifest.profile || 'unknown'}\``);
+  lines.push(`- applied runtime overlays: ${(foundationManifest.overlays || []).map((name) => `\`${name}\``).join(', ') || 'none'}`);
   lines.push('- daily implementation should read `.praxis/foundation/README.md` before reaching for governance docs.');
   lines.push('- OpenSpec remains available for proposal and governance work, but it is not the mandatory front door for daily execution.');
   return lines.join('\n');
@@ -1375,9 +1390,9 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   if (manifest) {
     lines.push(`- framework version: ${manifest.frameworkVersion || getPackageVersion()}`);
     lines.push(`- selected stack: ${manifest.selectedStack || 'unknown'}`);
-    lines.push(`- selected foundation: ${manifest.selectedFoundation || 'none'}`);
-    lines.push(`- foundation profile: ${manifest.foundationProfile || 'none'}`);
-    lines.push(`- foundation overlays: ${(manifest.foundationOverlays || []).join(', ') || 'none'}`);
+    lines.push(`- runtime base preset: ${manifest.selectedFoundation || 'none'}`);
+    lines.push(`- runtime profile: ${manifest.foundationProfile || 'none'}`);
+    lines.push(`- runtime overlays: ${(manifest.foundationOverlays || []).join(', ') || 'none'}`);
     lines.push(`- configured agents: ${(manifest.agents || []).join(', ') || 'none'}`);
   }
 
@@ -1612,7 +1627,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   if (!commandExists('npm')) {
-    throw new Error('npm is required to install OpenSpec automatically. Install npm, then rerun `npx praxis-devos setup --agent <name>`.');
+    throw new Error('npm is required to install OpenSpec automatically. Install npm, then rerun `npx praxis-devos init` or `npx praxis-devos setup --agent <name>`.');
   }
 
   const npmCommand = resolveCommandForExecution('npm');
@@ -2421,10 +2436,10 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-  setup          Bootstrap dependencies, initialize framework files, apply the built-in runtime foundation, and optionally apply a stack
-  init           Initialize the framework skeleton and built-in runtime foundation in the current project
+  setup          Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base, and optionally apply a stack
+  init           Initialize the framework skeleton and apply the built-in Praxis runtime base in the current project
   use-stack      Apply a technology stack to an initialized project
-  use-foundation Advanced: apply or re-apply a built-in runtime foundation profile
+  use-foundation Advanced: re-apply internal runtime-base assets
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold from the explicit proposal path
@@ -2435,12 +2450,11 @@ Commands:
   openspec       Run OpenSpec through the Praxis wrapper
   validate-session  Validate a transcript against Praxis evidence hooks
   list-stacks    List available technology stacks
-  list-foundations List available built-in runtime foundations
+  list-foundations Advanced: list internal runtime-base presets
   help           Show this help
 
 Options:
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
-  --foundation <name>    Advanced override for the built-in runtime foundation on setup/init, or pass it positionally to use-foundation
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
@@ -2484,7 +2498,7 @@ export const runCli = (argv) => {
 
   if (parsed.command === 'list-foundations') {
     const foundations = listFoundationsDetailed();
-    return `Available foundations:\n${foundations.map((foundation) => `  ${foundation.name} — ${foundation.description}`).join('\n')}`;
+    return `Available runtime base presets:\n${foundations.map((foundation) => `  ${foundation.name} — ${foundation.description}`).join('\n')}`;
   }
 
   if (parsed.command === 'status') {
@@ -2546,7 +2560,7 @@ export const runCli = (argv) => {
 
   if (parsed.command === 'use-foundation') {
     if (!parsed.foundation) {
-      throw new Error('Foundation name is required. Use `npx praxis-devos use-foundation <name>` or `--foundation <name>`.');
+      throw new Error('Runtime base preset name is required. Use the advanced command `npx praxis-devos use-foundation <name>`.');
     }
 
     return useFoundationProject({

@@ -314,14 +314,14 @@ const findSkillMarkdown = (rootDir) => {
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
-  assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files, apply the built-in runtime foundation/);
+  assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base/);
   assert.match(help, /change\s+Create an OpenSpec change scaffold/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
-  assert.match(help, /use-foundation\s+Advanced: apply or re-apply a built-in runtime foundation profile/);
+  assert.match(help, /use-foundation\s+Advanced: re-apply internal runtime-base assets/);
   assert.match(help, /use-stack\s+Apply a technology stack to an initialized project/);
-  assert.match(help, /list-foundations\s+List available built-in runtime foundations/);
+  assert.match(help, /list-foundations\s+Advanced: list internal runtime-base presets/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
-  assert.match(help, /--foundation <name>\s+Advanced override for the built-in runtime foundation/);
+  assert.doesNotMatch(help, /--foundation <name>/);
   assert.doesNotMatch(help, /--openspec/);
 });
 
@@ -367,6 +367,7 @@ test('list-stacks remains callable through runCli', () => {
 
 test('list-foundations remains callable through runCli', () => {
   const output = runCli(['list-foundations']);
+  assert.match(output, /Available runtime base presets:/);
   assert.match(output, /ecc-foundation/);
   assert.match(output, /ECC-oriented runtime base/);
 });
@@ -429,6 +430,7 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(agentsMd, /`change target`、`intended behavior`、`scope\/risk`、`open questions`/);
     assert.match(agentsMd, /才升级进入 `brainstorming`/);
     assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`；如果当前工作来自已批准 proposal/);
+    assert.match(agentsMd, /implementation flow: 如果项目已同步 built-in runtime base/);
     assert.match(agentsMd, /技术栈 skill 保持按需加载/);
     assert.match(agentsMd, /`openspec`、`git-workflow`、`verification-before-completion` 是硬门禁/);
     assert.match(agentsMd, /`brainstorming`、`writing-plans`、`systematic-debugging`、`subagent-driven-development` 则由/);
@@ -468,7 +470,25 @@ test('initProject can initialize framework files without applying a stack', () =
   });
 });
 
-test('initProject applies the built-in foundation profile by default', () => {
+test('initProject installs OpenSpec when runtime is missing', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-install-openspec-'));
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeWhichDir = installFakeWhich(projectDir, null);
+
+  withTempPath(fakeWhichDir, () => withTempPath(fakeNpmDir, () => {
+    const output = initProject({
+      projectDir,
+      agents: ['codex'],
+      applyDefaultFoundation: false,
+    });
+
+    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec')));
+    assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes')));
+  }));
+});
+
+test('initProject applies the built-in runtime base by default', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-foundation-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
 
@@ -482,7 +502,7 @@ test('initProject applies the built-in foundation profile by default', () => {
     const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
     const foundationReadme = fs.readFileSync(path.join(projectDir, '.praxis', 'foundation', 'README.md'), 'utf8');
 
-    assert.match(output, /Applying foundation: ecc-foundation/);
+    assert.match(output, /Applying built-in Praxis runtime base/);
     assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.equal(manifest.foundationProfile, 'internal-base');
     assert.deepEqual(manifest.foundationOverlays, ['ecc-runtime-base', 'internal-extension-points']);
@@ -490,6 +510,7 @@ test('initProject applies the built-in foundation profile by default', () => {
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'profile', 'runtime-base.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'overlays', 'internal-extension-points', 'mcp', 'README.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'overlays', 'internal-extension-points', 'skills', 'internal-placeholder', 'SKILL.md')));
+    assert.match(foundationReadme, /This project is provisioned with the built-in Praxis runtime base/);
     assert.match(foundationReadme, /not the required front door for every daily task/);
   });
 });
@@ -507,7 +528,7 @@ test('initProject can skip the default foundation internally', () => {
 
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
 
-    assert.doesNotMatch(output, /Applying foundation:/);
+    assert.doesNotMatch(output, /Applying built-in Praxis runtime base/);
     assert.equal(manifest.selectedFoundation, null);
     assert.ok(!fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'manifest.json')));
   });
@@ -563,13 +584,14 @@ test('useFoundationProject applies overlays after framework init', () => {
 
     assert.match(output, /\.praxis\/foundation\/profile\/ created from internal-base/);
     assert.match(output, /\.praxis\/overlays\/ecc-runtime-base\/ created/);
-    assert.match(agentsMd, /## Runtime Foundation/);
-    assert.match(agentsMd, /selected foundation: `ecc-foundation`/);
+    assert.match(agentsMd, /## Praxis Runtime Base/);
+    assert.match(agentsMd, /runtime base: built-in Praxis runtime base/);
+    assert.match(agentsMd, /runtime preset: `ecc-foundation`/);
     assert.match(agentsMd, /not the mandatory front door for daily execution/);
   });
 });
 
-test('setupProject installs Codex superpowers, initializes, applies the default foundation, and applies a requested stack', () => {
+test('setupProject installs Codex superpowers, initializes, applies the built-in runtime base, and applies a requested stack', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-'));
   const fakeGitDir = installFakeGit(projectDir);
   const fakeNpmDir = installFakeNpm(projectDir);
@@ -592,7 +614,8 @@ test('setupProject installs Codex superpowers, initializes, applies the default 
     assert.match(output, /Cloned Codex SuperPowers/);
     assert.match(output, /Linked Codex SuperPowers skills/);
     assert.match(output, /== setup ==/);
-    assert.match(output, /Applying foundation: ecc-foundation/);
+    assert.match(output, /Selected stack: java-spring/);
+    assert.match(output, /Applying built-in Praxis runtime base/);
     assert.match(output, /Dependency doctor:/);
     assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.equal(manifest.selectedStack, 'java-spring');
@@ -629,6 +652,7 @@ test('setupProject applies the default foundation to an initialized project that
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
 
     assert.match(output, /Project already initialized; refreshing selected agents and managed adapters\./);
+    assert.match(output, /Applying built-in Praxis runtime base/);
     assert.match(output, /\.praxis\/foundation\/profile\/ created from internal-base/);
     assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'manifest.json')));
@@ -770,8 +794,8 @@ test('statusProject summarizes initialized project state', () => {
     assert.match(output, /initialized: yes/);
     assert.match(output, /skills index: present/);
     assert.match(output, /selected stack: java-spring/);
-    assert.match(output, /selected foundation: ecc-foundation/);
-    assert.match(output, /foundation profile: internal-base/);
+    assert.match(output, /runtime base preset: ecc-foundation/);
+    assert.match(output, /runtime profile: internal-base/);
     assert.match(output, /overlay directories: ecc-runtime-base, internal-extension-points/);
     assert.match(output, /configured agents: codex, claude/);
     assert.match(output, /active changes: add-login-audit/);
@@ -1010,7 +1034,7 @@ test('runCli use-stack requires a stack name', () => {
 test('runCli use-foundation requires a foundation name', () => {
   assert.throws(
     () => runCli(['use-foundation']),
-    /Foundation name is required/,
+    /Runtime base preset name is required/,
   );
 });
 

@@ -65,7 +65,7 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
 
   tool: {
     'praxis-init': {
-      description: 'Initialize the current project with canonical .praxis assets and sync agent adapters.',
+      description: 'Initialize the current project with canonical .praxis assets, the built-in runtime base, and synced agent adapters.',
       parameters: {
         type: 'object',
         properties: {

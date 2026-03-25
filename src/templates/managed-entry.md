@@ -19,7 +19,7 @@
 
 - proposal flow: 先读取 `openspec/AGENTS.md`，然后必须加载 `openspec` skill；再按需读取 `openspec/project.md`；先做轻量 `Proposal Intake`，优先基于现有上下文提取 `change target`、`intended behavior`、`scope/risk`、`open questions`。只有当 `open questions` 仍阻塞提案，或存在多种可行方案 / 架构分歧时，才升级进入 `brainstorming`。
 - implementation flow: 先读取 `.praxis/rules.md`；如果当前工作来自已批准 proposal，开始编码前先检查 Git 分支；若已位于与该 change 对应的专用实现分支，可继续复用，否则必须加载 `git-workflow` 并创建或切换到实现分支。
-- implementation flow: 如果项目已应用 foundation，先读取 `.praxis/foundation/README.md` 与 `.praxis/foundation/profile/`，把 foundation 视作运行时基线；OpenSpec 仅在治理 / proposal 场景中作为入口。
+- implementation flow: 如果项目已同步 built-in runtime base，先读取 `.praxis/foundation/README.md` 与 `.praxis/foundation/profile/`，把它视作运行时基线；OpenSpec 仅在治理 / proposal 场景中作为入口。
 - implementation flow: 技术栈 skill 保持按需加载；需要项目或技术栈 skill 时，再读取 `.praxis/skills/INDEX.md` 并打开对应 `SKILL.md`。若任务变成多步骤依赖、出现 bug / 失败测试、或存在可并行子任务，必须分别判断 `writing-plans`、`systematic-debugging`、`subagent-driven-development`。
 - review flow: 先读取 `.praxis/rules.md`；如涉及评审流程或提案关联，再读取对应 skill 与 OpenSpec 文件。
 
@@ -33,9 +33,9 @@
 
 - `.praxis/framework-rules.md`：完整框架门控规则
 - `.praxis/rules.md`：完整技术栈 / 项目规则
-- `.praxis/foundation/README.md`：runtime foundation 总览
-- `.praxis/foundation/profile/`：foundation profile 基线
-- `.praxis/overlays/`：foundation overlay 扩展点
+- `.praxis/foundation/README.md`：built-in runtime base 总览
+- `.praxis/foundation/profile/`：runtime profile 基线
+- `.praxis/overlays/`：runtime overlay 扩展点
 - `.praxis/skills/INDEX.md`：当前项目可用 skills 摘要
 - `openspec/AGENTS.md`：OpenSpec 规范驱动工作流
 - `openspec/project.md`：项目规范上下文
