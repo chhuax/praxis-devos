@@ -20,6 +20,7 @@ import {
   setupProject,
   statusProject,
   syncProject,
+  useFoundationProject,
   useStackProject,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
@@ -316,7 +317,9 @@ test('renderHelp exposes change and proposal commands', () => {
   assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files/);
   assert.match(help, /change\s+Create an OpenSpec change scaffold/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
+  assert.match(help, /use-foundation\s+Apply a built-in runtime foundation profile/);
   assert.match(help, /use-stack\s+Apply a technology stack to an initialized project/);
+  assert.match(help, /list-foundations\s+List available built-in runtime foundations/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
   assert.doesNotMatch(help, /--openspec/);
 });
@@ -359,6 +362,12 @@ test('list-stacks remains callable through runCli', () => {
   const output = runCli(['list-stacks']);
   assert.match(output, /java-spring/);
   assert.match(output, /starter/);
+});
+
+test('list-foundations remains callable through runCli', () => {
+  const output = runCli(['list-foundations']);
+  assert.match(output, /ecc-foundation/);
+  assert.match(output, /ECC-oriented runtime base/);
 });
 
 test('doctor strict fails when openspec is missing', () => {
@@ -413,7 +422,7 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(agentsMd, /proposal flow/);
     assert.match(agentsMd, /implementation flow/);
     assert.match(agentsMd, /review flow/);
-    assert.match(agentsMd, /OpenSpec 命令统一通过 `npx praxis-devos openspec/);
+    assert.match(agentsMd, /治理 \/ proposal 场景统一通过 `npx praxis-devos openspec/);
     assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`，然后必须加载 `openspec` skill/);
     assert.match(agentsMd, /先做轻量 `Proposal Intake`/);
     assert.match(agentsMd, /`change target`、`intended behavior`、`scope\/risk`、`open questions`/);
@@ -458,6 +467,33 @@ test('initProject can initialize framework files without applying a stack', () =
   });
 });
 
+test('initProject can apply a built-in foundation profile', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-foundation-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    const output = initProject({
+      projectDir,
+      foundationName: 'ecc-foundation',
+      agents: ['codex'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
+    const foundationReadme = fs.readFileSync(path.join(projectDir, '.praxis', 'foundation', 'README.md'), 'utf8');
+
+    assert.match(output, /Applying foundation: ecc-foundation/);
+    assert.equal(manifest.selectedFoundation, 'ecc-foundation');
+    assert.equal(manifest.foundationProfile, 'internal-base');
+    assert.deepEqual(manifest.foundationOverlays, ['ecc-runtime-base', 'internal-extension-points']);
+    assert.equal(foundationManifest.runtimeBase, 'ecc');
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'profile', 'runtime-base.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'overlays', 'internal-extension-points', 'mcp', 'README.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'overlays', 'internal-extension-points', 'skills', 'internal-placeholder', 'SKILL.md')));
+    assert.match(foundationReadme, /not the required front door for every daily task/);
+  });
+});
+
 test('useStackProject applies a stack after framework init', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-use-stack-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -483,6 +519,32 @@ test('useStackProject applies a stack after framework init', () => {
     assert.match(stackMd, /Java \+ Spring Boot/);
     assert.match(rulesMd, /Spring Boot/);
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
+  });
+});
+
+test('useFoundationProject applies overlays after framework init', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-use-foundation-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const output = useFoundationProject({
+      projectDir,
+      foundationName: 'ecc-foundation',
+      agents: ['codex'],
+    });
+
+    const agentsMd = fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8');
+
+    assert.match(output, /\.praxis\/foundation\/profile\/ created from internal-base/);
+    assert.match(output, /\.praxis\/overlays\/ecc-runtime-base\/ created/);
+    assert.match(agentsMd, /## Runtime Foundation/);
+    assert.match(agentsMd, /selected foundation: `ecc-foundation`/);
+    assert.match(agentsMd, /not the mandatory front door for daily execution/);
   });
 });
 
@@ -640,6 +702,7 @@ test('statusProject summarizes initialized project state', () => {
     initProject({
       projectDir,
       stackName: 'java-spring',
+      foundationName: 'ecc-foundation',
       agents: ['codex', 'claude'],
     });
 
@@ -653,6 +716,9 @@ test('statusProject summarizes initialized project state', () => {
     assert.match(output, /initialized: yes/);
     assert.match(output, /skills index: present/);
     assert.match(output, /selected stack: java-spring/);
+    assert.match(output, /selected foundation: ecc-foundation/);
+    assert.match(output, /foundation profile: internal-base/);
+    assert.match(output, /overlay directories: ecc-runtime-base, internal-extension-points/);
     assert.match(output, /configured agents: codex, claude/);
     assert.match(output, /active changes: add-login-audit/);
     assert.match(output, /Dependencies:/);
@@ -884,6 +950,13 @@ test('runCli use-stack requires a stack name', () => {
   assert.throws(
     () => runCli(['use-stack']),
     /Stack name is required/,
+  );
+});
+
+test('runCli use-foundation requires a foundation name', () => {
+  assert.throws(
+    () => runCli(['use-foundation']),
+    /Foundation name is required/,
   );
 });
 

@@ -1,0 +1,13 @@
+{
+  "description": "ECC-oriented runtime base with optional OpenSpec governance and placeholder internal extension seams.",
+  "runtimeBase": "ecc",
+  "profile": "internal-base",
+  "overlays": [
+    "ecc-runtime-base",
+    "internal-extension-points"
+  ],
+  "openspec": {
+    "mode": "optional-governance",
+    "note": "Use OpenSpec for governed changes, not as the mandatory daily workflow entrypoint."
+  }
+}

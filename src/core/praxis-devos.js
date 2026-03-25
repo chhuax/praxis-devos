@@ -9,6 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PRAXIS_ROOT = path.resolve(__dirname, '../..');
 export const SKILLS_DIR = path.join(PRAXIS_ROOT, 'skills');
 export const STACKS_DIR = path.join(PRAXIS_ROOT, 'stacks');
+export const FOUNDATIONS_DIR = path.join(PRAXIS_ROOT, 'foundations');
+export const PROFILES_DIR = path.join(PRAXIS_ROOT, 'profiles');
+export const OVERLAYS_DIR = path.join(PRAXIS_ROOT, 'overlays');
 export const FRAMEWORK_RULES_MD = path.join(PRAXIS_ROOT, 'RULES.md');
 export const PACKAGE_JSON = path.join(PRAXIS_ROOT, 'package.json');
 export const MANAGED_ENTRY_TEMPLATE = path.join(PRAXIS_ROOT, 'src', 'templates', 'managed-entry.md');
@@ -90,6 +93,8 @@ This directory is a generated compatibility marker for OpenCode.
 Canonical project assets stay in \`.praxis/\`, and the Praxis OpenCode plugin reads them directly.
 
 - Edit project skills in \`.praxis/skills/\`
+- Edit runtime foundation assets in \`.praxis/foundation/\`
+- Edit runtime overlays in \`.praxis/overlays/\`
 - Edit stack metadata in \`.praxis/stack.md\`
 - Edit framework gates in \`.praxis/framework-rules.md\`
 - Compiled cross-agent rules live in \`.praxis/adapters/compiled-rules.md\`
@@ -298,6 +303,16 @@ const copyDirIfMissing = (src, dst) => {
   }
 };
 
+const seedDirPreservingExisting = (src, dst) => {
+  if (!fs.existsSync(dst)) {
+    syncDirRecursive(src, dst);
+    return 'created';
+  }
+
+  syncMissingFilesRecursive(src, dst);
+  return 'merged';
+};
+
 const sourceSkillLooksIncomplete = (src, dst) => {
   const srcSkillMd = path.join(src, 'SKILL.md');
   const dstSkillMd = path.join(dst, 'SKILL.md');
@@ -489,6 +504,11 @@ const projectPaths = (projectDir) => {
     praxisFrameworkRulesMd: path.join(praxisDir, PRAXIS_FRAMEWORK_RULES),
     praxisStackMd: path.join(praxisDir, 'stack.md'),
     praxisRulesMd: path.join(praxisDir, 'rules.md'),
+    praxisFoundationDir: path.join(praxisDir, 'foundation'),
+    praxisFoundationReadme: path.join(praxisDir, 'foundation', 'README.md'),
+    praxisFoundationProfileDir: path.join(praxisDir, 'foundation', 'profile'),
+    praxisFoundationManifestPath: path.join(praxisDir, 'foundation', 'manifest.json'),
+    praxisOverlaysDir: path.join(praxisDir, 'overlays'),
     praxisAdaptersDir: path.join(praxisDir, 'adapters'),
     praxisCompiledRulesMd: path.join(praxisDir, 'adapters', PRAXIS_COMPILED_RULES),
     opencodeConfigPath: path.join(projectDir, 'opencode.json'),
@@ -546,6 +566,9 @@ const ensurePraxisManifest = ({ projectDir, stackName, agents, migratedFrom }) =
   const manifest = readJson(paths.manifestPath) || {};
   const nextAgents = [...new Set([...(manifest.agents || []), ...uniqueAgents(agents)])];
   const selectedStack = stackName ?? manifest.selectedStack ?? detectProjectStack(projectDir) ?? null;
+  const selectedFoundation = manifest.selectedFoundation ?? null;
+  const foundationProfile = manifest.foundationProfile ?? null;
+  const foundationOverlays = Array.isArray(manifest.foundationOverlays) ? manifest.foundationOverlays : [];
 
   const nextManifest = {
     schemaVersion: 1,
@@ -553,6 +576,9 @@ const ensurePraxisManifest = ({ projectDir, stackName, agents, migratedFrom }) =
     frameworkVersion: getPackageVersion(),
     canonicalDir: '.praxis',
     selectedStack,
+    selectedFoundation,
+    foundationProfile,
+    foundationOverlays,
     agents: nextAgents,
     dependencies: {
       openspec: {
@@ -568,6 +594,42 @@ const ensurePraxisManifest = ({ projectDir, stackName, agents, migratedFrom }) =
       },
     },
     migratedFrom: migratedFrom || manifest.migratedFrom || null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  writeJson(paths.manifestPath, nextManifest);
+  return nextManifest;
+};
+
+const updatePraxisManifestFoundation = ({ projectDir, foundationName, profileName, overlayNames }) => {
+  const paths = projectPaths(projectDir);
+  const manifest = readJson(paths.manifestPath) || {};
+
+  const nextManifest = {
+    ...manifest,
+    schemaVersion: manifest.schemaVersion || 1,
+    framework: manifest.framework || 'praxis-devos',
+    frameworkVersion: manifest.frameworkVersion || getPackageVersion(),
+    canonicalDir: manifest.canonicalDir || '.praxis',
+    selectedStack: manifest.selectedStack ?? detectProjectStack(projectDir) ?? null,
+    selectedFoundation: foundationName,
+    foundationProfile: profileName,
+    foundationOverlays: overlayNames,
+    agents: manifest.agents || [],
+    dependencies: manifest.dependencies || {
+      openspec: {
+        required: true,
+        type: 'cli',
+      },
+      superpowers: {
+        required: true,
+        type: 'agent-runtime',
+        agents: Object.fromEntries(
+          SUPPORTED_AGENTS.map((agent) => [agent, { required: true }]),
+        ),
+      },
+    },
+    migratedFrom: manifest.migratedFrom || null,
     updatedAt: new Date().toISOString(),
   };
 
@@ -739,8 +801,8 @@ function renderDependencyGateSummary(projectDir) {
     '## 全局硬门禁',
     '',
     openspecRuntime.status === 'ok'
-      ? '- OpenSpec 已可用；所有 OpenSpec 命令统一通过 `npx praxis-devos openspec ...` 调用。'
-      : '- OpenSpec 不可用；先执行 `npx praxis-devos setup --agent <name>`，不要直接进入提案、校验或归档。',
+      ? '- OpenSpec 已可用；治理 / proposal 场景统一通过 `npx praxis-devos openspec ...` 调用。'
+      : '- OpenSpec 当前不可用；日常实现可继续沿用 foundation + stack 基线，但 proposal / validate / archive 流程必须先执行 `npx praxis-devos setup --agent <name>`。',
   ];
 
   lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
@@ -748,7 +810,7 @@ function renderDependencyGateSummary(projectDir) {
   lines.push('- Claude Code：`npx praxis-devos bootstrap --agent claude`');
   lines.push('- OpenCode：`npx praxis-devos bootstrap --agent opencode`');
   lines.push('- 框架管控中，`openspec`、`git-workflow`、`verification-before-completion` 是硬门禁；`brainstorming`、`writing-plans`、`systematic-debugging`、`subagent-driven-development` 则由 Proposal Intake、实现复杂度、故障信号和并行拆分信号触发。');
-  lines.push('- 标记完成前，必须执行验证门控；若当前任务属于 OpenSpec change，还必须执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`。');
+  lines.push('- 标记完成前，必须执行验证门控；若当前任务属于受治理的 OpenSpec change，还必须执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`。');
 
   return lines.join('\n');
 }
@@ -761,6 +823,7 @@ const renderManagedEntryTemplate = (projectDir) => {
 
   return template
     .replace('{{dependency_gate_summary}}', renderDependencyGateSummary(projectDir))
+    .replace('{{foundation_section}}', renderFoundationSection(projectDir))
     .replace('{{project_skills_section}}', renderProjectSkillsSection(projectDir));
 };
 
@@ -878,7 +941,7 @@ export const syncProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   return logs.join('\n');
 };
 
-export const initProject = ({ projectDir, stackName, agents = SUPPORTED_AGENTS }) => {
+export const initProject = ({ projectDir, stackName, foundationName = null, agents = SUPPORTED_AGENTS }) => {
   const logs = [];
   const log = (msg) => logs.push(msg);
 
@@ -898,6 +961,19 @@ export const initProject = ({ projectDir, stackName, agents = SUPPORTED_AGENTS }
   }
 
   ensurePraxisManifest({ projectDir, stackName: resolvedStack, agents: selectedAgents });
+
+  if (foundationName) {
+    log(`⟳ Applying foundation: ${foundationName}`);
+    const foundationLogs = useFoundationProject({
+      projectDir,
+      foundationName,
+      agents: selectedAgents,
+    });
+    if (foundationLogs) {
+      logs.push(foundationLogs);
+    }
+    return logs.join('\n');
+  }
 
   const syncLogs = syncProject({ projectDir, agents: selectedAgents });
   if (syncLogs) {
@@ -946,22 +1022,42 @@ const isProjectInitialized = (projectDir) => {
   return fs.existsSync(paths.praxisDir) && fs.existsSync(paths.openspecDir);
 };
 
-export const setupProject = ({ projectDir, stackName = null, agents = SUPPORTED_AGENTS, strict = false }) => {
+export const setupProject = ({
+  projectDir,
+  stackName = null,
+  foundationName = null,
+  agents = SUPPORTED_AGENTS,
+  strict = false,
+}) => {
   const selectedAgents = uniqueAgents(agents);
   const outputs = [];
+  const wasInitialized = isProjectInitialized(projectDir);
 
   outputs.push(ensureOpenSpecRuntime(projectDir));
   outputs.push('');
   outputs.push(ensureRuntimeDependencies({ projectDir, agents: selectedAgents }));
   outputs.push('');
 
-  if (!isProjectInitialized(projectDir)) {
+  if (!wasInitialized) {
     outputs.push('== setup ==');
-    outputs.push(initProject({ projectDir, agents: selectedAgents }));
+    outputs.push(initProject({
+      projectDir,
+      foundationName,
+      agents: selectedAgents,
+    }));
   } else {
     outputs.push('== setup ==');
     outputs.push('Project already initialized; refreshing selected agents and managed adapters.');
     outputs.push(syncProject({ projectDir, agents: selectedAgents }));
+  }
+
+  if (foundationName && wasInitialized) {
+    outputs.push('');
+    outputs.push(useFoundationProject({
+      projectDir,
+      foundationName,
+      agents: selectedAgents,
+    }));
   }
 
   if (stackName) {
@@ -1070,6 +1166,164 @@ export const listStacksDetailed = () => listDirs(STACKS_DIR).map((name) => {
   return { name, description: firstLine };
 });
 
+const readFoundationDefinition = (foundationName) => {
+  const definitionPath = path.join(FOUNDATIONS_DIR, foundationName, 'foundation.json');
+  const definition = readJson(definitionPath);
+  if (!definition) {
+    return null;
+  }
+
+  return {
+    name: foundationName,
+    ...definition,
+  };
+};
+
+export const listFoundationsDetailed = () => listDirs(FOUNDATIONS_DIR).map((name) => {
+  const definition = readFoundationDefinition(name);
+  return {
+    name,
+    description: definition?.description || 'No description',
+    runtimeBase: definition?.runtimeBase || 'unknown',
+    profile: definition?.profile || 'unknown',
+    overlays: Array.isArray(definition?.overlays) ? definition.overlays : [],
+    openspecMode: definition?.openspec?.mode || 'unknown',
+  };
+});
+
+const renderFoundationReadme = (definition) => {
+  const overlayList = Array.isArray(definition.overlays) && definition.overlays.length > 0
+    ? definition.overlays.map((name) => `- \`${name}\``).join('\n')
+    : '- none';
+
+  return `# Runtime Foundation
+
+This project uses the built-in \`${definition.name}\` foundation.
+
+## Summary
+
+- runtime base: \`${definition.runtimeBase || 'unknown'}\`
+- profile seed: \`${definition.profile || 'unknown'}\`
+- OpenSpec mode: \`${definition.openspec?.mode || 'unknown'}\`
+
+## Applied overlays
+
+${overlayList}
+
+## Operating model
+
+- Treat this foundation as the runtime base for day-to-day AI engineering workflows.
+- Keep \`.praxis/foundation/profile/\` as the local, editable profile baseline.
+- Keep \`.praxis/overlays/\` as extension seams for future internal MCP, docs, commands, hooks, rules, and skills.
+- Use OpenSpec when the work needs governance, proposal review, or controlled change records. It is available, but it is not the required front door for every daily task.
+`;
+};
+
+export const useFoundationProject = ({ projectDir, foundationName, agents = SUPPORTED_AGENTS }) => {
+  const paths = projectPaths(projectDir);
+  const manifest = readJson(paths.manifestPath);
+  const logs = [];
+  const log = (msg) => logs.push(msg);
+
+  if (!fs.existsSync(paths.praxisDir)) {
+    throw new Error('Praxis project is not initialized. Run `npx praxis-devos setup --agent <name>` first.');
+  }
+
+  if (!foundationName) {
+    throw new Error(`Foundation name is required. Use one of: ${listDirs(FOUNDATIONS_DIR).join(', ')}`);
+  }
+
+  const definition = readFoundationDefinition(foundationName);
+  if (!definition) {
+    throw new Error(`Foundation "${foundationName}" not found. Available: ${listDirs(FOUNDATIONS_DIR).join(', ')}`);
+  }
+
+  if (manifest?.selectedFoundation && manifest.selectedFoundation !== foundationName) {
+    throw new Error(
+      `Switching foundations from "${manifest.selectedFoundation}" to "${foundationName}" is not automatic yet. ` +
+      'Review and clean existing foundation assets before applying a different foundation.',
+    );
+  }
+
+  const profileSrc = path.join(PROFILES_DIR, definition.profile);
+  if (!fs.existsSync(profileSrc)) {
+    throw new Error(`Foundation profile "${definition.profile}" is missing from ${PROFILES_DIR}`);
+  }
+
+  ensureDir(paths.praxisFoundationDir);
+  ensureDir(paths.praxisOverlaysDir);
+
+  const profileStatus = seedDirPreservingExisting(profileSrc, paths.praxisFoundationProfileDir);
+  if (profileStatus === 'created') {
+    log(`✓ .praxis/foundation/profile/ created from ${definition.profile}`);
+  } else {
+    log(`✓ .praxis/foundation/profile/ merged from ${definition.profile}`);
+  }
+
+  const overlayNames = Array.isArray(definition.overlays) ? definition.overlays : [];
+  for (const overlayName of overlayNames) {
+    const overlaySrc = path.join(OVERLAYS_DIR, overlayName);
+    if (!fs.existsSync(overlaySrc)) {
+      throw new Error(`Foundation overlay "${overlayName}" is missing from ${OVERLAYS_DIR}`);
+    }
+
+    const overlayDst = path.join(paths.praxisOverlaysDir, overlayName);
+    const overlayStatus = seedDirPreservingExisting(overlaySrc, overlayDst);
+    if (overlayStatus === 'created') {
+      log(`✓ .praxis/overlays/${overlayName}/ created`);
+    } else {
+      log(`✓ .praxis/overlays/${overlayName}/ merged`);
+    }
+  }
+
+  writeJson(paths.praxisFoundationManifestPath, {
+    foundation: definition.name,
+    runtimeBase: definition.runtimeBase || null,
+    profile: definition.profile || null,
+    overlays: overlayNames,
+    openspec: definition.openspec || null,
+    appliedAt: new Date().toISOString(),
+  });
+  writeText(paths.praxisFoundationReadme, `${renderFoundationReadme(definition)}\n`);
+  updatePraxisManifestFoundation({
+    projectDir,
+    foundationName: definition.name,
+    profileName: definition.profile || null,
+    overlayNames,
+  });
+
+  const syncLogs = syncProject({ projectDir, agents });
+  if (syncLogs) {
+    logs.push(syncLogs);
+  }
+
+  return logs.join('\n');
+};
+
+const renderFoundationSection = (projectDir) => {
+  const paths = projectPaths(projectDir);
+  const foundationManifest = readJson(paths.praxisFoundationManifestPath);
+
+  const lines = [
+    '## Runtime Foundation',
+    '',
+  ];
+
+  if (!foundationManifest) {
+    lines.push('- selected foundation: none');
+    lines.push('- daily workflows can still run on the stack/runtime defaults, but no built-in ECC foundation overlay has been applied yet.');
+    return lines.join('\n');
+  }
+
+  lines.push(`- selected foundation: \`${foundationManifest.foundation || 'unknown'}\``);
+  lines.push(`- runtime base: \`${foundationManifest.runtimeBase || 'unknown'}\``);
+  lines.push(`- profile seed: \`${foundationManifest.profile || 'unknown'}\``);
+  lines.push(`- applied overlays: ${(foundationManifest.overlays || []).map((name) => `\`${name}\``).join(', ') || 'none'}`);
+  lines.push('- daily implementation should read `.praxis/foundation/README.md` before reaching for governance docs.');
+  lines.push('- OpenSpec remains available for proposal and governance work, but it is not the mandatory front door for daily execution.');
+  return lines.join('\n');
+};
+
 export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   const paths = projectPaths(projectDir);
   const manifest = readJson(paths.manifestPath);
@@ -1077,6 +1331,7 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   const activeChangesDir = path.join(paths.openspecDir, 'changes');
   const activeChanges = listDirs(activeChangesDir).filter((name) => !name.startsWith('.'));
   const projectSkills = listDirs(paths.praxisSkillsDir);
+  const appliedOverlays = listDirs(paths.praxisOverlaysDir);
   const adapterStatuses = [
     { name: 'codex', ok: fs.existsSync(paths.rootAgentsMd) },
     { name: 'claude', ok: fs.existsSync(paths.rootClaudeMd) },
@@ -1103,10 +1358,14 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   if (manifest) {
     lines.push(`- framework version: ${manifest.frameworkVersion || getPackageVersion()}`);
     lines.push(`- selected stack: ${manifest.selectedStack || 'unknown'}`);
+    lines.push(`- selected foundation: ${manifest.selectedFoundation || 'none'}`);
+    lines.push(`- foundation profile: ${manifest.foundationProfile || 'none'}`);
+    lines.push(`- foundation overlays: ${(manifest.foundationOverlays || []).join(', ') || 'none'}`);
     lines.push(`- configured agents: ${(manifest.agents || []).join(', ') || 'none'}`);
   }
 
   lines.push(`- project skills: ${projectSkills.length > 0 ? projectSkills.join(', ') : 'none'}`);
+  lines.push(`- overlay directories: ${appliedOverlays.length > 0 ? appliedOverlays.join(', ') : 'none'}`);
   lines.push(`- adapters: ${adapterStatuses.map((adapter) => `${adapter.name}=${adapter.ok ? 'ready' : 'missing'}`).join(', ')}`);
   lines.push(`- active changes: ${activeChanges.length > 0 ? activeChanges.join(', ') : 'none'}`);
   lines.push('');
@@ -1694,6 +1953,7 @@ export const parseCliArgs = (argv) => {
   const parsed = {
     command: args.shift() || 'help',
     stack: null,
+    foundation: null,
     agents: [],
     file: null,
     positional: [],
@@ -1707,6 +1967,11 @@ export const parseCliArgs = (argv) => {
 
     if (token === '--stack') {
       parsed.stack = args.shift() || null;
+      continue;
+    }
+
+    if (token === '--foundation') {
+      parsed.foundation = args.shift() || null;
       continue;
     }
 
@@ -1746,6 +2011,10 @@ export const parseCliArgs = (argv) => {
 
   if (parsed.command === 'use-stack' && !parsed.stack && parsed.positional.length > 0) {
     parsed.stack = parsed.positional[0];
+  }
+
+  if (parsed.command === 'use-foundation' && !parsed.foundation && parsed.positional.length > 0) {
+    parsed.foundation = parsed.positional[0];
   }
 
   return parsed;
@@ -2135,9 +2404,10 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-  setup          Bootstrap dependencies, initialize framework files, and optionally apply a stack
+  setup          Bootstrap dependencies, initialize framework files, and optionally apply a foundation or stack
   init           Initialize the framework skeleton in the current project
   use-stack      Apply a technology stack to an initialized project
+  use-foundation Apply a built-in runtime foundation profile to an initialized project
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold from the explicit proposal path
@@ -2148,10 +2418,12 @@ Commands:
   openspec       Run OpenSpec through the Praxis wrapper
   validate-session  Validate a transcript against Praxis evidence hooks
   list-stacks    List available technology stacks
+  list-foundations List available built-in runtime foundations
   help           Show this help
 
 Options:
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
+  --foundation <name>    Select a built-in runtime foundation for setup/init, or pass it positionally to use-foundation
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
@@ -2193,6 +2465,11 @@ export const runCli = (argv) => {
     return `Available stacks:\n${stacks.map((stack) => `  ${stack.name} — ${stack.description}`).join('\n')}`;
   }
 
+  if (parsed.command === 'list-foundations') {
+    const foundations = listFoundationsDetailed();
+    return `Available foundations:\n${foundations.map((foundation) => `  ${foundation.name} — ${foundation.description}`).join('\n')}`;
+  }
+
   if (parsed.command === 'status') {
     return statusProject({
       projectDir: parsed.projectDir,
@@ -2225,6 +2502,7 @@ export const runCli = (argv) => {
     return setupProject({
       projectDir: parsed.projectDir,
       stackName: parsed.stack,
+      foundationName: parsed.foundation,
       agents,
       strict: parsed.strict,
     });
@@ -2249,10 +2527,23 @@ export const runCli = (argv) => {
     });
   }
 
+  if (parsed.command === 'use-foundation') {
+    if (!parsed.foundation) {
+      throw new Error('Foundation name is required. Use `npx praxis-devos use-foundation <name>` or `--foundation <name>`.');
+    }
+
+    return useFoundationProject({
+      projectDir: parsed.projectDir,
+      foundationName: parsed.foundation,
+      agents,
+    });
+  }
+
   if (parsed.command === 'init') {
     return initProject({
       projectDir: parsed.projectDir,
       stackName: parsed.stack,
+      foundationName: parsed.foundation,
       agents,
     });
   }
