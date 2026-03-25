@@ -204,10 +204,45 @@ const syncDirRecursive = (src, dst) => {
   }
 };
 
+const syncMissingFilesRecursive = (src, dst) => {
+  ensureDir(dst);
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const dstPath = path.join(dst, entry.name);
+    if (entry.isDirectory()) {
+      syncMissingFilesRecursive(srcPath, dstPath);
+      continue;
+    }
+    if (!fs.existsSync(dstPath)) {
+      copyFile(srcPath, dstPath);
+    }
+  }
+};
+
 const copyDirIfMissing = (src, dst) => {
   if (!fs.existsSync(dst)) {
     syncDirRecursive(src, dst);
   }
+};
+
+const sourceSkillLooksIncomplete = (src, dst) => {
+  const srcSkillMd = path.join(src, 'SKILL.md');
+  const dstSkillMd = path.join(dst, 'SKILL.md');
+  return fs.existsSync(srcSkillMd) && !fs.existsSync(dstSkillMd);
+};
+
+const ensureDirSeeded = (src, dst) => {
+  if (!fs.existsSync(dst)) {
+    syncDirRecursive(src, dst);
+    return 'created';
+  }
+
+  if (sourceSkillLooksIncomplete(src, dst)) {
+    syncMissingFilesRecursive(src, dst);
+    return 'repaired';
+  }
+
+  return 'skipped';
 };
 
 const removePathIfExists = (targetPath) => {
@@ -502,11 +537,13 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
     const skillSrc = path.join(SKILLS_DIR, skillName);
     const skillDst = path.join(paths.praxisSkillsDir, skillName);
     if (fs.existsSync(skillSrc)) {
-      if (fs.existsSync(skillDst)) {
-        log(`⊘ .praxis/skills/${skillName}/ already exists, skipped`);
-      } else {
-        copyDirIfMissing(skillSrc, skillDst);
+      const status = ensureDirSeeded(skillSrc, skillDst);
+      if (status === 'created') {
         log(`✓ .praxis/skills/${skillName}/ copied (customizable)`);
+      } else if (status === 'repaired') {
+        log(`✓ .praxis/skills/${skillName}/ repaired from framework defaults`);
+      } else {
+        log(`⊘ .praxis/skills/${skillName}/ already exists, skipped`);
       }
     }
   }
@@ -523,11 +560,13 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
       if (!entry.isDirectory()) continue;
       const skillSrc = path.join(stackSkillsSrc, entry.name);
       const skillDst = path.join(paths.praxisSkillsDir, entry.name);
-      if (fs.existsSync(skillDst)) {
-        log(`⊘ .praxis/skills/${entry.name}/ already exists, skipped`);
-      } else {
-        copyDirIfMissing(skillSrc, skillDst);
+      const status = ensureDirSeeded(skillSrc, skillDst);
+      if (status === 'created') {
         log(`✓ .praxis/skills/${entry.name}/ copied (from ${stackName})`);
+      } else if (status === 'repaired') {
+        log(`✓ .praxis/skills/${entry.name}/ repaired from ${stackName}`);
+      } else {
+        log(`⊘ .praxis/skills/${entry.name}/ already exists, skipped`);
       }
     }
   }

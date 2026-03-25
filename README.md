@@ -145,7 +145,7 @@ That compiled rules artifact also includes a dependency gate summary, so agents 
 
 If `AGENTS.md` or `CLAUDE.md` already exists, Praxis only appends or refreshes the managed block between `<!-- PRAXIS_DEVOS_START -->` and `<!-- PRAXIS_DEVOS_END -->`. User-owned content outside that block is preserved.
 
-Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. Those commands mean "enter the proposal path", not "start implementation immediately"; if the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
+Praxis also treats `/change` as the explicit proposal entrypoint, with `/proposal` kept as a compatibility alias. This is a text-level workflow convention, not a guarantee that every agent runtime exposes a native slash command with that exact name. In Codex and Claude, the managed block uses those tokens to mean "enter the proposal path", while the executable scaffold entrypoint remains `praxis-devos change` / `praxis-devos proposal`. If the request is still ambiguous, agents should enter `brainstorming` before choosing a full or lightweight proposal.
 
 ## CLI
 

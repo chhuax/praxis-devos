@@ -145,7 +145,7 @@ npx praxis-devos sync --agent opencode
 
 如果项目原本已经有 `AGENTS.md` 或 `CLAUDE.md`，Praxis 只会追加或刷新 `<!-- PRAXIS_DEVOS_START -->` 到 `<!-- PRAXIS_DEVOS_END -->` 之间的托管区，不会覆盖区块外的人工内容。
 
-另外，Praxis 约定 `/change` 为显式提案主入口，`/proposal` 为兼容别名。它们的语义是“进入提案通道”，不是“直接开始实现”；如果需求不明确，应先进入 `brainstorming`，再决定完整提案或轻量提案。
+另外，Praxis 约定 `/change` 为显式提案主入口，`/proposal` 为兼容别名。这里说的是“文本语义入口”，不是保证所有 agent 平台都会原生注册同名 slash 命令；在 Codex / Claude 里，它表示“进入提案通道”的受管控语义，而真正可执行的脚手架命令仍然是 `praxis-devos change` / `praxis-devos proposal`。如果需求不明确，应先进入 `brainstorming`，再决定完整提案或轻量提案。
 
 ## CLI
 

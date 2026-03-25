@@ -72,6 +72,7 @@ your-project/
 - 受管控区块会包含项目 skills 摘要，完整索引位于 `.praxis/skills/INDEX.md`
 - 如果项目已经存在 `AGENTS.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
 - `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
+- 这属于受管控文本语义，不表示 Codex 平台一定原生注册了 `/change` slash 命令；真正可执行的脚手架入口仍然是 `praxis-devos change`
 - 不要求 Codex 使用专属项目目录
 
 ### Claude Code
@@ -81,6 +82,7 @@ your-project/
 - 受管控区块会包含项目 skills 摘要，完整索引位于 `.praxis/skills/INDEX.md`
 - 如果项目已经存在 `CLAUDE.md`，Praxis 只追加或刷新受管控区块，不覆盖人工内容
 - `/change` 作为显式提案主入口写入受管控语义；`/proposal` 保留为兼容别名
+- 这属于受管控文本语义，不表示 Claude Code 平台一定原生注册了 `/change` slash 命令；真正可执行的脚手架入口仍然是 `praxis-devos change`
 - 不把 canonical project state 放进 Claude 专属目录
 
 ## CLI 归属

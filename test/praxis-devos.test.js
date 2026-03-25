@@ -176,6 +176,27 @@ test('initProject creates canonical assets and managed adapters', () => {
   });
 });
 
+test('initProject repairs incomplete skill directories instead of skipping them', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-repair-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  fs.mkdirSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow'), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, '.praxis', 'skills', 'java-security'), { recursive: true });
+
+  withTempPath(fakeBinDir, () => {
+    const output = initProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['codex'],
+    });
+
+    assert.match(output, /repaired from framework defaults/);
+    assert.match(output, /repaired from java-spring/);
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
+  });
+});
+
 test('statusProject summarizes initialized project state', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-status-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
