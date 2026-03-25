@@ -92,7 +92,9 @@ Canonical project assets stay in \`.praxis/\`, and the Praxis OpenCode plugin re
 - Edit framework gates in \`.praxis/framework-rules.md\`
 - Compiled cross-agent rules live in \`.praxis/adapters/compiled-rules.md\`
 - Edit stack rules in \`.praxis/rules.md\`
-- \`.opencode/\` no longer mirrors skills, stack, or rules files by default
+- \`.opencode/\` no longer mirrors canonical skills, stack, or rules files by default
+- If you add OpenCode-only supplemental skills, place them in \`.opencode/skills/\`
+- The plugin prioritizes \`.praxis/skills/\` and treats \`.opencode/skills/\` as a supplemental layer
 - Re-run \`praxis-devos sync --agent opencode\` after changing canonical files
 `;
 
@@ -708,7 +710,6 @@ const syncOpenCodeAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
 
   ensureDir(paths.legacyOpenCodeDir);
-  removePathIfExists(paths.legacyOpenCodeSkillsDir);
   removePathIfExists(paths.legacyOpenCodeStackMd);
   removePathIfExists(paths.legacyOpenCodeRulesMd);
 
@@ -833,7 +834,9 @@ export const collectSkillsPaths = (projectDir) => {
 
   if (fs.existsSync(project.praxisSkillsDir)) {
     paths.push(project.praxisSkillsDir);
-  } else if (fs.existsSync(project.legacyOpenCodeSkillsDir)) {
+  }
+
+  if (fs.existsSync(project.legacyOpenCodeSkillsDir)) {
     paths.push(project.legacyOpenCodeSkillsDir);
   }
 

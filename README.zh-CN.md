@@ -60,7 +60,7 @@ your-project/
         └── compiled-rules.md
 ```
 
-OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCode 通过插件直接读取 `.praxis/`，不再默认镜像 skills、stack、rules 到 `.opencode/`。
+OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCode 通过插件优先读取 `.praxis/`，并把 `.opencode/skills/` 当作补充层；不再默认镜像 canonical skills、stack、rules 到 `.opencode/`。
 
 更详细的设计说明见：
 
