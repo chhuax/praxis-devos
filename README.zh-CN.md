@@ -60,7 +60,7 @@ your-project/
         └── compiled-rules.md
 ```
 
-OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `praxis-devos sync --agent opencode` 会生成或刷新它。
+OpenCode 仍然支持，但 `.opencode/` 现在只是最小兼容目录。OpenCode 通过插件直接读取 `.praxis/`，不再默认镜像 skills、stack、rules 到 `.opencode/`。
 
 更详细的设计说明见：
 
@@ -69,6 +69,8 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `prax
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
 - [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
+- [docs/releases/v0.2.2.md](docs/releases/v0.2.2.md)
+- [docs/releases/v0.2.3.md](docs/releases/v0.2.3.md)
 
 ## 快速开始
 
@@ -88,6 +90,18 @@ npx praxis-devos init --stack java-spring
 - 把技术栈工具链写入 `.praxis/stack.md`
 - 把技术栈规则写入 `.praxis/rules.md`
 - 同步 OpenCode、Codex、Claude Code 的适配入口
+
+如果你当前只打算使用某一个 agent，也可以显式指定：
+
+```bash
+npx praxis-devos init --stack java-spring --agents codex
+```
+
+后续如果团队里有人想补用其他 agent，再增量同步即可：
+
+```bash
+npx praxis-devos sync --agent opencode
+```
 
 如果当前环境还没有 OpenSpec，`init` 会直接失败，不再降级为手工脚手架模式。
 
@@ -144,9 +158,15 @@ praxis-devos status
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
-praxis-devos openspec list --specs
+npx praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
+
+说明：
+
+- 不带 `--agent` / `--agents` 时，默认会处理 `opencode,codex,claude`
+- 可以只指定单个 agent，例如 `--agents codex`
+- 后续增量扩展不会覆盖已有配置，`sync --agent opencode` 会把 `opencode` 合并进当前项目的已配置 agents
 
 ## 依赖管理
 

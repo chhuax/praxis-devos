@@ -60,7 +60,7 @@ your-project/
         └── compiled-rules.md
 ```
 
-OpenCode compatibility is still supported. `praxis-devos sync --agent opencode` generates `.opencode/` as a compatibility projection.
+OpenCode compatibility is still supported. `praxis-devos sync --agent opencode` now keeps `.opencode/` as a minimal compatibility marker while the plugin reads canonical assets directly from `.praxis/`.
 
 Detailed architecture and migration notes:
 
@@ -69,6 +69,8 @@ Detailed architecture and migration notes:
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
 - [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
+- [docs/releases/v0.2.2.md](docs/releases/v0.2.2.md)
+- [docs/releases/v0.2.3.md](docs/releases/v0.2.3.md)
 
 ## Quick Start
 
@@ -88,6 +90,18 @@ This will:
 - copy stack metadata into `.praxis/stack.md`
 - copy stack rules into `.praxis/rules.md`
 - sync adapters for OpenCode, Codex, and Claude Code
+
+If you only want one agent at first, target it explicitly:
+
+```bash
+npx praxis-devos init --stack java-spring --agents codex
+```
+
+If a teammate later wants another agent, just add it incrementally:
+
+```bash
+npx praxis-devos sync --agent opencode
+```
 
 If OpenSpec is not available, `init` now fails directly instead of falling back to a manual scaffold.
 
@@ -144,9 +158,15 @@ praxis-devos status
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
-praxis-devos openspec list --specs
+npx praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
+
+Notes:
+
+- Without `--agent` / `--agents`, Praxis defaults to `opencode,codex,claude`
+- You can target a single agent, for example `--agents codex`
+- Later expansion is additive: `sync --agent opencode` merges `opencode` into the project's configured agents instead of replacing the existing ones
 
 ## Dependency Management
 

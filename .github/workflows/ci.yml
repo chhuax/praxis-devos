@@ -38,6 +38,7 @@ jobs:
         run: |
           node bin/praxis-devos.js help
           node bin/praxis-devos.js list-stacks
+          node bin/praxis-devos.js status
 
       - name: Pack dry run
         run: npm pack --dry-run --json

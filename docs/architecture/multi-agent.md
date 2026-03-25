@@ -58,10 +58,11 @@ your-project/
 
 - OpenCode 插件读取框架内置 `skills/`
 - 同时读取项目内 `.praxis/skills/`
-- `.praxis/skills/` 仍然是 canonical source，`.opencode/skills/` 只是兼容投影
+- `.praxis/skills/` 是唯一 canonical source
+- 只有旧项目缺少 `.praxis/skills/` 时，才回退读取 `.opencode/skills/`
 - 注入框架 `RULES.md` 和项目 `.praxis/rules.md`
 - 同时可以复用 `.praxis/adapters/compiled-rules.md` 作为统一规则摘要
-- `praxis-devos sync --agent opencode` 会生成 `.opencode/` 兼容投影
+- `praxis-devos sync --agent opencode` 只保留 `.opencode/` 最小兼容目录，不再镜像 skills / stack / rules
 
 ### Codex
 
@@ -93,6 +94,13 @@ praxis-devos status
 praxis-devos list-stacks
 ```
 
+补充说明：
+
+- 不带 `--agent` / `--agents` 时，默认处理 `opencode,codex,claude`
+- 如果项目当前只使用一个 agent，可以显式指定，例如 `praxis-devos init --stack java-spring --agents codex`
+- 后续增量启用其他 agent 时，执行 `praxis-devos sync --agent opencode`
+- 已配置 agents 会写入 `.praxis/manifest.json`，后续同步时按并集累加，不会覆盖已有配置
+
 插件里保留的 `praxis-init`、`praxis-sync`、`praxis-migrate` 只是共享核心的薄封装，不能再拥有独立逻辑。
 
 ## 依赖管理
@@ -113,7 +121,7 @@ praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
 praxis-devos bootstrap --agent codex
 praxis-devos bootstrap --agent claude
-praxis-devos openspec list --specs
+npx praxis-devos openspec list --specs
 ```
 
 详细说明见 [docs/dependency-management.md](../dependency-management.md)。

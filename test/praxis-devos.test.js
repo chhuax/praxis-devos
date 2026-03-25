@@ -5,12 +5,18 @@ import os from 'os';
 import path from 'path';
 
 import {
+  bootstrapOpenSpec,
+  bootstrapProject,
+  collectSkillsPaths,
   createChangeScaffold,
   doctorProject,
   initProject,
+  migrateProject,
   renderHelp,
+  runOpenSpecCommand,
   runCli,
   statusProject,
+  syncProject,
 } from '../src/core/praxis-devos.js';
 
 const makeTempProject = () => {
@@ -51,6 +57,24 @@ exit 1
   fs.chmodSync(scriptPath, 0o755);
   return binDir;
 };
+
+const installFakeProjectLocalOpenSpec = (projectDir, label = 'LOCAL') => {
+  const binDir = path.join(projectDir, 'node_modules', '.bin');
+  const scriptPath = path.join(binDir, 'openspec');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+echo "${label}:$*"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
+const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
@@ -163,4 +187,116 @@ test('statusProject summarizes initialized project state', () => {
     assert.match(output, /active changes: add-login-audit/);
     assert.match(output, /Dependencies:/);
   });
+});
+
+test('syncProject preserves user content and refreshes opencode projection', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-sync-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['codex'],
+    });
+
+    const agentsPath = path.join(projectDir, 'AGENTS.md');
+    fs.writeFileSync(agentsPath, `# User Notes\n\nKeep this section.\n\n${fs.readFileSync(agentsPath, 'utf8')}`);
+
+    const output = syncProject({
+      projectDir,
+      agents: ['opencode', 'codex'],
+    });
+
+    const nextAgents = fs.readFileSync(agentsPath, 'utf8');
+    assert.match(output, /OpenCode adapter synced to \.opencode\//);
+    assert.match(output, /Codex adapter synced via AGENTS\.md/);
+    assert.match(nextAgents, /Keep this section\./);
+    assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+    assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'skills')));
+    assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'stack.md')));
+    assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'stack-rules.md')));
+
+    const opencodeReadme = fs.readFileSync(path.join(projectDir, '.opencode', 'README.md'), 'utf8');
+    assert.match(opencodeReadme, /no longer mirrors skills, stack, or rules files by default/);
+
+    const paths = collectSkillsPaths(projectDir);
+    assert.ok(paths.includes(path.join(projectDir, '.praxis', 'skills')));
+    assert.ok(!paths.includes(path.join(projectDir, '.opencode', 'skills')));
+  });
+});
+
+test('migrateProject moves legacy opencode assets into canonical praxis state', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-migrate-'));
+
+  fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'legacy-skill'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'legacy-skill', 'SKILL.md'), '# Legacy Skill\n');
+  fs.writeFileSync(path.join(projectDir, '.opencode', 'stack.md'), '# Legacy Stack\n');
+  fs.writeFileSync(path.join(projectDir, '.opencode', 'stack-rules.md'), '# Legacy Rules\n');
+
+  const output = migrateProject({
+    projectDir,
+    agents: ['codex'],
+  });
+
+  const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+  assert.match(output, /Migrated \.opencode\/skills\/legacy-skill\/ to \.praxis\/skills\//);
+  assert.equal(manifest.migratedFrom, '.opencode');
+  assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'legacy-skill', 'SKILL.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+});
+
+test('bootstrapProject updates opencode config and prints agent-specific guidance', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bootstrap-'));
+
+  const output = bootstrapProject({
+    projectDir,
+    agents: ['opencode', 'codex', 'claude'],
+  });
+
+  const config = readJsonFile(path.join(projectDir, 'opencode.json'));
+  assert.ok(Array.isArray(config.plugin));
+  assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+  assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
+  assert.match(output, /== opencode ==/);
+  assert.match(output, /== codex ==/);
+  assert.match(output, /ln -s ~\/\.codex\/superpowers\/skills ~\/\.agents\/skills\/superpowers/);
+  assert.match(output, /== claude ==/);
+  assert.match(output, /\/plugin install superpowers@claude-plugins-official/);
+});
+
+test('bootstrapOpenSpec reports project-local runtime when available', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-bootstrap-'));
+  installFakeProjectLocalOpenSpec(projectDir);
+
+  const output = bootstrapOpenSpec({ projectDir });
+  assert.match(output, /OpenSpec already available \(project-local\)/);
+  assert.match(output, /npx praxis-devos openspec list --specs/);
+  assert.match(output, /praxis-devos openspec list --specs/);
+});
+
+test('runOpenSpecCommand prefers project-local runtime over PATH', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-run-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+  installFakeProjectLocalOpenSpec(projectDir, 'LOCAL');
+
+  withTempPath(fakeBinDir, () => {
+    const output = runOpenSpecCommand({
+      projectDir,
+      args: ['list', '--specs'],
+    });
+
+    assert.equal(output, 'LOCAL:list --specs');
+  });
+});
+
+test('collectSkillsPaths falls back to legacy opencode skills for unmigrated projects', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-legacy-skills-'));
+  fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'legacy-only'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'legacy-only', 'SKILL.md'), '# Legacy Only\n');
+
+  const paths = collectSkillsPaths(projectDir);
+  assert.ok(paths.includes(path.join(projectDir, '.opencode', 'skills')));
 });
