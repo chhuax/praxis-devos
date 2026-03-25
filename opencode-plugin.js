@@ -18,6 +18,7 @@ import {
   listStacksDetailed,
   migrateProject,
   runOpenSpecCommand,
+  statusProject,
   syncProject,
   SUPPORTED_AGENTS,
 } from './src/core/praxis-devos.js';
@@ -299,6 +300,35 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
         } catch (err) {
           return {
             content: [{ type: 'text', text: `praxis-doctor failed: ${err?.message || String(err)}` }],
+          };
+        }
+      },
+    },
+
+    'praxis-status': {
+      description: 'Show current project initialization state, active changes, adapters, and dependency summary.',
+      parameters: {
+        type: 'object',
+        properties: {
+          agents: {
+            type: 'array',
+            items: { type: 'string' },
+            description: `Agents to include in the dependency summary. Defaults to: ${SUPPORTED_AGENTS.join(', ')}`,
+          },
+        },
+      },
+      execute: async (args) => {
+        try {
+          const result = statusProject({
+            projectDir: directory,
+            agents: args.agents || SUPPORTED_AGENTS,
+          });
+          return {
+            content: [{ type: 'text', text: String(result || 'praxis-status completed (no output)') }],
+          };
+        } catch (err) {
+          return {
+            content: [{ type: 'text', text: `praxis-status failed: ${err?.message || String(err)}` }],
           };
         }
       },

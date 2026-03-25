@@ -113,7 +113,7 @@ Add to your project's `opencode.json`:
 
 Then restart OpenCode.
 
-The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, `praxis-change`, and `praxis-openspec`.
+The plugin no longer owns initialization. It reads `.praxis/` and exposes thin wrappers such as `praxis-init`, `praxis-sync`, `praxis-migrate`, `praxis-change`, `praxis-status`, and `praxis-openspec`.
 
 ## How Rule Gating Works
 
@@ -140,6 +140,7 @@ praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
 praxis-devos change --title "Add two factor auth" --capability auth
+praxis-devos status
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
@@ -178,6 +179,7 @@ Bundled with the framework:
 ### Project Skills
 
 Installed into `.praxis/skills/` during `init`. These are safe to customize in the target project.
+Praxis also generates `.praxis/skills/INDEX.md` so Codex / Claude managed blocks can surface the currently installed project skills instead of only relying on raw file discovery.
 
 ### Stack Skills
 

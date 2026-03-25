@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Show tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Run tests
+        run: npm test
+
+      - name: CLI smoke checks
+        run: |
+          node bin/praxis-devos.js help
+          node bin/praxis-devos.js list-stacks
+
+      - name: Pack dry run
+        run: npm pack --dry-run --json

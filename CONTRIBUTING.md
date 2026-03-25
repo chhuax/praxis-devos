@@ -68,6 +68,12 @@ node bin/praxis-devos.js sync
 5. Push and open a Pull Request
 6. Link related issues or discussions
 
+Pull requests are validated by GitHub Actions CI. At minimum, contributors should expect:
+
+- `npm test`
+- CLI smoke checks (`help`, `list-stacks`)
+- `npm pack --dry-run`
+
 ## What NOT to Submit
 
 - Enterprise-specific content that belongs in private stacks

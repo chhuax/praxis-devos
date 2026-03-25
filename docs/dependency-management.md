@@ -52,10 +52,13 @@ Praxis DevOS 强依赖两类外部能力：
 使用：
 
 ```bash
+praxis-devos status
 praxis-devos doctor
 praxis-devos doctor --agents opencode,codex
 praxis-devos doctor --strict
 ```
+
+其中 `status` 更偏向项目运行态总览，`doctor` 更偏向依赖门禁检查。
 
 检查内容：
 
