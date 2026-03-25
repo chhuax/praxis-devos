@@ -244,7 +244,10 @@ const installFakeGit = (projectDir) => {
 set -eu
 if [ "$1" = "clone" ]; then
   target="$3"
-  mkdir -p "$target/skills"
+  mkdir -p "$target/skills/example-skill"
+  cat > "$target/skills/example-skill/SKILL.md" <<'EOF'
+# Example Skill
+EOF
   exit 0
 fi
 echo "unsupported git invocation: $*" >&2
@@ -290,6 +293,23 @@ exit 1
 };
 
 const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+const findSkillMarkdown = (rootDir) => {
+  const pending = [rootDir];
+  while (pending.length > 0) {
+    const currentDir = pending.pop();
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isFile() && entry.name === 'SKILL.md') {
+        return entryPath;
+      }
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+      }
+    }
+  }
+  return null;
+};
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
@@ -494,6 +514,7 @@ test('setupProject installs Codex superpowers, initializes, and applies a reques
     assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
     assert.ok(fs.existsSync(codexSkillsPath));
+    assert.ok(findSkillMarkdown(codexSkillsPath));
     assert.doesNotMatch(output, /\[MISSING\] superpowers:codex/);
   })));
 });
@@ -554,6 +575,24 @@ test('setupProject skips OpenSpec install when project-local runtime already exi
     assert.match(output, /OpenSpec already available \(project-local\)/);
     assert.doesNotMatch(output, /Installed OpenSpec locally with npm/);
   })));
+});
+
+test('doctor warns when Codex superpowers path has no skill content', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-codex-empty-'));
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-codex-empty-'));
+  const codexSkillsPath = path.join(fakeHomeDir, '.agents', 'skills', 'superpowers');
+
+  fs.mkdirSync(codexSkillsPath, { recursive: true });
+
+  withEnv('HOME', fakeHomeDir, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /\[WARN\] superpowers:codex/);
+    assert.match(output, /no SKILL\.md files were found/);
+  });
 });
 
 test('setupProject surfaces manual action required for claude', () => {

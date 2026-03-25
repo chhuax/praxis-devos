@@ -212,6 +212,28 @@ const codexSuperpowersPaths = () => ({
   cloneParent: path.join(os.homedir(), '.codex'),
 });
 
+const hasSkillMarkdownFiles = (rootDir) => {
+  if (!rootDir || !fs.existsSync(rootDir)) {
+    return false;
+  }
+
+  const pending = [rootDir];
+  while (pending.length > 0) {
+    const currentDir = pending.pop();
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isFile() && entry.name === 'SKILL.md') {
+        return true;
+      }
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+      }
+    }
+  }
+
+  return false;
+};
+
 const resolveCommandForExecution = (cmd) => {
   if (path.extname(cmd)) {
     return findCommandPath(cmd) || cmd;
@@ -1354,15 +1376,37 @@ const ensureOpenCodeSuperpowers = (projectDir) => {
 
 const detectCodexSuperpowers = () => {
   const { skillsPath, clonePath } = codexSuperpowersPaths();
+  const cloneSkillsPath = path.join(clonePath, 'skills');
 
   if (fs.existsSync(skillsPath)) {
+    if (!hasSkillMarkdownFiles(skillsPath)) {
+      return {
+        status: 'warning',
+        detail: `Detected Codex skills path at ${skillsPath}, but no SKILL.md files were found`,
+      };
+    }
+
     return {
       status: 'ok',
-      detail: `Detected Codex skills path at ${skillsPath}`,
+      detail: `Detected Codex skills path with skill content at ${skillsPath}`,
     };
   }
 
   if (fs.existsSync(clonePath)) {
+    if (!fs.existsSync(cloneSkillsPath)) {
+      return {
+        status: 'warning',
+        detail: `Found clone at ${clonePath}, but ${cloneSkillsPath} is missing`,
+      };
+    }
+
+    if (!hasSkillMarkdownFiles(cloneSkillsPath)) {
+      return {
+        status: 'warning',
+        detail: `Found clone at ${clonePath}, but ${cloneSkillsPath} has no SKILL.md files`,
+      };
+    }
+
     return {
       status: 'warning',
       detail: `Found clone at ${clonePath}, but ~/.agents/skills/superpowers is missing`,
@@ -1405,6 +1449,10 @@ const ensureCodexSuperpowers = () => {
   const targetPath = path.join(clonePath, 'skills');
   if (!fs.existsSync(targetPath)) {
     throw new Error(`Codex SuperPowers clone is incomplete: missing ${targetPath}`);
+  }
+
+  if (!hasSkillMarkdownFiles(targetPath)) {
+    throw new Error(`Codex SuperPowers clone is incomplete: no SKILL.md files found under ${targetPath}`);
   }
 
   if (!fs.existsSync(skillsPath)) {

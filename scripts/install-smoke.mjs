@@ -104,6 +104,24 @@ const localOpenSpecPath = (projectDir) => path.join(
   process.platform === 'win32' ? 'openspec.cmd' : 'openspec',
 );
 
+const findSkillMarkdown = (rootDir) => {
+  const pending = [rootDir];
+  while (pending.length > 0) {
+    const currentDir = pending.pop();
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (entry.isFile() && entry.name === 'SKILL.md') {
+        return entryPath;
+      }
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+      }
+    }
+  }
+
+  return null;
+};
+
 const runSmoke = ({ packageFile, scenario }) => {
   const { agent, strictDoctor } = scenarioConfig(scenario);
   const packagePath = path.resolve(packageFile);
@@ -150,6 +168,7 @@ const runSmoke = ({ packageFile, scenario }) => {
   if (scenario === 'codex') {
     const codexSkillsPath = path.join(fakeHome, '.agents', 'skills', 'superpowers');
     assert.ok(fs.existsSync(codexSkillsPath), `Expected Codex skills path at ${codexSkillsPath}`);
+    assert.ok(findSkillMarkdown(codexSkillsPath), `Expected Codex skills content under ${codexSkillsPath}`);
     assert.match(setupResult.stdout, /== codex ==/);
     assert.doesNotMatch(setupResult.stdout, /\[MISSING\] superpowers:codex/);
     assert.match(secondSetupResult.stdout, /Codex SuperPowers/);
