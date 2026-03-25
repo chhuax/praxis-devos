@@ -11,6 +11,7 @@
 - 如果需求不明确，先加载 `brainstorming`
 - 如果需求明确，再开始创建 proposal / spec delta
 - 这两个入口都不应直接进入实现，也不应自动创建 Git 分支
+- 进入提案通道后，必须显式加载 `openspec` skill，而不是只停留在本最小规则集
 
 ## TL;DR 快速核查
 
@@ -21,7 +22,7 @@
 - 编写 deltas：`## ADDED|MODIFIED|REMOVED|RENAMED Requirements`
 - 每个需求至少一个 `#### Scenario:`
 - 验证：`praxis-devos openspec validate [change-id] --strict --no-interactive`
-- **请求批准后才开始实现，批准后再创建实现分支**
+- **请求批准后才开始实现；批准后先检查当前分支，若已在该 change 的专用实现分支可继续复用，否则再创建实现分支**
 
 ---
 
@@ -37,7 +38,7 @@
 
 ### 第二阶段：实施变更
 
-读 `proposal.md` → 读 `design.md`(如有) → 按 `tasks.md` 逐项实现 → 全部完成后标记 `[x]` → 验证
+读 `proposal.md` → 读 `design.md`(如有) → 检查当前 Git 分支是否已是该 change 的专用实现分支（否则先创建 / 切换）→ 按 `tasks.md` 逐项实现 → 全部完成后标记 `[x]` → 验证
 
 ### 第三阶段：归档变更
 

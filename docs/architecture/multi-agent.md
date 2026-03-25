@@ -106,6 +106,24 @@ praxis-devos list-stacks
 
 插件里保留的 `praxis-init`、`praxis-sync`、`praxis-migrate` 只是共享核心的薄封装，不能再拥有独立逻辑。
 
+## RULES.md 与托管区
+
+`RULES.md` 和 `AGENTS.md` / `CLAUDE.md` 里的托管区不是同一层资产。
+
+- `RULES.md` 是框架级完整规则源
+- 初始化项目后，这份规则会镜像到 `.praxis/framework-rules.md`
+- 托管区不是直接复制整份 `RULES.md`
+- 托管区使用独立模板生成，定位是给 AI 的入口摘要 / dispatch block
+- JS 核心只负责把模板与动态内容渲染到最终托管区，例如：
+  - 依赖门禁摘要
+  - 当前项目已安装 skills 摘要
+
+换句话说：
+
+- `RULES.md` = full framework policy
+- 托管区模板 = distilled AI entry block
+- `src/core/praxis-devos.js` = renderer，而不是托管区正文的主要事实来源
+
 ## 依赖管理
 
 Praxis 强依赖：

@@ -11,6 +11,7 @@ export const SKILLS_DIR = path.join(PRAXIS_ROOT, 'skills');
 export const STACKS_DIR = path.join(PRAXIS_ROOT, 'stacks');
 export const FRAMEWORK_RULES_MD = path.join(PRAXIS_ROOT, 'RULES.md');
 export const PACKAGE_JSON = path.join(PRAXIS_ROOT, 'package.json');
+export const MANAGED_ENTRY_TEMPLATE = path.join(PRAXIS_ROOT, 'src', 'templates', 'managed-entry.md');
 
 export const PRAXIS_DIRNAME = '.praxis';
 export const PRAXIS_MANIFEST = 'manifest.json';
@@ -623,52 +624,25 @@ function renderDependencyGateSummary(projectDir) {
   lines.push('- Codex：`npx praxis-devos bootstrap --agent codex`');
   lines.push('- Claude Code：`npx praxis-devos bootstrap --agent claude`');
   lines.push('- OpenCode：`npx praxis-devos bootstrap --agent opencode`');
+  lines.push('- 框架管控 skill 中，`openspec`、`brainstorming`、`git-workflow`、`verification-before-completion` 必须按阶段显式加载；技术栈 skill 保持按需加载。');
   lines.push('- 标记完成前，必须执行验证门控；若当前任务属于 OpenSpec change，还必须执行 `npx praxis-devos openspec validate <change-id> --strict --no-interactive`。');
 
   return lines.join('\n');
 }
 
+const renderManagedEntryTemplate = (projectDir) => {
+  const template = readFile(MANAGED_ENTRY_TEMPLATE);
+  if (!template) {
+    throw new Error(`Managed entry template is missing: ${MANAGED_ENTRY_TEMPLATE}`);
+  }
+
+  return template
+    .replace('{{dependency_gate_summary}}', renderDependencyGateSummary(projectDir))
+    .replace('{{project_skills_section}}', renderProjectSkillsSection(projectDir));
+};
+
 const renderManagedRulesBlock = (projectDir) => {
-  const paths = projectPaths(projectDir);
-
-  const sections = [
-    '> AI 入口区块：以下内容由 Praxis DevOS 自动维护。',
-    '> 先按本区块分流，再读取后续项目上下文；执行 `praxis-devos sync` 时，此区块会被刷新。',
-    '',
-    '## AI Dispatch',
-    '',
-    '- 你当前位于一个由 Praxis DevOS 管理的项目中。',
-    '- 项目 canonical source 位于 `.praxis/`；不要把 `.opencode/`、`.claude/` 等 agent 适配目录视为规范事实来源。',
-    '- `.opencode/skills/` 仍可作为 OpenCode supplemental layer，但它不是项目规范的 canonical source。',
-    '- 先决定当前任务属于 proposal、implementation、review 中的哪一条流程，不要直接开始实现。',
-    '',
-    '## Flow Selection',
-    '',
-    '- proposal flow: 用户显式输入 `/change` 或 `/proposal`，或者任务属于新功能、API 变更、架构重构、破坏性变更。此时禁止直接实现。',
-    '- implementation flow: 任务属于代码实现、测试、重构、调试、修缺陷。',
-    '- review flow: 用户要求 review、审查、排查回归风险、检查测试缺口。',
-    '- 如果任务意图不清晰，先澄清；不要在未分流前直接写代码。',
-    '',
-    '## Required Reads',
-    '',
-    '- proposal flow: 先读取 `openspec/AGENTS.md`，再按需读取 `openspec/project.md`；若需求仍不清晰，先进入 brainstorming，再决定 full / lite proposal。',
-    '- implementation flow: 先读取 `.praxis/rules.md`；需要项目 skill 时，先读取 `.praxis/skills/INDEX.md`，再打开对应 `SKILL.md`。',
-    '- review flow: 先读取 `.praxis/rules.md`；如涉及评审流程或提案关联，再读取对应 skill 与 OpenSpec 文件。',
-    '',
-    renderDependencyGateSummary(projectDir),
-    '',
-    renderProjectSkillsSection(projectDir),
-    '',
-    '## Canonical Sources',
-    '',
-    '- `.praxis/framework-rules.md`：完整框架门控规则',
-    '- `.praxis/rules.md`：完整技术栈 / 项目规则',
-    '- `.praxis/skills/INDEX.md`：当前项目可用 skills 摘要',
-    '- `openspec/AGENTS.md`：OpenSpec 规范驱动工作流',
-    '- `openspec/project.md`：项目规范上下文',
-  ].filter(Boolean);
-
-  return sections.join('\n');
+  return renderManagedEntryTemplate(projectDir);
 };
 
 const ensureProjectSkillsIndex = ({ projectDir, log }) => {

@@ -11,6 +11,7 @@
 - 如果需求仍不明确，先加载 `brainstorming` 澄清范围、风险和提案级别。
 - 如果需求已经明确，再进入 OpenSpec 提案脚手架。
 - `/change` 或 `/proposal` 都**不应直接触发实现**，也**不应自动创建 Git 分支**。
+- 提案获批并进入实现前，MUST 先检查当前 Git 分支；如果用户已经位于与该 change 对应的专用实现分支，可继续复用，否则先加载 `git-workflow` 并创建 / 切换分支。
 
 ## 1. 意图门控 — 收到任务时必须过此决策
 
@@ -36,7 +37,7 @@
 
 ## 2. Skill 触发表 — 按意图 / 阶段加载
 
-**规则**：多个 skill 可同时加载。涉及代码编写时，始终叠加当前技术栈的领域 skills。
+**规则**：多个 skill 可同时加载。框架管控 skill 必须按阶段显式加载；技术栈领域 skills 保持按需加载，不做全局强制。
 **命令面**：所有 OpenSpec 命令统一使用 `praxis-devos openspec ...`，不要直接调用裸 `openspec`。
 
 | 意图 / 阶段 | 加载 Skill | 来源 |
@@ -54,7 +55,7 @@
 | 隔离工作区 | `using-git-worktrees` | SuperPowers |
 | 技术栈领域（数据库等） | 栈专属 skills（如 java-database） | 技术栈 |
 
-> **标记「强制」的 skill** 不可跳过：框架层唯一全局强制的 SuperPowers skill 是 `verification-before-completion`。TDD 是高价值策略，但不是全局硬门槛。
+> **标记「强制」的 skill** 不可跳过：`openspec`（提案 / 规范 / 归档）、`brainstorming`（需求不明确时）、`git-workflow`（已批准提案进入实现且当前分支不可直接复用时）、`verification-before-completion`（完成前）都属于框架层强制 skill。TDD 是高价值策略，但不是全局硬门槛；技术栈 skill 继续按需触发。
 
 ### Skill 优先级
 
