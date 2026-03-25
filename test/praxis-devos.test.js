@@ -4,12 +4,52 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { createChangeScaffold, renderHelp, runCli } from '../src/core/praxis-devos.js';
+import {
+  createChangeScaffold,
+  doctorProject,
+  initProject,
+  renderHelp,
+  runCli,
+  statusProject,
+} from '../src/core/praxis-devos.js';
 
 const makeTempProject = () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-test-'));
   fs.mkdirSync(path.join(projectDir, 'openspec', 'changes'), { recursive: true });
   return projectDir;
+};
+
+const withTempPath = (binDir, fn) => {
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${binDir}${path.delimiter}${previousPath || ''}`;
+  try {
+    return fn();
+  } finally {
+    process.env.PATH = previousPath;
+  }
+};
+
+const installFakeOpenSpec = (projectDir) => {
+  const binDir = path.join(projectDir, 'fake-bin');
+  const scriptPath = path.join(binDir, 'openspec');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+cmd="$1"
+target="$2"
+if [ "$cmd" = "init" ]; then
+  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
+  exit 0
+fi
+echo "unsupported" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return binDir;
 };
 
 test('renderHelp exposes change and proposal commands', () => {
@@ -56,4 +96,60 @@ test('list-stacks remains callable through runCli', () => {
   const output = runCli(['list-stacks']);
   assert.match(output, /java-spring/);
   assert.match(output, /starter/);
+});
+
+test('doctor strict fails when openspec is missing', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-'));
+
+  assert.throws(
+    () => doctorProject({ projectDir, agents: ['opencode'], strict: true }),
+    /Strict dependency check failed/,
+  );
+});
+
+test('initProject creates canonical assets and managed adapters', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    const output = initProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['codex', 'claude'],
+    });
+
+    assert.match(output, /Selected stack: java-spring/);
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'manifest.json')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+    assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
+  });
+});
+
+test('statusProject summarizes initialized project state', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-status-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      stackName: 'java-spring',
+      agents: ['codex', 'claude'],
+    });
+
+    fs.mkdirSync(path.join(projectDir, 'openspec', 'changes', 'add-login-audit'), { recursive: true });
+
+    const output = statusProject({
+      projectDir,
+      agents: ['codex', 'claude'],
+    });
+
+    assert.match(output, /initialized: yes/);
+    assert.match(output, /selected stack: java-spring/);
+    assert.match(output, /configured agents: codex, claude/);
+    assert.match(output, /active changes: add-login-audit/);
+    assert.match(output, /Dependencies:/);
+  });
 });

@@ -113,7 +113,7 @@ npx praxis-devos init --stack java-spring
 
 然后重启 OpenCode。
 
-插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-change`、`praxis-openspec` 这类薄封装工具。
+插件不再拥有独立初始化逻辑。它直接读取 `.praxis/`，并只暴露 `praxis-init`、`praxis-sync`、`praxis-migrate`、`praxis-change`、`praxis-status`、`praxis-openspec` 这类薄封装工具。
 
 ## 门控规则如何生效
 
@@ -140,6 +140,7 @@ praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
 praxis-devos change --title "Add two factor auth" --capability auth
+praxis-devos status
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode

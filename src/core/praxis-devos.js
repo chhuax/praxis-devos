@@ -737,6 +737,51 @@ export const listStacksDetailed = () => listDirs(STACKS_DIR).map((name) => {
   return { name, description: firstLine };
 });
 
+export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
+  const paths = projectPaths(projectDir);
+  const manifest = readJson(paths.manifestPath);
+  const selectedAgents = uniqueAgents(agents);
+  const activeChangesDir = path.join(paths.openspecDir, 'changes');
+  const activeChanges = listDirs(activeChangesDir).filter((name) => !name.startsWith('.'));
+  const projectSkills = listDirs(paths.praxisSkillsDir);
+  const adapterStatuses = [
+    { name: 'codex', ok: fs.existsSync(paths.rootAgentsMd) },
+    { name: 'claude', ok: fs.existsSync(paths.rootClaudeMd) },
+    { name: 'opencode', ok: fs.existsSync(paths.legacyOpenCodeDir) },
+  ];
+  const openspecRuntime = resolveOpenSpecRuntime(projectDir);
+  const dependencyLines = [
+    `- openspec: [${formatStatus(openspecRuntime.status)}] ${openspecRuntime.detail}`,
+    ...selectedAgents.map((agent) => {
+      const detection = detectSuperpowersForAgent(projectDir, agent);
+      return `- superpowers:${agent}: [${formatStatus(detection.status)}] ${detection.detail}`;
+    }),
+  ];
+
+  const lines = [
+    'Project status:',
+    `- initialized: ${fs.existsSync(paths.praxisDir) ? 'yes' : 'no'}`,
+    `- canonical dir: ${fs.existsSync(paths.praxisDir) ? '.praxis/' : 'missing'}`,
+    `- openspec workspace: ${fs.existsSync(paths.openspecDir) ? 'present' : 'missing'}`,
+    `- manifest: ${manifest ? 'present' : 'missing'}`,
+  ];
+
+  if (manifest) {
+    lines.push(`- framework version: ${manifest.frameworkVersion || getPackageVersion()}`);
+    lines.push(`- selected stack: ${manifest.selectedStack || 'unknown'}`);
+    lines.push(`- configured agents: ${(manifest.agents || []).join(', ') || 'none'}`);
+  }
+
+  lines.push(`- project skills: ${projectSkills.length > 0 ? projectSkills.join(', ') : 'none'}`);
+  lines.push(`- adapters: ${adapterStatuses.map((adapter) => `${adapter.name}=${adapter.ok ? 'ready' : 'missing'}`).join(', ')}`);
+  lines.push(`- active changes: ${activeChanges.length > 0 ? activeChanges.join(', ') : 'none'}`);
+  lines.push('');
+  lines.push('Dependencies:');
+  lines.push(...dependencyLines);
+
+  return lines.join('\n');
+};
+
 const normalizeChangeId = (value) => String(value || '')
   .trim()
   .toLowerCase()
@@ -1178,6 +1223,7 @@ export const parseCliArgs = (argv) => {
 
     if (token === '--openspec') {
       parsed.withOpenSpec = true;
+      continue;
     }
   }
 
@@ -1281,6 +1327,7 @@ Commands:
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold from the explicit proposal path
   proposal       Compatibility alias of \`change\`
+  status         Show current project initialization and dependency state
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
   openspec       Run OpenSpec through the Praxis wrapper
@@ -1328,6 +1375,13 @@ export const runCli = (argv) => {
   if (parsed.command === 'list-stacks') {
     const stacks = listStacksDetailed();
     return `Available stacks:\n${stacks.map((stack) => `  ${stack.name} — ${stack.description}`).join('\n')}`;
+  }
+
+  if (parsed.command === 'status') {
+    return statusProject({
+      projectDir: parsed.projectDir,
+      agents,
+    });
   }
 
   if (parsed.command === 'doctor') {

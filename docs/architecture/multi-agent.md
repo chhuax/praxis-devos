@@ -86,6 +86,7 @@ your-project/
 praxis-devos init --stack java-spring
 praxis-devos sync --agents opencode,codex,claude
 praxis-devos migrate
+praxis-devos status
 praxis-devos list-stacks
 ```
 

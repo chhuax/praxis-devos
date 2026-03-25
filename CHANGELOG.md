@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-03-25
+
+### Added
+- `praxis-devos status` for current project initialization, adapters, active changes, and dependency summary
+- OpenCode tool `praxis-status`
+- Regression tests covering `initProject`, strict `doctor`, and project status output
+
+### Changed
+- `0.2.x` verification now covers more of the real project lifecycle instead of only scaffold helpers
+
 ## [0.2.1] - 2026-03-25
 
 ### Added
