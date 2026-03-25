@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-03-25
+
+### Changed
+- Managed AI entry gates no longer assume the current runtime can reliably self-identify as Codex, Claude Code, or OpenCode
+- Managed blocks now describe `.praxis/` as the canonical source while explicitly keeping `.opencode/skills/` as an OpenCode supplemental layer
+- Dependency gate guidance now uses agent-agnostic bootstrap instructions with explicit per-agent commands instead of embedding runtime-specific wording in the generated entry block
+
+### Fixed
+- Downstream managed blocks no longer risk implying that `.opencode/skills/` is disabled just because it is not part of the canonical project state
+- Generated AI entry wording now avoids brittle runtime-specific statements such as "current entry is codex", which were too fragile for a multi-agent setup
+
 ## [0.2.4] - 2026-03-25
 
 ### Changed
