@@ -202,6 +202,8 @@ test('syncProject preserves user content and refreshes opencode projection', () 
 
     const agentsPath = path.join(projectDir, 'AGENTS.md');
     fs.writeFileSync(agentsPath, `# User Notes\n\nKeep this section.\n\n${fs.readFileSync(agentsPath, 'utf8')}`);
+    fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode'), { recursive: true });
+    fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode', 'SKILL.md'), '# Custom OpenCode Skill\n');
 
     const output = syncProject({
       projectDir,
@@ -213,16 +215,18 @@ test('syncProject preserves user content and refreshes opencode projection', () 
     assert.match(output, /Codex adapter synced via AGENTS\.md/);
     assert.match(nextAgents, /Keep this section\./);
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
-    assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'skills')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode', 'SKILL.md')));
     assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'stack.md')));
     assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'stack-rules.md')));
 
     const opencodeReadme = fs.readFileSync(path.join(projectDir, '.opencode', 'README.md'), 'utf8');
-    assert.match(opencodeReadme, /no longer mirrors skills, stack, or rules files by default/);
+    assert.match(opencodeReadme, /no longer mirrors canonical skills, stack, or rules files by default/);
+    assert.match(opencodeReadme, /supplemental skills/);
 
     const paths = collectSkillsPaths(projectDir);
     assert.ok(paths.includes(path.join(projectDir, '.praxis', 'skills')));
-    assert.ok(!paths.includes(path.join(projectDir, '.opencode', 'skills')));
+    assert.ok(paths.includes(path.join(projectDir, '.opencode', 'skills')));
+    assert.ok(paths.indexOf(path.join(projectDir, '.praxis', 'skills')) < paths.indexOf(path.join(projectDir, '.opencode', 'skills')));
   });
 });
 
@@ -292,7 +296,7 @@ test('runOpenSpecCommand prefers project-local runtime over PATH', () => {
   });
 });
 
-test('collectSkillsPaths falls back to legacy opencode skills for unmigrated projects', () => {
+test('collectSkillsPaths still supports legacy opencode-only projects', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-legacy-skills-'));
   fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'legacy-only'), { recursive: true });
   fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'legacy-only', 'SKILL.md'), '# Legacy Only\n');

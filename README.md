@@ -60,7 +60,7 @@ your-project/
         └── compiled-rules.md
 ```
 
-OpenCode compatibility is still supported. `praxis-devos sync --agent opencode` now keeps `.opencode/` as a minimal compatibility marker while the plugin reads canonical assets directly from `.praxis/`.
+OpenCode compatibility is still supported. `praxis-devos sync --agent opencode` now keeps `.opencode/` as a minimal compatibility marker while the plugin prioritizes canonical assets from `.praxis/` and treats `.opencode/skills/` as an optional supplemental layer.
 
 Detailed architecture and migration notes:
 
