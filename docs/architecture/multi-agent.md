@@ -113,7 +113,7 @@ praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
 praxis-devos bootstrap --agent codex
 praxis-devos bootstrap --agent claude
-praxis-devos openspec list --specs
+npx praxis-devos openspec list --specs
 ```
 
 详细说明见 [docs/dependency-management.md](../dependency-management.md)。

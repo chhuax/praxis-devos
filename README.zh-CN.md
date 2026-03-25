@@ -69,6 +69,8 @@ OpenCode 仍然支持，但 `.opencode/` 现在只是兼容投影。执行 `prax
 - [docs/migration-guide.md](docs/migration-guide.md)
 - [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md)
 - [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md)
+- [docs/releases/v0.2.2.md](docs/releases/v0.2.2.md)
+- [docs/releases/v0.2.3.md](docs/releases/v0.2.3.md)
 
 ## 快速开始
 
@@ -144,7 +146,7 @@ praxis-devos status
 praxis-devos doctor --strict
 praxis-devos bootstrap --openspec
 praxis-devos bootstrap --agent opencode
-praxis-devos openspec list --specs
+npx praxis-devos openspec list --specs
 praxis-devos list-stacks
 ```
 

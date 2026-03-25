@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-03-25
+
+### Added
+- Regression tests covering `syncProject`, `migrateProject`, `bootstrapProject`, `bootstrapOpenSpec`, and `runOpenSpecCommand`
+
+### Changed
+- GitHub Actions CLI smoke checks now include `praxis-devos status`
+- `0.2.x` stability coverage now reaches adapter sync, migration, dependency bootstrap, and OpenSpec runtime resolution
+- OpenSpec bootstrap guidance now recommends `npx praxis-devos ...` for one-shot usage and only suggests bare `praxis-devos ...` when it is actually installed on PATH
+
 ## [0.2.2] - 2026-03-25
 
 ### Added

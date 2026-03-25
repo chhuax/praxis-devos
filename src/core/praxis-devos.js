@@ -1258,7 +1258,9 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
       '== openspec ==',
       `OpenSpec already available (${runtime.source})`,
       `- ${runtime.detail}`,
-      '- Use the unified wrapper command:',
+      '- Use the unified wrapper command from the same installation context:',
+      '  npx praxis-devos openspec list --specs',
+      '- If `praxis-devos` is installed on PATH, you can also run:',
       '  praxis-devos openspec list --specs',
     ].join('\n');
   }
@@ -1269,6 +1271,8 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
     'Preferred install (project-local):',
     `- npm install -D ${OPENSPEC_PACKAGE}`,
     'Then use the unified wrapper command:',
+    '  npx praxis-devos openspec list --specs',
+    '- If `praxis-devos` is installed on PATH, you can also run:',
     '  praxis-devos openspec list --specs',
     'Fallback install (global):',
     `- npm install -g ${OPENSPEC_PACKAGE}`,
