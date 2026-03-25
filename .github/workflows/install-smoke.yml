@@ -25,7 +25,11 @@ jobs:
             scenario: codex
           - os: ubuntu-latest
             scenario: opencode
+          - os: windows-latest
+            scenario: opencode
           - os: ubuntu-latest
+            scenario: claude
+          - os: windows-latest
             scenario: claude
 
     runs-on: ${{ matrix.os }}
