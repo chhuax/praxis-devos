@@ -96,7 +96,7 @@ Canonical project assets stay in \`.praxis/\`, and the Praxis OpenCode plugin re
 - \`.opencode/\` no longer mirrors canonical skills, stack, or rules files by default
 - If you add OpenCode-only supplemental skills, place them in \`.opencode/skills/\`
 - The plugin prioritizes \`.praxis/skills/\` and treats \`.opencode/skills/\` as a supplemental layer
-- Re-run \`praxis-devos sync --agent opencode\` after changing canonical files
+- Re-run \`npx praxis-devos sync --agent opencode\` after changing canonical files
 `;
 
 export const readFile = (filePath) => {
@@ -156,7 +156,7 @@ const resolveOpenSpecRuntime = (projectDir) => {
     status: 'missing',
     source: 'missing',
     command: null,
-    detail: 'OpenSpec CLI is missing. Install it with `praxis-devos bootstrap --openspec`.',
+    detail: 'OpenSpec CLI is missing. Install it with `npx praxis-devos setup --agent <name>` or `npx praxis-devos bootstrap --agents <name>`.',
   };
 };
 
@@ -436,16 +436,44 @@ export const detectProjectStack = (projectDir) => {
       return stackName;
     }
   }
-  return 'starter';
+  return null;
 };
 
 const resolveStackName = (projectDir, stackName) => stackName || detectProjectStack(projectDir);
+
+const NO_STACK_MARKER = '<!-- PRAXIS_NO_STACK -->';
+
+const renderNoStackStackMd = () => `${NO_STACK_MARKER}
+# No Stack Selected
+
+This project has the Praxis DevOS framework initialized, but no technology stack has been applied yet.
+
+Next step:
+
+\`\`\`bash
+npx praxis-devos use-stack <stack-name>
+\`\`\`
+`;
+
+const renderNoStackRulesMd = () => `${NO_STACK_MARKER}
+# No Stack Rules Installed
+
+No stack-specific rules are installed yet.
+
+Select a stack before relying on project-level stack guidance:
+
+\`\`\`bash
+npx praxis-devos use-stack <stack-name>
+\`\`\`
+`;
+
+const isNoStackPlaceholder = (content) => typeof content === 'string' && content.includes(NO_STACK_MARKER);
 
 const ensurePraxisManifest = ({ projectDir, stackName, agents, migratedFrom }) => {
   const paths = projectPaths(projectDir);
   const manifest = readJson(paths.manifestPath) || {};
   const nextAgents = [...new Set([...(manifest.agents || []), ...uniqueAgents(agents)])];
-  const selectedStack = stackName || manifest.selectedStack || detectProjectStack(projectDir);
+  const selectedStack = stackName ?? manifest.selectedStack ?? detectProjectStack(projectDir) ?? null;
 
   const nextManifest = {
     schemaVersion: 1,
@@ -528,7 +556,7 @@ const ensureFrameworkRulesMirror = ({ projectDir, log }) => {
   }
 };
 
-const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
+const ensureBaseCanonicalAssets = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
   ensureDir(paths.praxisSkillsDir);
   ensureDir(paths.praxisAdaptersDir);
@@ -548,7 +576,10 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
       }
     }
   }
+};
 
+const applyStackAssets = ({ projectDir, stackName, log }) => {
+  const paths = projectPaths(projectDir);
   const stackSrc = path.join(STACKS_DIR, stackName);
   if (!fs.existsSync(stackSrc)) {
     const available = listDirs(STACKS_DIR).join(', ');
@@ -573,19 +604,39 @@ const ensureCanonicalAssets = ({ projectDir, stackName, log }) => {
   }
 
   const stackMdSrc = path.join(stackSrc, 'stack.md');
-  if (fs.existsSync(stackMdSrc) && !fs.existsSync(paths.praxisStackMd)) {
+  const existingStackMd = readFile(paths.praxisStackMd);
+  if (fs.existsSync(stackMdSrc) && (!fs.existsSync(paths.praxisStackMd) || isNoStackPlaceholder(existingStackMd))) {
     copyFile(stackMdSrc, paths.praxisStackMd);
-    log('✓ .praxis/stack.md created');
+    log(fs.existsSync(paths.praxisStackMd) && isNoStackPlaceholder(existingStackMd)
+      ? '✓ .praxis/stack.md applied from selected stack'
+      : '✓ .praxis/stack.md created');
   } else if (fs.existsSync(paths.praxisStackMd)) {
     log('⊘ .praxis/stack.md already exists, skipped');
   }
 
   const rulesMdSrc = path.join(stackSrc, 'rules.md');
-  if (fs.existsSync(rulesMdSrc) && !fs.existsSync(paths.praxisRulesMd)) {
+  const existingRulesMd = readFile(paths.praxisRulesMd);
+  if (fs.existsSync(rulesMdSrc) && (!fs.existsSync(paths.praxisRulesMd) || isNoStackPlaceholder(existingRulesMd))) {
     copyFile(rulesMdSrc, paths.praxisRulesMd);
-    log('✓ .praxis/rules.md created');
+    log(fs.existsSync(paths.praxisRulesMd) && isNoStackPlaceholder(existingRulesMd)
+      ? '✓ .praxis/rules.md applied from selected stack'
+      : '✓ .praxis/rules.md created');
   } else if (fs.existsSync(paths.praxisRulesMd)) {
     log('⊘ .praxis/rules.md already exists, skipped');
+  }
+};
+
+const ensureNoStackPlaceholders = ({ projectDir, log }) => {
+  const paths = projectPaths(projectDir);
+
+  if (!fs.existsSync(paths.praxisStackMd)) {
+    writeText(paths.praxisStackMd, renderNoStackStackMd());
+    log('✓ .praxis/stack.md placeholder created');
+  }
+
+  if (!fs.existsSync(paths.praxisRulesMd)) {
+    writeText(paths.praxisRulesMd, renderNoStackRulesMd());
+    log('✓ .praxis/rules.md placeholder created');
   }
 };
 
@@ -617,7 +668,7 @@ function renderDependencyGateSummary(projectDir) {
     '',
     openspecRuntime.status === 'ok'
       ? '- OpenSpec 已可用；所有 OpenSpec 命令统一通过 `npx praxis-devos openspec ...` 调用。'
-      : '- OpenSpec 不可用；先执行 `npx praxis-devos bootstrap --openspec`，不要直接进入提案、校验或归档。',
+      : '- OpenSpec 不可用；先执行 `npx praxis-devos setup --agent <name>`，不要直接进入提案、校验或归档。',
   ];
 
   lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
@@ -762,11 +813,18 @@ export const initProject = ({ projectDir, stackName, agents = SUPPORTED_AGENTS }
   const resolvedStack = resolveStackName(projectDir, stackName);
   const selectedAgents = uniqueAgents(agents);
 
-  log(`⟳ Selected stack: ${resolvedStack}`);
-
   ensureOpenSpecLayout({ projectDir, log });
   ensureFrameworkFiles({ projectDir, log });
-  ensureCanonicalAssets({ projectDir, stackName: resolvedStack, log });
+  ensureBaseCanonicalAssets({ projectDir, log });
+
+  if (resolvedStack) {
+    log(`⟳ Selected stack: ${resolvedStack}`);
+    applyStackAssets({ projectDir, stackName: resolvedStack, log });
+  } else {
+    log('⟳ No stack selected during init');
+    ensureNoStackPlaceholders({ projectDir, log });
+  }
+
   ensurePraxisManifest({ projectDir, stackName: resolvedStack, agents: selectedAgents });
 
   const syncLogs = syncProject({ projectDir, agents: selectedAgents });
@@ -775,6 +833,74 @@ export const initProject = ({ projectDir, stackName, agents = SUPPORTED_AGENTS }
   }
 
   return logs.join('\n');
+};
+
+export const useStackProject = ({ projectDir, stackName, agents = SUPPORTED_AGENTS }) => {
+  const logs = [];
+  const log = (msg) => logs.push(msg);
+  const paths = projectPaths(projectDir);
+  const manifest = readJson(paths.manifestPath);
+  const resolvedStack = resolveStackName(projectDir, stackName);
+
+  if (!fs.existsSync(paths.praxisDir) || !fs.existsSync(paths.openspecDir)) {
+    throw new Error('Praxis project is not initialized. Run `npx praxis-devos setup --agent <name>` first.');
+  }
+
+  if (!resolvedStack) {
+    throw new Error(`Stack name is required. Use one of: ${listDirs(STACKS_DIR).join(', ')}`);
+  }
+
+  if (manifest?.selectedStack && manifest.selectedStack !== resolvedStack) {
+    throw new Error(
+      `Switching stacks from "${manifest.selectedStack}" to "${resolvedStack}" is not automatic yet. ` +
+      'Review and clean existing stack assets before applying a different stack.',
+    );
+  }
+
+  log(`⟳ Applying stack: ${resolvedStack}`);
+  applyStackAssets({ projectDir, stackName: resolvedStack, log });
+  ensurePraxisManifest({ projectDir, stackName: resolvedStack, agents: uniqueAgents(agents) });
+
+  const syncLogs = syncProject({ projectDir, agents });
+  if (syncLogs) {
+    logs.push(syncLogs);
+  }
+
+  return logs.join('\n');
+};
+
+const isProjectInitialized = (projectDir) => {
+  const paths = projectPaths(projectDir);
+  return fs.existsSync(paths.praxisDir) && fs.existsSync(paths.openspecDir);
+};
+
+export const setupProject = ({ projectDir, stackName = null, agents = SUPPORTED_AGENTS, strict = false }) => {
+  const selectedAgents = uniqueAgents(agents);
+  const outputs = [];
+
+  outputs.push(bootstrapOpenSpec({ projectDir }));
+  outputs.push('');
+  outputs.push(bootstrapProject({ projectDir, agents: selectedAgents }));
+  outputs.push('');
+
+  if (!isProjectInitialized(projectDir)) {
+    outputs.push('== setup ==');
+    outputs.push(initProject({ projectDir, agents: selectedAgents }));
+  } else {
+    outputs.push('== setup ==');
+    outputs.push('Project already initialized; refreshing selected agents and managed adapters.');
+    outputs.push(syncProject({ projectDir, agents: selectedAgents }));
+  }
+
+  if (stackName) {
+    outputs.push('');
+    outputs.push(useStackProject({ projectDir, stackName, agents: selectedAgents }));
+  }
+
+  outputs.push('');
+  outputs.push(doctorProject({ projectDir, agents: selectedAgents, strict }));
+
+  return outputs.filter(Boolean).join('\n');
 };
 
 export const migrateProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
@@ -1005,7 +1131,7 @@ export const createChangeScaffold = ({
   const paths = projectPaths(projectDir);
 
   if (!fs.existsSync(paths.openspecDir)) {
-    throw new Error('OpenSpec workspace is missing. Run `praxis-devos init --stack <stack>` first.');
+    throw new Error('OpenSpec workspace is missing. Run `npx praxis-devos setup --agent <name> --stack <stack>` first.');
   }
 
   const trimmedTitle = String(title || '').trim();
@@ -1060,7 +1186,7 @@ export const createChangeScaffold = ({
     '',
     'Next steps:',
     '- refine proposal.md and spec delta before validation',
-    `- run: praxis-devos openspec validate ${nextChangeId} --strict --no-interactive`,
+    `- run: npx praxis-devos openspec validate ${nextChangeId} --strict --no-interactive`,
     '- request approval before implementation',
     '- after approval, create the implementation branch and start coding',
   ];
@@ -1306,9 +1432,11 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
   }
 
   lines.push('');
-  lines.push('Bootstrap commands:');
-  lines.push('- praxis-devos bootstrap --openspec');
-  lines.push(`- praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);
+  lines.push('Recommended next step:');
+  lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  lines.push('');
+  lines.push('Advanced repair command:');
+  lines.push(`- npx praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);
 
   const hasBlockingIssue = results.some((result) =>
     result.status === 'missing' || (strict && result.status === 'unknown'));
@@ -1327,6 +1455,7 @@ export const parseCliArgs = (argv) => {
     stack: null,
     agents: [],
     file: null,
+    positional: [],
     projectDir: process.cwd(),
     strict: false,
     withOpenSpec: false,
@@ -1368,9 +1497,14 @@ export const parseCliArgs = (argv) => {
     }
 
     if (token === '--openspec') {
-      parsed.withOpenSpec = true;
-      continue;
+      throw new Error('`--openspec` has been removed. `bootstrap` always includes OpenSpec. Use `npx praxis-devos bootstrap --agent <name>` or `npx praxis-devos setup --agent <name>`.');
     }
+
+    parsed.positional.push(token);
+  }
+
+  if (parsed.command === 'use-stack' && !parsed.stack && parsed.positional.length > 0) {
+    parsed.stack = parsed.positional[0];
   }
 
   return parsed;
@@ -1713,7 +1847,7 @@ export const analyzeSessionTranscript = (transcriptText) => {
 
 export const validateSessionTranscript = ({ filePath, strict = false }) => {
   if (!filePath) {
-    throw new Error('Missing transcript file. Use `praxis-devos validate-session --file <path>`.');
+    throw new Error('Missing transcript file. Use `npx praxis-devos validate-session --file <path>`.');
   }
 
   const transcriptText = readFile(filePath);
@@ -1760,7 +1894,9 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-  init           Initialize a project with canonical .praxis assets
+  setup          Bootstrap dependencies, initialize framework files, and optionally apply a stack
+  init           Initialize the framework skeleton in the current project
+  use-stack      Apply a technology stack to an initialized project
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold from the explicit proposal path
@@ -1774,7 +1910,7 @@ Commands:
   help           Show this help
 
 Options:
-  --stack <name>         Select a technology stack for init
+  --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
@@ -1785,7 +1921,6 @@ Options:
   --type <mode>          Scaffold type: auto, full, or lite
   --summary <text>       One-line summary for proposal scaffolding
   --strict               Fail doctor if required dependencies are missing
-  --openspec             Include or target OpenSpec bootstrap
 
 Supported agents:
   ${SUPPORTED_AGENTS.join(', ')}
@@ -1834,21 +1969,36 @@ export const runCli = (argv) => {
 
   if (parsed.command === 'bootstrap') {
     const outputs = [];
-
-    if (parsed.withOpenSpec) {
-      outputs.push(bootstrapOpenSpec({
-        projectDir: parsed.projectDir,
-      }));
-    }
-
-    if (!parsed.withOpenSpec || parsed.agents.length > 0) {
-      outputs.push(bootstrapProject({
-        projectDir: parsed.projectDir,
-        agents,
-      }));
-    }
+    outputs.push(bootstrapOpenSpec({
+      projectDir: parsed.projectDir,
+    }));
+    outputs.push(bootstrapProject({
+      projectDir: parsed.projectDir,
+      agents,
+    }));
 
     return outputs.join('\n\n');
+  }
+
+  if (parsed.command === 'setup') {
+    return setupProject({
+      projectDir: parsed.projectDir,
+      stackName: parsed.stack,
+      agents,
+      strict: parsed.strict,
+    });
+  }
+
+  if (parsed.command === 'use-stack') {
+    if (!parsed.stack) {
+      throw new Error('Stack name is required. Use `npx praxis-devos use-stack <name>` or `--stack <name>`.');
+    }
+
+    return useStackProject({
+      projectDir: parsed.projectDir,
+      stackName: parsed.stack,
+      agents,
+    });
   }
 
   if (parsed.command === 'validate-session') {

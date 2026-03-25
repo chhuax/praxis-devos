@@ -66,8 +66,8 @@ npx praxis-devos migrate
 ### 新项目初始化
 
 ```bash
-npx praxis-devos bootstrap --openspec
-npx praxis-devos init --stack java-spring
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos doctor --strict
 ```
 
 ### 当你修改了 `.praxis/` 下的内容

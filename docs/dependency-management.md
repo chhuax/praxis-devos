@@ -29,6 +29,21 @@ Praxis DevOS 强依赖两类外部能力：
 - 其中 `verification-before-completion` 是框架硬要求
 - `test-driven-development` 是高风险变更的优先策略，但不是所有场景的强制要求
 
+## 推荐入口
+
+对大多数用户，不要先区分 `bootstrap` 和 `init`。推荐直接使用：
+
+```bash
+npx praxis-devos setup --agent codex --stack java-spring
+```
+
+`setup` 是用户入口；`bootstrap` 和 `init` 是更底层的拆分命令。
+
+当前发布支持范围：
+
+- 发布支持：macOS、Linux
+- Windows：后续版本补齐，目前仍缺本地 OpenSpec runtime 与 Codex bootstrap 的专用处理
+
 ## 为什么不能把 Superpowers 放进 `.praxis/`
 
 `.praxis/` 负责保存项目的 canonical state，但 `superpowers` 是运行时能力，不是项目资产。
@@ -78,7 +93,8 @@ npx praxis-devos doctor --strict
 使用：
 
 ```bash
-npx praxis-devos bootstrap --openspec
+npx praxis-devos bootstrap --agents codex
+npx praxis-devos bootstrap --agents opencode,codex,claude
 npx praxis-devos bootstrap --agent opencode
 npx praxis-devos bootstrap --agent codex
 npx praxis-devos bootstrap --agent claude
@@ -86,7 +102,9 @@ npx praxis-devos bootstrap --agent claude
 
 行为：
 
-- `openspec`：输出 OpenSpec 的项目本地/全局安装建议
+- `bootstrap` 会同时给出 OpenSpec 和所选 agent 的依赖引导
+- `--agent` / `--agents`：决定要输出哪些 runtime 的 SuperPowers 指引
+- 推荐把它视为高级修复命令，而不是 Quick Start 主入口
 - `opencode`：自动写入或更新项目根目录 `opencode.json`
 - `codex`：输出官方安装步骤
 - `claude`：输出官方 marketplace 安装命令

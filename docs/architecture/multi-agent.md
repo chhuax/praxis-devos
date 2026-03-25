@@ -138,7 +138,7 @@ Praxis 强依赖：
 ```bash
 npx praxis-devos doctor
 npx praxis-devos doctor --strict
-npx praxis-devos bootstrap --openspec
+npx praxis-devos setup --agent codex
 npx praxis-devos bootstrap --agent opencode
 npx praxis-devos bootstrap --agent codex
 npx praxis-devos bootstrap --agent claude
