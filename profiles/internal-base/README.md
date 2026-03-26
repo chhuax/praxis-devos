@@ -2,9 +2,12 @@
 
 This profile is a non-proprietary starter baseline for internal AI engineering environments.
 
-Use it to document:
+Built-in baseline assets:
 
-- runtime assumptions
-- default working agreements
-- local customization points
-- what remains intentionally unresolved until proprietary integrations exist
+- `runtime-base.md`: runtime assumptions and what the public baseline does not try to fake
+- `workflow.md`: how daily work flows through foundation, stack, and governance
+- `branch-workflow.md`: default branch naming and change-isolation expectations
+- `verification.md`: minimum verification by change risk
+- `operating-agreements.md`: default operating agreements for agent and human collaboration
+
+Use this profile as the editable local baseline after scaffolding into `.praxis/foundation/profile/`.
