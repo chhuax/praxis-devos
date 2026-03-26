@@ -4,6 +4,7 @@ import path from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { projectToAgent, detectForAgent, expectedSkillNames } from '../projection/index.js';
+import { resolveUserHomeDir } from '../support/home.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -189,10 +190,10 @@ const runFile = (cmd, args, opts = {}) => {
 };
 
 const codexSuperpowersPaths = () => ({
-  skillsPath: path.join(os.homedir(), '.agents', 'skills', 'superpowers'),
-  skillsParent: path.join(os.homedir(), '.agents', 'skills'),
-  clonePath: path.join(os.homedir(), '.codex', 'superpowers'),
-  cloneParent: path.join(os.homedir(), '.codex'),
+  skillsPath: path.join(resolveUserHomeDir(), '.agents', 'skills', 'superpowers'),
+  skillsParent: path.join(resolveUserHomeDir(), '.agents', 'skills'),
+  clonePath: path.join(resolveUserHomeDir(), '.codex', 'superpowers'),
+  cloneParent: path.join(resolveUserHomeDir(), '.codex'),
 });
 
 const hasSkillMarkdownFiles = (rootDir) => {
@@ -1039,7 +1040,7 @@ const ensureCodexSuperpowers = () => {
 };
 
 const claudeSettingsCandidates = (projectDir) => [
-  path.join(os.homedir(), '.claude', 'settings.json'),
+  path.join(resolveUserHomeDir(), '.claude', 'settings.json'),
   path.join(projectDir, '.claude', 'settings.json'),
   path.join(projectDir, '.claude', 'settings.local.json'),
 ];

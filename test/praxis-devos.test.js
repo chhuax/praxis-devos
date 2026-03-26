@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { injectMarker } from '../src/projection/markers.js';
 
 import {
   PRAXIS_ROOT,
@@ -14,6 +15,7 @@ import {
   initProject,
   migrateProject,
   parseCliArgs,
+  projectNativeSkills,
   renderHelp,
   runCli,
   runOpenSpecCommand,
@@ -163,6 +165,39 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /Keep this section\./);
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+});
+
+test('injectMarker preserves YAML frontmatter at the top of projected skills', () => {
+  const content = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-propose', 'SKILL.md'),
+    'utf8',
+  );
+
+  const projected = injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->');
+
+  assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+});
+
+test('projectNativeSkills writes Codex skills under the resolved user home with valid frontmatter', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-projection-home-'));
+  const logs = [];
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir: makeTempProject(),
+      agents: ['codex'],
+      log: (msg) => logs.push(msg),
+    });
+
+    const projectedCodexSkill = fs.readFileSync(
+      path.join(fakeHome, '.agents', 'skills', 'opsx-propose', 'SKILL.md'),
+      'utf8',
+    );
+
+    assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+  });
+
+  assert.match(logs.join('\n'), /Codex: projected opsx-propose/);
 });
 
 test('initProject bootstraps openspec workspace through a local runtime', () => {
