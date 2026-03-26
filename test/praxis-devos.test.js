@@ -121,10 +121,10 @@ cmd="$1"
 target="\${2:-}"
 if [ "$cmd" = "init" ]; then
   mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
-  printf '%s' "\${OPENSPEC_TELEMETRY:-unset}" > "$target/openspec/.telemetry"
+  printf 'TELEMETRY:%s\nDNT:%s\n' "\${OPENSPEC_TELEMETRY:-unset}" "\${DO_NOT_TRACK:-unset}" > "$target/openspec/.telemetry"
   exit 0
 fi
-printf 'TELEMETRY:%s\\nARGS:%s\\n' "\${OPENSPEC_TELEMETRY:-unset}" "$*"
+printf 'TELEMETRY:%s\\nDNT:%s\\nARGS:%s\\n' "\${OPENSPEC_TELEMETRY:-unset}" "\${DO_NOT_TRACK:-unset}" "$*"
 `,
     { mode: 0o755 },
   );
@@ -152,7 +152,7 @@ const installFakeWindowsOpenSpecTelemetryProbe = (projectDir, location = 'local'
     scriptPath,
     `#!/bin/sh
 set -eu
-printf 'TELEMETRY:%s\\nARGS:%s\\n' "\${OPENSPEC_TELEMETRY:-unset}" "$*"
+printf 'TELEMETRY:%s\\nDNT:%s\\nARGS:%s\\n' "\${OPENSPEC_TELEMETRY:-unset}" "\${DO_NOT_TRACK:-unset}" "$*"
 `,
     { mode: 0o755 },
   );
@@ -555,7 +555,7 @@ test('initProject disables OpenSpec telemetry for child runtime invocations by d
 
   assert.equal(
     fs.readFileSync(path.join(projectDir, 'openspec', '.telemetry'), 'utf8'),
-    '0',
+    'TELEMETRY:0\nDNT:1\n',
   );
 });
 
@@ -1035,7 +1035,38 @@ test('runOpenSpecCommand disables OpenSpec telemetry by default', () => {
   });
 
   assert.match(output, /TELEMETRY:0/);
+  assert.match(output, /DNT:1/);
   assert.match(output, /ARGS:list --specs/);
+});
+
+test('runOpenSpecCommand bridges DO_NOT_TRACK opt-out to OpenSpec telemetry', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-run-dnt-'));
+  installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
+
+  withEnv('DO_NOT_TRACK', '1', () => withEnv('OPENSPEC_TELEMETRY', null, () => {
+    const output = runOpenSpecCommand({
+      projectDir,
+      args: ['list', '--specs'],
+    });
+
+    assert.match(output, /TELEMETRY:0/);
+    assert.match(output, /DNT:1/);
+  }));
+});
+
+test('runOpenSpecCommand bridges disabled OpenSpec telemetry to DO_NOT_TRACK', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-run-telemetry-bridge-'));
+  installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
+
+  withEnv('OPENSPEC_TELEMETRY', '0', () => withEnv('DO_NOT_TRACK', null, () => {
+    const output = runOpenSpecCommand({
+      projectDir,
+      args: ['list', '--specs'],
+    });
+
+    assert.match(output, /TELEMETRY:0/);
+    assert.match(output, /DNT:1/);
+  }));
 });
 
 test('runOpenSpecCommand uses cmd wrapper for Windows project-local openspec.cmd', () => {
@@ -1070,6 +1101,7 @@ test('runOpenSpecCommand disables telemetry for Windows batch runtimes by defaul
       });
 
       assert.match(output, /TELEMETRY:0/);
+      assert.match(output, /DNT:1/);
       assert.match(output, /ARGS:list --specs/);
     });
   });

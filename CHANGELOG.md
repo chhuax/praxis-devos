@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- OpenSpec wrapper invocations now propagate the default telemetry opt-out consistently through both `OPENSPEC_TELEMETRY` and `DO_NOT_TRACK`
+
 ## [0.2.7] - 2026-03-25
 
 ### Added
