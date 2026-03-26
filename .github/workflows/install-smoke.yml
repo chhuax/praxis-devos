@@ -60,4 +60,4 @@ jobs:
           echo "PACK_FILE=$PACK_FILE" >> "$GITHUB_ENV"
 
       - name: Run install smoke
-        run: node scripts/install-smoke.mjs --package "${{ env.PACK_FILE }}" --scenario "${{ matrix.scenario }}"
+        run: node test/install-smoke-cli.mjs --package "${{ env.PACK_FILE }}" --scenario "${{ matrix.scenario }}"
