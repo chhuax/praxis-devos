@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 
 import {
   PRAXIS_ROOT,
@@ -353,6 +354,17 @@ exit 1
 };
 
 const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+const adapterExecutableName = (name) => (process.platform === 'win32' ? `${name}.cmd` : name);
+
+const eccCommandsAdapterShimPath = (projectDir) => path.join(
+  projectDir,
+  '.praxis',
+  'adapters',
+  'ecc-commands',
+  'bin',
+  adapterExecutableName('ecc'),
+);
 
 const findSkillMarkdown = (rootDir) => {
   const pending = [rootDir];
@@ -800,6 +812,34 @@ test('initProject applies the built-in runtime base by default', () => {
   });
 });
 
+test('initProject seeds an ECC commands adapter placeholder before runtime binding exists', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-ecc-commands-placeholder-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const adapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const adapterReadme = fs.readFileSync(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'README.md'), 'utf8');
+    const status = statusProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.equal(adapterManifest.adapter, 'ecc-commands');
+    assert.equal(adapterManifest.status, 'placeholder');
+    assert.equal(adapterManifest.binding.state, 'unbound');
+    assert.equal(adapterManifest.binding.source, 'missing');
+    assert.equal(adapterManifest.shim, null);
+    assert.match(adapterReadme, /shim: unavailable until ECC is bound/);
+    assert.ok(!fs.existsSync(eccCommandsAdapterShimPath(projectDir)));
+    assert.match(status, /ecc-commands: \[WARN\] ECC commands adapter placeholder is present/);
+  });
+});
+
 test('initProject can skip the default foundation internally', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-no-foundation-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -1176,6 +1216,8 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     const bindingConfig = readJsonFile(path.join(projectDir, '.praxis', 'ecc-binding.json'));
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
     const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
+    const adapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const shimPath = eccCommandsAdapterShimPath(projectDir);
     const status = statusProject({
       projectDir,
       agents: ['codex'],
@@ -1188,9 +1230,24 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     assert.equal(manifest.dependencies.ecc.binding.source, 'project-binding');
     assert.equal(foundationManifest.binding.state, 'bound');
     assert.equal(foundationManifest.binding.source, 'project-binding');
+    assert.equal(adapterManifest.status, 'ready');
+    assert.equal(adapterManifest.binding.state, 'bound');
+    assert.equal(adapterManifest.binding.source, 'project-binding');
+    assert.equal(adapterManifest.shim?.command, path.join(fakeEccDir, 'ecc'));
+    assert.ok(fs.existsSync(shimPath));
     assert.match(status, /ecc binding state: bound/);
     assert.match(status, /ecc binding source: project-binding/);
+    assert.match(status, /ecc-commands: \[OK\] ECC commands shim is ready/);
     assert.doesNotMatch(status, /ecc remediation:/);
+
+    if (process.platform === 'win32') {
+      const shimContent = fs.readFileSync(shimPath, 'utf8');
+      assert.match(shimContent, /@echo off/i);
+      assert.match(shimContent, /ecc/);
+    } else {
+      const shimStdout = execFileSync(shimPath, ['probe'], { encoding: 'utf8' });
+      assert.match(shimStdout, /ECC:probe/);
+    }
   });
 });
 
