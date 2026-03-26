@@ -373,6 +373,7 @@ const findSkillMarkdown = (rootDir) => {
 
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
+  assert.match(help, /bind\s+Bind an ECC runtime into the current project and refresh manifest state/);
   assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base/);
   assert.match(help, /change\s+Create an OpenSpec change scaffold for governance-oriented work/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
@@ -380,6 +381,7 @@ test('renderHelp exposes change and proposal commands', () => {
   assert.match(help, /use-stack\s+Apply a technology stack after setup or init/);
   assert.match(help, /list-foundations\s+Advanced: list internal runtime-base presets/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
+  assert.match(help, /--ecc-runtime <path>/);
   assert.match(help, /--foundation <name>/);
   assert.doesNotMatch(help, /--openspec/);
 });
@@ -1082,6 +1084,7 @@ test('statusProject summarizes initialized project state', () => {
     assert.match(output, /runtime profile: internal-base/);
     assert.match(output, /ecc binding state: unbound/);
     assert.match(output, /ecc binding source: missing/);
+    assert.match(output, /ecc remediation: npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime/);
     assert.match(output, /overlay directories: ecc-runtime-base, internal-extension-points/);
     assert.match(output, /configured agents: codex, claude/);
     assert.match(output, /active changes: add-login-audit/);
@@ -1116,6 +1119,48 @@ test('statusProject reports bound ECC runtime when ecc is available on PATH', ()
   }));
 });
 
+test('runCli bind stores project-level ECC binding and refreshes manifest state', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bind-ecc-'));
+  const fakeOpenSpecDir = installFakeOpenSpec(projectDir);
+  const fakeEccDir = installFakeEcc(projectDir);
+
+  withTempPath(fakeOpenSpecDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const output = runCli([
+      'bind',
+      '--project-dir',
+      projectDir,
+      '--agent',
+      'codex',
+      '--ecc-runtime',
+      fakeEccDir,
+    ]);
+
+    const bindingConfig = readJsonFile(path.join(projectDir, '.praxis', 'ecc-binding.json'));
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
+    const status = statusProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /ECC runtime bound via \.praxis\/ecc-binding\.json/);
+    assert.equal(bindingConfig.path, fakeEccDir);
+    assert.equal(bindingConfig.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(manifest.dependencies.ecc.binding.state, 'bound');
+    assert.equal(manifest.dependencies.ecc.binding.source, 'project-binding');
+    assert.equal(foundationManifest.binding.state, 'bound');
+    assert.equal(foundationManifest.binding.source, 'project-binding');
+    assert.match(status, /ecc binding state: bound/);
+    assert.match(status, /ecc binding source: project-binding/);
+    assert.doesNotMatch(status, /ecc remediation:/);
+  });
+});
+
 test('doctorProject strict fails when ECC runtime is missing for an ECC-bound project', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-ecc-missing-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -1132,7 +1177,7 @@ test('doctorProject strict fails when ECC runtime is missing for an ECC-bound pr
 
     assert.throws(
       () => doctorProject({ projectDir, agents: ['opencode'], strict: true }),
-      /Bind ECC with PRAXIS_ECC_RUNTIME=\/path\/to\/ecc-runtime/,
+      /Bind ECC with `npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime`/,
     );
   });
 });
@@ -1478,6 +1523,13 @@ test('runCli use-foundation requires a foundation name', () => {
   assert.throws(
     () => runCli(['use-foundation']),
     /Runtime base preset name is required/,
+  );
+});
+
+test('runCli bind requires an ECC runtime path', () => {
+  assert.throws(
+    () => runCli(['bind']),
+    /ECC runtime path is required/,
   );
 });
 

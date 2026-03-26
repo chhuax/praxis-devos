@@ -37,6 +37,8 @@ const SUPERPOWERS_DOCS = {
 const OPENSPEC_INSTALL_DOC = 'https://github.com/Fission-AI/OpenSpec';
 const ECC_RUNTIME_ENV_VARS = ['PRAXIS_ECC_RUNTIME', 'ECC_RUNTIME_DIR', 'ECC_HOME'];
 const ECC_EXECUTABLE = 'ecc';
+const ECC_BINDING_CONFIG = 'ecc-binding.json';
+const ECC_BIND_COMMAND = 'npx praxis-devos bind --ecc-runtime /path/to/ecc-runtime';
 
 const normalizeEnvFlag = (value) => String(value || '').trim().toLowerCase();
 const isEnvFlagUnset = (value) => value == null || String(value).trim() === '';
@@ -227,6 +229,38 @@ const resolveExecutableFromDir = (rootDir, executable) => {
   return null;
 };
 
+const resolveConfiguredEccRuntime = (projectDir) => {
+  const configPath = path.join(projectDir, PRAXIS_DIRNAME, ECC_BINDING_CONFIG);
+  const config = readJson(configPath);
+  const rawPath = String(config?.path || '').trim();
+  if (!rawPath) {
+    return null;
+  }
+
+  const resolvedPath = path.isAbsolute(rawPath) ? rawPath : path.resolve(projectDir, rawPath);
+  const stats = pathStats(resolvedPath);
+  if (!stats.exists) {
+    return {
+      status: 'warning',
+      source: 'project-binding',
+      path: resolvedPath,
+      command: null,
+      detail: `Project ECC binding in .praxis/${ECC_BINDING_CONFIG} points to ${resolvedPath}, but that path does not exist.`,
+    };
+  }
+
+  const command = stats.isDirectory ? resolveExecutableFromDir(resolvedPath, ECC_EXECUTABLE) : resolvedPath;
+  return {
+    status: 'ok',
+    source: 'project-binding',
+    path: resolvedPath,
+    command,
+    detail: stats.isDirectory
+      ? `ECC runtime root is bound via .praxis/${ECC_BINDING_CONFIG} at ${resolvedPath}${command ? ` (detected ${ECC_EXECUTABLE} at ${command})` : ''}`
+      : `ECC runtime is bound via .praxis/${ECC_BINDING_CONFIG} at ${resolvedPath}`,
+  };
+};
+
 const resolveEccRuntime = (projectDir) => {
   for (const envName of ECC_RUNTIME_ENV_VARS) {
     const rawValue = String(process.env[envName] || '').trim();
@@ -259,6 +293,11 @@ const resolveEccRuntime = (projectDir) => {
     };
   }
 
+  const configured = resolveConfiguredEccRuntime(projectDir);
+  if (configured) {
+    return configured;
+  }
+
   const localPath = localExecutablePath(projectDir, ECC_EXECUTABLE);
   if (fs.existsSync(localPath)) {
     return {
@@ -286,7 +325,7 @@ const resolveEccRuntime = (projectDir) => {
     source: 'missing',
     path: null,
     command: null,
-    detail: 'ECC runtime is not bound. Bind it with PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or by putting `ecc` on PATH.',
+    detail: `ECC runtime is not bound. Run \`${ECC_BIND_COMMAND}\`, bind it with PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or put \`ecc\` on PATH.`,
   };
 };
 
@@ -635,6 +674,7 @@ const throwUnexpectedPositionalArgs = (commandName, positional) => {
 
 const CORE_COMMAND_OPTION_ALLOWLIST = {
   help: new Set(),
+  bind: new Set(['--ecc-runtime', '--agent', '--agents', '--project-dir']),
   'list-stacks': new Set(),
   'list-foundations': new Set(),
   setup: new Set(['--stack', '--foundation', '--agent', '--agents', '--project-dir', '--strict']),
@@ -709,6 +749,7 @@ const projectPaths = (projectDir) => {
   return {
     projectDir,
     praxisDir,
+    praxisEccBindingPath: path.join(praxisDir, ECC_BINDING_CONFIG),
     manifestPath: path.join(praxisDir, PRAXIS_MANIFEST),
     praxisSkillsDir: path.join(praxisDir, 'skills'),
     praxisSkillsIndexMd: path.join(praxisDir, 'skills', PRAXIS_SKILLS_INDEX),
@@ -817,6 +858,72 @@ const buildProjectDependencies = ({ projectDir, selectedFoundation, existingDepe
       },
     },
   };
+};
+
+const buildFoundationBindingRecord = (eccBinding) => (eccBinding
+  ? {
+    state: eccBinding.state,
+    status: eccBinding.status,
+    source: eccBinding.source,
+    detail: eccBinding.detail,
+    path: eccBinding.path,
+    command: eccBinding.command,
+    detectedAt: new Date().toISOString(),
+  }
+  : null);
+
+const writeFoundationArtifacts = ({
+  projectDir,
+  definition,
+  overlayNames,
+  eccBinding = null,
+  appliedAt = new Date().toISOString(),
+}) => {
+  const paths = projectPaths(projectDir);
+
+  writeJson(paths.praxisFoundationManifestPath, {
+    foundation: definition.name,
+    runtimeBase: definition.runtimeBase || null,
+    profile: definition.profile || null,
+    overlays: overlayNames,
+    openspec: definition.openspec || null,
+    binding: definition.runtimeBase === 'ecc'
+      ? buildFoundationBindingRecord(eccBinding)
+      : null,
+    appliedAt,
+  });
+  writeText(paths.praxisFoundationReadme, `${renderFoundationReadme(definition, eccBinding)}\n`);
+};
+
+const syncFoundationBindingState = ({ projectDir, foundationName }) => {
+  if (!foundationName) {
+    return null;
+  }
+
+  const definition = readFoundationDefinition(foundationName);
+  if (!definition) {
+    return null;
+  }
+
+  const paths = projectPaths(projectDir);
+  const existingManifest = readJson(paths.praxisFoundationManifestPath) || {};
+  const overlayNames = Array.isArray(existingManifest.overlays) && existingManifest.overlays.length > 0
+    ? existingManifest.overlays
+    : (Array.isArray(definition.overlays) ? definition.overlays : []);
+  const eccBinding = resolveEccBinding({
+    projectDir,
+    foundationName: definition.name,
+  });
+
+  writeFoundationArtifacts({
+    projectDir,
+    definition,
+    overlayNames,
+    eccBinding,
+    appliedAt: existingManifest.appliedAt || new Date().toISOString(),
+  });
+
+  return eccBinding;
 };
 
 const describeRuntimeBaseSelection = (foundationName) => foundationName === DEFAULT_FOUNDATION_NAME
@@ -1091,7 +1198,7 @@ function renderDependencyGateSummary(projectDir) {
   if (eccBinding.required) {
     lines.push(eccBinding.status === 'ok'
       ? '- ECC runtime 已绑定；当前项目可以显式依赖 ECC runtime base。'
-      : '- ECC runtime base 已选中，但当前还没有检测到 runtime binding；开始依赖 ECC 之前，先绑定 `PRAXIS_ECC_RUNTIME`、`ECC_RUNTIME_DIR`、`ECC_HOME`，或把 `ecc` 放到 PATH。');
+      : `- ECC runtime base 已选中，但当前还没有检测到 runtime binding；开始依赖 ECC 之前，先执行 \`${ECC_BIND_COMMAND}\`，或绑定 \`PRAXIS_ECC_RUNTIME\`、\`ECC_RUNTIME_DIR\`、\`ECC_HOME\`，或把 \`ecc\` 放到 PATH。`);
   }
 
   lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
@@ -1617,26 +1724,12 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
     }
   }
 
-  writeJson(paths.praxisFoundationManifestPath, {
-    foundation: definition.name,
-    runtimeBase: definition.runtimeBase || null,
-    profile: definition.profile || null,
-    overlays: overlayNames,
-    openspec: definition.openspec || null,
-    binding: definition.runtimeBase === 'ecc'
-      ? {
-        state: eccBinding.state,
-        status: eccBinding.status,
-        source: eccBinding.source,
-        detail: eccBinding.detail,
-        path: eccBinding.path,
-        command: eccBinding.command,
-        detectedAt: new Date().toISOString(),
-      }
-      : null,
-    appliedAt: new Date().toISOString(),
+  writeFoundationArtifacts({
+    projectDir,
+    definition,
+    overlayNames,
+    eccBinding,
   });
-  writeText(paths.praxisFoundationReadme, `${renderFoundationReadme(definition, eccBinding)}\n`);
   updatePraxisManifestFoundation({
     projectDir,
     foundationName: definition.name,
@@ -1650,7 +1743,7 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
     } else if (eccBinding.status === 'warning') {
       log(`! ECC runtime binding warning: ${eccBinding.detail}`);
     } else {
-      log('⊘ ECC runtime binding not detected yet; bind PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or put `ecc` on PATH');
+      log(`⊘ ECC runtime binding not detected yet; run \`${ECC_BIND_COMMAND}\`, bind PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or put \`ecc\` on PATH`);
     }
   }
 
@@ -1754,6 +1847,9 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   lines.push(`- overlay directories: ${appliedOverlays.length > 0 ? appliedOverlays.join(', ') : 'none'}`);
   lines.push(`- adapters: ${adapterStatuses.map((adapter) => `${adapter.name}=${adapter.ok ? 'ready' : 'missing'}`).join(', ')}`);
   lines.push(`- active changes: ${activeChanges.length > 0 ? activeChanges.join(', ') : 'none'}`);
+  if (eccBinding.required && eccBinding.status !== 'ok') {
+    lines.push(`- ecc remediation: ${ECC_BIND_COMMAND}`);
+  }
   lines.push('');
   lines.push('Dependencies:');
   lines.push(...dependencyLines);
@@ -2346,7 +2442,8 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
   lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
 
   if (eccBinding.required && eccBinding.status !== 'ok') {
-    lines.push('- Bind ECC with PRAXIS_ECC_RUNTIME=/path/to/ecc-runtime, ECC_RUNTIME_DIR=/path/to/ecc-runtime, ECC_HOME=/path/to/ecc-runtime, or expose `ecc` on PATH');
+    lines.push(`- Bind ECC with \`${ECC_BIND_COMMAND}\``);
+    lines.push('- Alternative: PRAXIS_ECC_RUNTIME=/path/to/ecc-runtime, ECC_RUNTIME_DIR=/path/to/ecc-runtime, ECC_HOME=/path/to/ecc-runtime, or expose `ecc` on PATH');
   }
 
   lines.push('');
@@ -2371,6 +2468,7 @@ export const parseCliArgs = (argv) => {
     foundation: null,
     agents: [],
     file: null,
+    eccRuntimePath: null,
     positional: [],
     projectDir: process.cwd(),
     strict: false,
@@ -2414,6 +2512,12 @@ export const parseCliArgs = (argv) => {
     if (token === '--file') {
       usedOptions.add(token);
       parsed.file = path.resolve(shiftOptionValue(args, '--file'));
+      continue;
+    }
+
+    if (token === '--ecc-runtime') {
+      usedOptions.add(token);
+      parsed.eccRuntimePath = shiftOptionValue(args, '--ecc-runtime');
       continue;
     }
 
@@ -2863,6 +2967,7 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
+  bind           Bind an ECC runtime into the current project and refresh manifest state
   setup          Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base, and optionally apply a stack
   init           Initialize the framework skeleton and apply the built-in Praxis runtime base in the current project
   use-stack      Apply a technology stack after setup or init
@@ -2881,6 +2986,7 @@ Commands:
   help           Show this help
 
 Options:
+  --ecc-runtime <path>  ECC runtime root or executable path for \`bind\`
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
   --foundation <name>    Select a runtime base for setup/init, or pass it positionally to use-foundation
   --agent <name>         Sync one agent adapter (repeatable)
@@ -2897,6 +3003,65 @@ Options:
 Supported agents:
   ${SUPPORTED_AGENTS.join(', ')}
 `;
+
+export const bindProject = ({ projectDir, eccRuntimePath, agents = SUPPORTED_AGENTS }) => {
+  const paths = projectPaths(projectDir);
+
+  const rawPath = String(eccRuntimePath || '').trim();
+  if (!rawPath) {
+    throw new Error('ECC runtime path is required. Use `npx praxis-devos bind --ecc-runtime <path>`.');
+  }
+
+  if (!fs.existsSync(paths.praxisDir)) {
+    throw new Error('Praxis project is not initialized. Run `npx praxis-devos setup --agent <name>` first.');
+  }
+
+  const resolvedPath = path.isAbsolute(rawPath) ? rawPath : path.resolve(projectDir, rawPath);
+  const stats = pathStats(resolvedPath);
+  if (!stats.exists) {
+    throw new Error(`ECC runtime path does not exist: ${resolvedPath}`);
+  }
+
+  const command = stats.isDirectory ? resolveExecutableFromDir(resolvedPath, ECC_EXECUTABLE) : resolvedPath;
+  if (stats.isDirectory && !command) {
+    throw new Error(`ECC runtime directory does not contain \`${ECC_EXECUTABLE}\`: ${resolvedPath}`);
+  }
+
+  writeJson(paths.praxisEccBindingPath, {
+    path: resolvedPath,
+    command,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const manifest = readJson(paths.manifestPath) || {};
+  const selectedAgents = Array.isArray(manifest.agents) && manifest.agents.length > 0
+    ? manifest.agents
+    : uniqueAgents(agents);
+
+  syncProject({
+    projectDir,
+    agents: selectedAgents,
+  });
+
+  const foundationName = manifest.selectedFoundation || null;
+  const eccBinding = syncFoundationBindingState({
+    projectDir,
+    foundationName,
+  }) || resolveEccBinding({
+    projectDir,
+    foundationName,
+  });
+
+  const lines = [
+    `✓ ECC runtime bound via .praxis/${ECC_BINDING_CONFIG}`,
+    `- path: ${resolvedPath}`,
+    `- command: ${command || 'none'}`,
+    `- binding state: ${eccBinding.state}`,
+    `- binding source: ${eccBinding.source}`,
+  ];
+
+  return lines.join('\n');
+};
 
 export const runCli = (argv) => {
   if (argv[0] === 'openspec') {
@@ -2964,6 +3129,14 @@ export const runCli = (argv) => {
       foundationName: parsed.foundation,
       agents,
       strict: parsed.strict,
+    });
+  }
+
+  if (parsed.command === 'bind') {
+    return bindProject({
+      projectDir: parsed.projectDir,
+      eccRuntimePath: parsed.eccRuntimePath,
+      agents,
     });
   }
 
