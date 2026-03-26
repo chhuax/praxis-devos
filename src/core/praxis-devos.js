@@ -41,6 +41,8 @@ const ECC_BINDING_CONFIG = 'ecc-binding.json';
 const ECC_BIND_COMMAND = 'npx praxis-devos bind --ecc-runtime /path/to/ecc-runtime';
 const ECC_COMMANDS_ADAPTER_DIR = 'ecc-commands';
 const ECC_COMMANDS_ADAPTER_MANIFEST = 'manifest.json';
+const ECC_HOOKS_ADAPTER_DIR = 'ecc-hooks';
+const ECC_HOOKS_ADAPTER_MANIFEST = 'manifest.json';
 
 const normalizeEnvFlag = (value) => String(value || '').trim().toLowerCase();
 const isEnvFlagUnset = (value) => value == null || String(value).trim() === '';
@@ -775,6 +777,11 @@ const projectPaths = (projectDir) => {
     praxisEccCommandsAdapterReadmePath: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR, 'README.md'),
     praxisEccCommandsAdapterBinDir: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR, 'bin'),
     praxisEccCommandsAdapterShimPath: adapterExecutablePath(path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR), ECC_EXECUTABLE),
+    praxisEccHooksAdapterDir: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR),
+    praxisEccHooksAdapterManifestPath: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, ECC_HOOKS_ADAPTER_MANIFEST),
+    praxisEccHooksAdapterReadmePath: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'README.md'),
+    praxisEccHooksAdapterHooksDir: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'hooks'),
+    praxisEccHooksAdapterDescriptorPath: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'hooks', 'runtime-bound.json'),
     opencodeConfigPath: path.join(projectDir, 'opencode.json'),
     rootAgentsMd: path.join(projectDir, 'AGENTS.md'),
     rootClaudeMd: path.join(projectDir, 'CLAUDE.md'),
@@ -887,6 +894,52 @@ set -eu
 "${escapeShellDoubleQuotes(commandPath)}" "$@"
 `);
 
+const renderEccHooksAdapterReadme = ({ eccBinding, descriptorRelativePath }) => {
+  const lines = [
+    '# ECC Hooks Adapter',
+    '',
+    'This directory is a generated Praxis adapter layer for the minimal ECC hooks bridge.',
+    '',
+    `- runtime required: ${eccBinding.required ? 'yes' : 'no'}`,
+    `- binding state: ${eccBinding.state}`,
+    `- binding source: ${eccBinding.source}`,
+    `- binding detail: ${eccBinding.detail}`,
+  ];
+
+  if (eccBinding.status === 'ok' && eccBinding.command) {
+    lines.push(`- descriptor: \`${descriptorRelativePath}\``);
+    lines.push(`- target command: \`${eccBinding.command}\``);
+    lines.push('- usage: wire the descriptor into project workflow nodes that need a project-local ECC hook placeholder.');
+  } else {
+    lines.push(`- descriptor: unavailable until ECC is bound with \`${ECC_BIND_COMMAND}\``);
+  }
+
+  lines.push('- re-run `npx praxis-devos sync` or `npx praxis-devos bind --ecc-runtime <path>` after changing ECC binding.');
+  return `${lines.join('\n')}\n`;
+};
+
+const buildEccHooksAdapterDescriptor = ({ eccBinding, descriptorRelativePath }) => ({
+  adapter: 'ecc-hooks',
+  runtimeBase: eccBinding.runtimeBase,
+  mode: 'descriptor',
+  binding: {
+    state: eccBinding.state,
+    status: eccBinding.status,
+    source: eccBinding.source,
+    detail: eccBinding.detail,
+    path: eccBinding.path,
+    command: eccBinding.command,
+  },
+  hook: {
+    name: 'ecc-runtime-bound',
+    trigger: 'manual-wiring-required',
+    description: 'Project-level ECC hook placeholder generated after runtime binding.',
+    path: descriptorRelativePath,
+    command: eccBinding.command,
+  },
+  generatedAt: new Date().toISOString(),
+});
+
 const writeExecutableText = (filePath, content) => {
   writeText(filePath, content);
   if (process.platform !== 'win32') {
@@ -935,6 +988,50 @@ const resolveEccCommandsAdapterStatus = ({ projectDir, foundationName = null }) 
   return {
     status: 'missing',
     detail: 'ECC commands adapter is missing. Re-run `npx praxis-devos sync` after applying the ECC runtime base.',
+  };
+};
+
+const resolveEccHooksAdapterStatus = ({ projectDir, foundationName = null }) => {
+  const paths = projectPaths(projectDir);
+  const eccBinding = resolveEccBinding({
+    projectDir,
+    foundationName,
+  });
+  const manifest = readJson(paths.praxisEccHooksAdapterManifestPath);
+  const hasManifest = Boolean(manifest);
+  const hasDescriptor = fs.existsSync(paths.praxisEccHooksAdapterDescriptorPath);
+
+  if (!eccBinding.required) {
+    return {
+      status: 'ok',
+      detail: 'ECC hooks adapter is not required because no ECC runtime base preset is applied.',
+    };
+  }
+
+  if (eccBinding.status === 'ok' && hasDescriptor) {
+    return {
+      status: 'ok',
+      detail: `ECC hooks descriptor is ready at .praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/hooks/${path.basename(paths.praxisEccHooksAdapterDescriptorPath)}`,
+    };
+  }
+
+  if (eccBinding.status === 'ok') {
+    return {
+      status: 'warning',
+      detail: 'ECC runtime is bound, but the hooks descriptor is missing. Re-run `npx praxis-devos sync`.',
+    };
+  }
+
+  if (hasManifest) {
+    return {
+      status: 'warning',
+      detail: `ECC hooks adapter placeholder is present, but ECC is not bound yet. Run \`${ECC_BIND_COMMAND}\`.`,
+    };
+  }
+
+  return {
+    status: 'missing',
+    detail: 'ECC hooks adapter is missing. Re-run `npx praxis-devos sync` after applying the ECC runtime base.',
   };
 };
 
@@ -1437,6 +1534,60 @@ const syncEccCommandsAdapter = ({ projectDir, foundationName, log }) => {
   log(`✓ .praxis/adapters/${ECC_COMMANDS_ADAPTER_DIR}/ synced (placeholder; ${eccBinding.source})`);
 };
 
+const syncEccHooksAdapter = ({ projectDir, foundationName, log }) => {
+  const paths = projectPaths(projectDir);
+  const eccBinding = resolveEccBinding({
+    projectDir,
+    foundationName,
+  });
+
+  if (!eccBinding.required) {
+    return;
+  }
+
+  ensureDir(paths.praxisEccHooksAdapterDir);
+  const descriptorRelativePath = `.praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/hooks/${path.basename(paths.praxisEccHooksAdapterDescriptorPath)}`;
+
+  writeText(
+    paths.praxisEccHooksAdapterReadmePath,
+    renderEccHooksAdapterReadme({ eccBinding, descriptorRelativePath }),
+  );
+  writeJson(paths.praxisEccHooksAdapterManifestPath, {
+    adapter: 'ecc-hooks',
+    runtimeBase: eccBinding.runtimeBase,
+    required: eccBinding.required,
+    status: eccBinding.status === 'ok' ? 'ready' : 'placeholder',
+    binding: {
+      state: eccBinding.state,
+      status: eccBinding.status,
+      source: eccBinding.source,
+      detail: eccBinding.detail,
+      path: eccBinding.path,
+      command: eccBinding.command,
+    },
+    descriptor: eccBinding.status === 'ok' && eccBinding.command
+      ? {
+        path: descriptorRelativePath,
+        command: eccBinding.command,
+      }
+      : null,
+    updatedAt: new Date().toISOString(),
+  });
+
+  if (eccBinding.status === 'ok' && eccBinding.command) {
+    ensureDir(paths.praxisEccHooksAdapterHooksDir);
+    writeJson(
+      paths.praxisEccHooksAdapterDescriptorPath,
+      buildEccHooksAdapterDescriptor({ eccBinding, descriptorRelativePath }),
+    );
+    log(`✓ .praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/ synced (${eccBinding.source})`);
+    return;
+  }
+
+  removePathIfExists(paths.praxisEccHooksAdapterHooksDir);
+  log(`✓ .praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/ synced (placeholder; ${eccBinding.source})`);
+};
+
 const syncCodexAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
   const status = upsertManagedBlock(
@@ -1503,6 +1654,11 @@ export const syncProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   ensureProjectSkillsIndex({ projectDir, log });
   ensureCompiledRulesArtifact({ projectDir, log });
   syncEccCommandsAdapter({
+    projectDir,
+    foundationName: manifest.selectedFoundation || null,
+    log,
+  });
+  syncEccHooksAdapter({
     projectDir,
     foundationName: manifest.selectedFoundation || null,
     log,
@@ -2006,9 +2162,14 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
     projectDir,
     foundationName,
   });
+  const eccHooksAdapter = resolveEccHooksAdapterStatus({
+    projectDir,
+    foundationName,
+  });
   const dependencyLines = [
     `- ecc-runtime: [${formatStatus(eccBinding.status)}] ${eccBinding.detail}`,
     `- ecc-commands: [${formatStatus(eccCommandsAdapter.status)}] ${eccCommandsAdapter.detail}`,
+    `- ecc-hooks: [${formatStatus(eccHooksAdapter.status)}] ${eccHooksAdapter.detail}`,
     `- openspec: [${formatStatus(openspecRuntime.status)}] ${openspecRuntime.detail}`,
     ...selectedAgents.map((agent) => {
       const detection = detectSuperpowersForAgent(projectDir, agent);
@@ -2614,6 +2775,16 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
     detail: eccBinding.detail,
   });
 
+  const eccHooksAdapter = resolveEccHooksAdapterStatus({
+    projectDir,
+    foundationName,
+  });
+  results.push({
+    name: 'ecc-hooks',
+    status: eccHooksAdapter.status,
+    detail: eccHooksAdapter.detail,
+  });
+
   const openspecRuntime = resolveOpenSpecRuntime(projectDir);
   results.push({
     name: 'openspec',
@@ -2647,7 +2818,7 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
     lines.push(`- ${eccRemediation.alternative}`);
   }
 
-  const setupRequired = results.some((result) => result.name !== 'ecc-runtime' && result.status !== 'ok');
+  const setupRequired = results.some((result) => !result.name.startsWith('ecc-') && result.status !== 'ok');
   if (setupRequired) {
     lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
   }

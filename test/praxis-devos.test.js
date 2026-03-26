@@ -366,6 +366,15 @@ const eccCommandsAdapterShimPath = (projectDir) => path.join(
   adapterExecutableName('ecc'),
 );
 
+const eccHooksAdapterDescriptorPath = (projectDir) => path.join(
+  projectDir,
+  '.praxis',
+  'adapters',
+  'ecc-hooks',
+  'hooks',
+  'runtime-bound.json',
+);
+
 const findSkillMarkdown = (rootDir) => {
   const pending = [rootDir];
   while (pending.length > 0) {
@@ -840,6 +849,39 @@ test('initProject seeds an ECC commands adapter placeholder before runtime bindi
   });
 });
 
+test('initProject seeds an ECC hooks adapter placeholder before runtime binding exists', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-ecc-hooks-placeholder-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const adapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'manifest.json'));
+    const adapterReadme = fs.readFileSync(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'README.md'), 'utf8');
+    const status = statusProject({
+      projectDir,
+      agents: ['codex'],
+    });
+    const doctor = doctorProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.equal(adapterManifest.adapter, 'ecc-hooks');
+    assert.equal(adapterManifest.status, 'placeholder');
+    assert.equal(adapterManifest.binding.state, 'unbound');
+    assert.equal(adapterManifest.binding.source, 'missing');
+    assert.equal(adapterManifest.descriptor, null);
+    assert.match(adapterReadme, /descriptor: unavailable until ECC is bound/);
+    assert.ok(!fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
+    assert.match(status, /ecc-hooks: \[WARN\] ECC hooks adapter placeholder is present/);
+    assert.match(doctor, /\[WARN\] ecc-hooks — ECC hooks adapter placeholder is present/);
+  });
+});
+
 test('initProject can skip the default foundation internally', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-no-foundation-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -1216,9 +1258,16 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     const bindingConfig = readJsonFile(path.join(projectDir, '.praxis', 'ecc-binding.json'));
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
     const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
-    const adapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const commandsAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const hooksAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'manifest.json'));
     const shimPath = eccCommandsAdapterShimPath(projectDir);
+    const hooksDescriptorPath = eccHooksAdapterDescriptorPath(projectDir);
+    const hooksDescriptor = readJsonFile(hooksDescriptorPath);
     const status = statusProject({
+      projectDir,
+      agents: ['codex'],
+    });
+    const doctor = doctorProject({
       projectDir,
       agents: ['codex'],
     });
@@ -1230,14 +1279,25 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     assert.equal(manifest.dependencies.ecc.binding.source, 'project-binding');
     assert.equal(foundationManifest.binding.state, 'bound');
     assert.equal(foundationManifest.binding.source, 'project-binding');
-    assert.equal(adapterManifest.status, 'ready');
-    assert.equal(adapterManifest.binding.state, 'bound');
-    assert.equal(adapterManifest.binding.source, 'project-binding');
-    assert.equal(adapterManifest.shim?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(commandsAdapterManifest.status, 'ready');
+    assert.equal(commandsAdapterManifest.binding.state, 'bound');
+    assert.equal(commandsAdapterManifest.binding.source, 'project-binding');
+    assert.equal(commandsAdapterManifest.shim?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(hooksAdapterManifest.status, 'ready');
+    assert.equal(hooksAdapterManifest.binding.state, 'bound');
+    assert.equal(hooksAdapterManifest.binding.source, 'project-binding');
+    assert.equal(hooksAdapterManifest.descriptor?.command, path.join(fakeEccDir, 'ecc'));
     assert.ok(fs.existsSync(shimPath));
+    assert.ok(fs.existsSync(hooksDescriptorPath));
+    assert.equal(hooksDescriptor.adapter, 'ecc-hooks');
+    assert.equal(hooksDescriptor.binding.state, 'bound');
+    assert.equal(hooksDescriptor.binding.source, 'project-binding');
+    assert.equal(hooksDescriptor.hook.command, path.join(fakeEccDir, 'ecc'));
     assert.match(status, /ecc binding state: bound/);
     assert.match(status, /ecc binding source: project-binding/);
     assert.match(status, /ecc-commands: \[OK\] ECC commands shim is ready/);
+    assert.match(status, /ecc-hooks: \[OK\] ECC hooks descriptor is ready/);
+    assert.match(doctor, /\[OK\] ecc-hooks — ECC hooks descriptor is ready/);
     assert.doesNotMatch(status, /ecc remediation:/);
 
     if (process.platform === 'win32') {
