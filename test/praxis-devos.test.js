@@ -366,6 +366,14 @@ const eccCommandsAdapterShimPath = (projectDir) => path.join(
   adapterExecutableName('ecc'),
 );
 
+const eccCommandsAdapterCommandsPath = (projectDir) => path.join(
+  projectDir,
+  '.praxis',
+  'adapters',
+  'ecc-commands',
+  'commands.json',
+);
+
 const eccHooksAdapterDescriptorPath = (projectDir) => path.join(
   projectDir,
   '.praxis',
@@ -373,6 +381,15 @@ const eccHooksAdapterDescriptorPath = (projectDir) => path.join(
   'ecc-hooks',
   'hooks',
   'runtime-bound.json',
+);
+
+const eccHooksAdapterWiringExamplePath = (projectDir) => path.join(
+  projectDir,
+  '.praxis',
+  'adapters',
+  'ecc-hooks',
+  'hooks',
+  'wiring-example.json',
 );
 
 const findSkillMarkdown = (rootDir) => {
@@ -832,6 +849,7 @@ test('initProject seeds an ECC commands adapter placeholder before runtime bindi
     });
 
     const adapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const commandsMap = readJsonFile(eccCommandsAdapterCommandsPath(projectDir));
     const adapterReadme = fs.readFileSync(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'README.md'), 'utf8');
     const status = statusProject({
       projectDir,
@@ -842,8 +860,19 @@ test('initProject seeds an ECC commands adapter placeholder before runtime bindi
     assert.equal(adapterManifest.status, 'placeholder');
     assert.equal(adapterManifest.binding.state, 'unbound');
     assert.equal(adapterManifest.binding.source, 'missing');
+    assert.equal(adapterManifest.commandsPath, '.praxis/adapters/ecc-commands/commands.json');
+    assert.deepEqual(
+      adapterManifest.commandMap.map((entry) => entry.id),
+      ['bind-runtime', 'refresh-adapters', 'verify-runtime', 'runtime-cli', 'status'],
+    );
     assert.equal(adapterManifest.shim, null);
+    assert.equal(commandsMap.format, 'praxis-ecc-commands/v1');
+    assert.equal(commandsMap.commands.find((entry) => entry.id === 'runtime-cli')?.command, null);
     assert.match(adapterReadme, /shim: unavailable until ECC is bound/);
+    assert.match(adapterReadme, /command map: `\.praxis\/adapters\/ecc-commands\/commands\.json`/);
+    assert.match(adapterReadme, /bind-runtime/);
+    assert.match(adapterReadme, /refresh-adapters/);
+    assert.match(adapterReadme, /verify-runtime/);
     assert.ok(!fs.existsSync(eccCommandsAdapterShimPath(projectDir)));
     assert.match(status, /ecc-commands: \[WARN\] ECC commands adapter placeholder is present/);
   });
@@ -885,6 +914,7 @@ test('initProject seeds an ECC hooks adapter placeholder before runtime binding 
     assert.match(adapterReadme, /session-evidence/);
     assert.match(adapterReadme, /descriptor: unavailable until ECC is bound/);
     assert.ok(!fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
+    assert.ok(!fs.existsSync(eccHooksAdapterWiringExamplePath(projectDir)));
     assert.match(status, /ecc-hooks: \[WARN\] ECC hooks adapter placeholder is present/);
     assert.match(doctor, /\[WARN\] ecc-hooks — ECC hooks adapter placeholder is present/);
   });
@@ -904,7 +934,9 @@ test('initProject closes the ECC loop immediately when the runtime is already av
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
     const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
     const commandsAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const commandsMap = readJsonFile(eccCommandsAdapterCommandsPath(projectDir));
     const hooksAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'manifest.json'));
+    const wiringExample = readJsonFile(eccHooksAdapterWiringExamplePath(projectDir));
     const status = statusProject({
       projectDir,
       agents: ['codex'],
@@ -919,7 +951,9 @@ test('initProject closes the ECC loop immediately when the runtime is already av
     assert.equal(foundationManifest.binding.source, 'path');
     assert.equal(commandsAdapterManifest.status, 'ready');
     assert.equal(commandsAdapterManifest.binding.source, 'path');
+    assert.equal(commandsAdapterManifest.commandsPath, '.praxis/adapters/ecc-commands/commands.json');
     assert.equal(commandsAdapterManifest.shim?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(commandsMap.commands.find((entry) => entry.id === 'runtime-cli')?.command, '.praxis/adapters/ecc-commands/bin/ecc');
     assert.equal(hooksAdapterManifest.status, 'ready');
     assert.equal(hooksAdapterManifest.binding.source, 'path');
     assert.equal(hooksAdapterManifest.descriptor?.command, path.join(fakeEccDir, 'ecc'));
@@ -928,8 +962,15 @@ test('initProject closes the ECC loop immediately when the runtime is already av
       hooksAdapterManifest.descriptor?.slots,
       ['pre-task-environment', 'post-change-audit', 'session-evidence'],
     );
+    assert.equal(hooksAdapterManifest.wiringExample?.path, '.praxis/adapters/ecc-hooks/hooks/wiring-example.json');
     assert.ok(fs.existsSync(eccCommandsAdapterShimPath(projectDir)));
     assert.ok(fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
+    assert.ok(fs.existsSync(eccHooksAdapterWiringExamplePath(projectDir)));
+    assert.equal(wiringExample.format, 'praxis-ecc-hooks-example/v1');
+    assert.deepEqual(
+      wiringExample.wiring.map((entry) => entry.slot),
+      ['pre-task-environment', 'post-change-audit', 'session-evidence'],
+    );
     assert.match(status, /ecc binding state: bound/);
     assert.match(status, /ecc-commands: \[OK\] ECC commands shim is ready/);
     assert.match(status, /ecc-hooks: \[OK\] ECC hooks descriptor is ready/);
@@ -1358,10 +1399,13 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
     const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
     const commandsAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const commandsMap = readJsonFile(eccCommandsAdapterCommandsPath(projectDir));
     const hooksAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'manifest.json'));
     const shimPath = eccCommandsAdapterShimPath(projectDir);
     const hooksDescriptorPath = eccHooksAdapterDescriptorPath(projectDir);
+    const hooksWiringExamplePath = eccHooksAdapterWiringExamplePath(projectDir);
     const hooksDescriptor = readJsonFile(hooksDescriptorPath);
+    const hooksWiringExample = readJsonFile(hooksWiringExamplePath);
     const status = statusProject({
       projectDir,
       agents: ['codex'],
@@ -1381,7 +1425,10 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     assert.equal(commandsAdapterManifest.status, 'ready');
     assert.equal(commandsAdapterManifest.binding.state, 'bound');
     assert.equal(commandsAdapterManifest.binding.source, 'project-binding');
+    assert.equal(commandsAdapterManifest.commandsPath, '.praxis/adapters/ecc-commands/commands.json');
     assert.equal(commandsAdapterManifest.shim?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(commandsMap.format, 'praxis-ecc-commands/v1');
+    assert.equal(commandsMap.commands.find((entry) => entry.id === 'runtime-cli')?.command, '.praxis/adapters/ecc-commands/bin/ecc');
     assert.equal(hooksAdapterManifest.status, 'ready');
     assert.equal(hooksAdapterManifest.binding.state, 'bound');
     assert.equal(hooksAdapterManifest.binding.source, 'project-binding');
@@ -1391,8 +1438,10 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
       hooksAdapterManifest.descriptor?.slots,
       ['pre-task-environment', 'post-change-audit', 'session-evidence'],
     );
+    assert.equal(hooksAdapterManifest.wiringExample?.path, '.praxis/adapters/ecc-hooks/hooks/wiring-example.json');
     assert.ok(fs.existsSync(shimPath));
     assert.ok(fs.existsSync(hooksDescriptorPath));
+    assert.ok(fs.existsSync(hooksWiringExamplePath));
     assert.equal(hooksDescriptor.adapter, 'ecc-hooks');
     assert.equal(hooksDescriptor.format, 'praxis-ecc-hooks/v1');
     assert.equal(hooksDescriptor.binding.state, 'bound');
@@ -1407,6 +1456,12 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
       ['pre-task-environment', 'post-change-audit', 'session-evidence'],
     );
     assert.equal(hooksDescriptor.slots[0].command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(hooksWiringExample.format, 'praxis-ecc-hooks-example/v1');
+    assert.equal(hooksWiringExample.descriptor, '.praxis/adapters/ecc-hooks/hooks/runtime-bound.json');
+    assert.deepEqual(
+      hooksWiringExample.wiring.map((entry) => entry.node),
+      ['pre-task-validation', 'post-change-audit', 'session-evidence-capture'],
+    );
     assert.match(status, /ecc binding state: bound/);
     assert.match(status, /ecc binding source: project-binding/);
     assert.match(status, /ecc-commands: \[OK\] ECC commands shim is ready/);

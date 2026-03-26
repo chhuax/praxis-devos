@@ -130,10 +130,13 @@ Advanced commands:
 - `npx praxis-devos bootstrap`: repair-oriented dependency guidance
 - `npx praxis-devos init`: lower-level initialization
 - `npx praxis-devos use-foundation`: advanced runtime baseline repair/re-apply
+- `npx praxis-devos bind --ecc-runtime <path>`: create or refresh a project-level ECC runtime binding when ECC is not already available on PATH
+- `npx praxis-devos sync`: refresh generated ECC adapter artifacts after binding or runtime changes
 
 ## 7. Where To Read Next
 
 - [README.md](../README.md)
+- [docs/ecc-integration.md](ecc-integration.md)
 - [docs/dependency-management.md](dependency-management.md)
 - [docs/architecture/multi-agent.md](architecture/multi-agent.md)
 - [docs/migration-guide.md](migration-guide.md)

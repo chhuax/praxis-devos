@@ -775,6 +775,7 @@ const projectPaths = (projectDir) => {
     praxisEccCommandsAdapterDir: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR),
     praxisEccCommandsAdapterManifestPath: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR, ECC_COMMANDS_ADAPTER_MANIFEST),
     praxisEccCommandsAdapterReadmePath: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR, 'README.md'),
+    praxisEccCommandsAdapterCommandsPath: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR, 'commands.json'),
     praxisEccCommandsAdapterBinDir: path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR, 'bin'),
     praxisEccCommandsAdapterShimPath: adapterExecutablePath(path.join(praxisDir, 'adapters', ECC_COMMANDS_ADAPTER_DIR), ECC_EXECUTABLE),
     praxisEccHooksAdapterDir: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR),
@@ -782,6 +783,7 @@ const projectPaths = (projectDir) => {
     praxisEccHooksAdapterReadmePath: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'README.md'),
     praxisEccHooksAdapterHooksDir: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'hooks'),
     praxisEccHooksAdapterDescriptorPath: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'hooks', 'runtime-bound.json'),
+    praxisEccHooksAdapterWiringExamplePath: path.join(praxisDir, 'adapters', ECC_HOOKS_ADAPTER_DIR, 'hooks', 'wiring-example.json'),
     opencodeConfigPath: path.join(projectDir, 'opencode.json'),
     rootAgentsMd: path.join(projectDir, 'AGENTS.md'),
     rootClaudeMd: path.join(projectDir, 'CLAUDE.md'),
@@ -884,7 +886,51 @@ const buildEccRemediationPlan = (eccBinding) => {
 const escapeShellDoubleQuotes = (value) => String(value).replace(/(["\\$`])/g, '\\$1');
 const escapeCmdDoubleQuotes = (value) => String(value).replace(/"/g, '""');
 
-const renderEccCommandsAdapterReadme = ({ eccBinding, shimRelativePath }) => {
+const buildEccCommandsAdapterCommandMap = ({ eccBinding, shimRelativePath, commandsRelativePath }) => [
+  {
+    id: 'bind-runtime',
+    source: 'praxis',
+    availability: 'always',
+    command: ECC_BIND_COMMAND,
+    purpose: 'Create or refresh the project-level ECC runtime binding.',
+  },
+  {
+    id: 'refresh-adapters',
+    source: 'praxis',
+    availability: 'always',
+    command: 'npx praxis-devos sync',
+    purpose: 'Refresh generated ECC adapter artifacts after binding or runtime changes.',
+  },
+  {
+    id: 'verify-runtime',
+    source: 'praxis',
+    availability: 'always',
+    command: 'npx praxis-devos doctor --strict',
+    purpose: 'Verify ECC dependency health and adapter readiness.',
+  },
+  {
+    id: 'runtime-cli',
+    source: 'ecc',
+    availability: eccBinding.status === 'ok' && eccBinding.command ? 'bound-only' : 'unavailable',
+    command: eccBinding.status === 'ok' && eccBinding.command ? shimRelativePath : null,
+    targetCommand: eccBinding.command,
+    purpose: 'Project-local ECC CLI passthrough that tracks current Praxis binding state.',
+  },
+  {
+    id: 'status',
+    source: 'praxis',
+    availability: 'always',
+    command: 'npx praxis-devos status',
+    purpose: `Inspect ECC binding state and adapter artifacts. See \`${commandsRelativePath}\` for the generated command map.`,
+  },
+];
+
+const renderEccCommandsAdapterReadme = ({
+  eccBinding,
+  shimRelativePath,
+  commandsRelativePath,
+  commandMap,
+}) => {
   const lines = [
     '# ECC Commands Adapter',
     '',
@@ -894,14 +940,21 @@ const renderEccCommandsAdapterReadme = ({ eccBinding, shimRelativePath }) => {
     `- binding state: ${eccBinding.state}`,
     `- binding source: ${eccBinding.source}`,
     `- binding detail: ${eccBinding.detail}`,
+    `- command map: \`${commandsRelativePath}\``,
   ];
+
+  lines.push('- mapped commands:');
+  lines.push(
+    ...commandMap.map((entry) => `  - \`${entry.id}\` [${entry.availability}]: ${entry.command || 'unavailable'}`),
+  );
 
   if (eccBinding.status === 'ok' && eccBinding.command) {
     lines.push(`- shim: \`${shimRelativePath}\``);
     lines.push(`- target command: \`${eccBinding.command}\``);
-    lines.push('- usage: invoke the shim when you want a project-local ECC entrypoint that tracks Praxis binding state.');
+    lines.push('- usage: start with `bind-runtime`, `refresh-adapters`, and `verify-runtime`; then invoke `runtime-cli` when you need the bound project-local ECC entrypoint.');
   } else {
     lines.push(`- shim: unavailable until ECC is bound with \`${ECC_BIND_COMMAND}\``);
+    lines.push('- next step: run `bind-runtime`, then `refresh-adapters`, then `verify-runtime`.');
   }
 
   lines.push('- re-run `npx praxis-devos sync` or `npx praxis-devos bind --ecc-runtime <path>` after changing ECC binding.');
@@ -915,7 +968,31 @@ set -eu
 "${escapeShellDoubleQuotes(commandPath)}" "$@"
 `);
 
-const renderEccHooksAdapterReadme = ({ eccBinding, descriptorRelativePath }) => {
+const buildEccHooksWiringExample = ({ eccBinding, descriptorRelativePath, wiringRelativePath }) => ({
+  adapter: 'ecc-hooks',
+  format: 'praxis-ecc-hooks-example/v1',
+  summary: 'Example project-local wiring for declared ECC hook slots.',
+  descriptor: descriptorRelativePath,
+  examplePath: wiringRelativePath,
+  wiring: buildEccHookSlots({ eccBinding, descriptorRelativePath }).map((slot) => ({
+    slot: slot.id,
+    stage: slot.stage,
+    node: slot.id === 'pre-task-environment'
+      ? 'pre-task-validation'
+      : (slot.id === 'post-change-audit' ? 'post-change-audit' : 'session-evidence-capture'),
+    action: slot.id === 'pre-task-environment'
+      ? 'Validate that the bound ECC runtime is reachable before ECC-dependent work starts.'
+      : (slot.id === 'post-change-audit'
+        ? 'Record the active ECC binding after changes that touch ECC-dependent workflow paths.'
+        : 'Record ECC adapter activity in transcript evidence when session validation matters.'),
+    descriptorPath: descriptorRelativePath,
+    command: eccBinding.command,
+    wiring: 'manual',
+  })),
+  generatedAt: new Date().toISOString(),
+});
+
+const renderEccHooksAdapterReadme = ({ eccBinding, descriptorRelativePath, wiringRelativePath }) => {
   const lines = [
     '# ECC Hooks Adapter',
     '',
@@ -936,8 +1013,9 @@ const renderEccHooksAdapterReadme = ({ eccBinding, descriptorRelativePath }) => 
 
   if (eccBinding.status === 'ok' && eccBinding.command) {
     lines.push(`- descriptor: \`${descriptorRelativePath}\``);
+    lines.push(`- wiring example: \`${wiringRelativePath}\``);
     lines.push(`- target command: \`${eccBinding.command}\``);
-    lines.push('- usage: wire one or more declared hook slots into project workflow nodes that need a project-local ECC hook bridge.');
+    lines.push('- usage: use the descriptor for available hook slots, and start from the wiring example when attaching them to project workflow nodes.');
   } else {
     lines.push(`- descriptor: unavailable until ECC is bound with \`${ECC_BIND_COMMAND}\``);
   }
@@ -1534,10 +1612,35 @@ const syncEccCommandsAdapter = ({ projectDir, foundationName, log }) => {
 
   ensureDir(paths.praxisEccCommandsAdapterDir);
   const shimRelativePath = `.praxis/adapters/${ECC_COMMANDS_ADAPTER_DIR}/bin/${path.basename(paths.praxisEccCommandsAdapterShimPath)}`;
+  const commandsRelativePath = `.praxis/adapters/${ECC_COMMANDS_ADAPTER_DIR}/${path.basename(paths.praxisEccCommandsAdapterCommandsPath)}`;
+  const commandMap = buildEccCommandsAdapterCommandMap({
+    eccBinding,
+    shimRelativePath,
+    commandsRelativePath,
+  });
 
+  writeJson(paths.praxisEccCommandsAdapterCommandsPath, {
+    adapter: 'ecc-commands',
+    format: 'praxis-ecc-commands/v1',
+    binding: {
+      state: eccBinding.state,
+      status: eccBinding.status,
+      source: eccBinding.source,
+      detail: eccBinding.detail,
+      path: eccBinding.path,
+      command: eccBinding.command,
+    },
+    commands: commandMap,
+    generatedAt: new Date().toISOString(),
+  });
   writeText(
     paths.praxisEccCommandsAdapterReadmePath,
-    renderEccCommandsAdapterReadme({ eccBinding, shimRelativePath }),
+    renderEccCommandsAdapterReadme({
+      eccBinding,
+      shimRelativePath,
+      commandsRelativePath,
+      commandMap,
+    }),
   );
   writeJson(paths.praxisEccCommandsAdapterManifestPath, {
     adapter: 'ecc-commands',
@@ -1552,6 +1655,8 @@ const syncEccCommandsAdapter = ({ projectDir, foundationName, log }) => {
       path: eccBinding.path,
       command: eccBinding.command,
     },
+    commandsPath: commandsRelativePath,
+    commandMap,
     shim: eccBinding.status === 'ok' && eccBinding.command
       ? {
         path: shimRelativePath,
@@ -1588,10 +1693,11 @@ const syncEccHooksAdapter = ({ projectDir, foundationName, log }) => {
 
   ensureDir(paths.praxisEccHooksAdapterDir);
   const descriptorRelativePath = `.praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/hooks/${path.basename(paths.praxisEccHooksAdapterDescriptorPath)}`;
+  const wiringRelativePath = `.praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/hooks/${path.basename(paths.praxisEccHooksAdapterWiringExamplePath)}`;
 
   writeText(
     paths.praxisEccHooksAdapterReadmePath,
-    renderEccHooksAdapterReadme({ eccBinding, descriptorRelativePath }),
+    renderEccHooksAdapterReadme({ eccBinding, descriptorRelativePath, wiringRelativePath }),
   );
   writeJson(paths.praxisEccHooksAdapterManifestPath, {
     adapter: 'ecc-hooks',
@@ -1619,6 +1725,12 @@ const syncEccHooksAdapter = ({ projectDir, foundationName, log }) => {
         slots: ECC_HOOK_SLOT_DEFINITIONS.map((slot) => slot.id),
       }
       : null,
+    wiringExample: eccBinding.status === 'ok' && eccBinding.command
+      ? {
+        path: wiringRelativePath,
+        format: 'praxis-ecc-hooks-example/v1',
+      }
+      : null,
     updatedAt: new Date().toISOString(),
   });
 
@@ -1627,6 +1739,10 @@ const syncEccHooksAdapter = ({ projectDir, foundationName, log }) => {
     writeJson(
       paths.praxisEccHooksAdapterDescriptorPath,
       buildEccHooksAdapterDescriptor({ eccBinding, descriptorRelativePath }),
+    );
+    writeJson(
+      paths.praxisEccHooksAdapterWiringExamplePath,
+      buildEccHooksWiringExample({ eccBinding, descriptorRelativePath, wiringRelativePath }),
     );
     log(`✓ .praxis/adapters/${ECC_HOOKS_ADAPTER_DIR}/ synced (${eccBinding.source})`);
     return;

@@ -150,6 +150,7 @@ your-project/
 ## Focused Docs
 
 - [docs/getting-started.md](docs/getting-started.md): install, first use, and common onboarding scenarios
+- [docs/ecc-integration.md](docs/ecc-integration.md): ECC runtime binding flow, adapter artifacts, and day-1 usage
 - [docs/dependency-management.md](docs/dependency-management.md): what `setup`, `doctor`, and `bootstrap` handle
 - [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md): command design model
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md): canonical layout and adapter model

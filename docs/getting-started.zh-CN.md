@@ -130,10 +130,13 @@ npx praxis-devos change --title "Add two factor auth" --capability auth
 - `npx praxis-devos bootstrap`：偏修复和排障
 - `npx praxis-devos init`：更底层的初始化命令
 - `npx praxis-devos use-foundation`：高级 runtime baseline 补刷 / 重应用
+- `npx praxis-devos bind --ecc-runtime <path>`：当 ECC 不在 PATH 上时，创建或刷新项目级 ECC 绑定
+- `npx praxis-devos sync`：在绑定或 runtime 变化后刷新生成的 ECC adapter 产物
 
 ## 7. 接下来读什么
 
 - [README.zh-CN.md](../README.zh-CN.md)
+- [docs/ecc-integration.zh-CN.md](ecc-integration.zh-CN.md)
 - [docs/dependency-management.md](dependency-management.md)
 - [docs/architecture/multi-agent.md](architecture/multi-agent.md)
 - [docs/migration-guide.md](migration-guide.md)

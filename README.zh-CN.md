@@ -150,6 +150,7 @@ your-project/
 ## 聚焦文档
 
 - [docs/getting-started.zh-CN.md](docs/getting-started.zh-CN.md)：安装、第一次使用、常见接入场景
+- [docs/ecc-integration.zh-CN.md](docs/ecc-integration.zh-CN.md)：ECC runtime 绑定路径、adapter 产物和实际使用方式
 - [docs/dependency-management.md](docs/dependency-management.md)：`setup`、`doctor`、`bootstrap` 分别处理什么
 - [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md)：命令设计模型
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md)：canonical layout 与 adapter 模型
