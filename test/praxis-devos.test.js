@@ -315,8 +315,9 @@ test('doctorProject reports current dependency status for OpenCode', () => {
 test('doctorProject reports missing Claude plugin when settings do not contain it', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-missing-'));
+  const fakeClaudeBin = installFakeClaude(fakeHome);
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeClaudeBin, () => {
     const output = doctorProject({
       projectDir,
       agents: ['claude'],
@@ -324,7 +325,7 @@ test('doctorProject reports missing Claude plugin when settings do not contain i
 
     assert.match(output, /\[MISSING\] superpowers:claude/);
     assert.match(output, /claude plugin install superpowers@claude-plugins-official --scope user/);
-  });
+  }));
 });
 
 test('analyzeSessionTranscript distinguishes valid and incomplete evidence', () => {

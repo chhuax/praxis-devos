@@ -23,6 +23,22 @@ const quoteWindowsArg = (value) => {
   return /[\s"&()<>^|]/.test(value) ? `"${escaped}"` : escaped;
 };
 
+const getPathKey = (env) => {
+  if (Object.prototype.hasOwnProperty.call(env, 'PATH')) {
+    return 'PATH';
+  }
+  if (Object.prototype.hasOwnProperty.call(env, 'Path')) {
+    return 'Path';
+  }
+  return 'PATH';
+};
+
+const prependToPath = (env, entry) => {
+  const pathKey = getPathKey(env);
+  const currentPath = env[pathKey] || '';
+  env[pathKey] = currentPath ? `${entry}${path.delimiter}${currentPath}` : entry;
+};
+
 const runCommand = (command, args, options = {}) => {
   const {
     cwd = process.cwd(),
@@ -231,7 +247,7 @@ const runSmoke = ({ packageFile, scenario }) => {
 
   if (scenario === 'claude') {
     const fakeClaudeBin = installFakeClaude(fakeHome);
-    env.PATH = `${fakeClaudeBin}${path.delimiter}${env.PATH || ''}`;
+    prependToPath(env, fakeClaudeBin);
   }
 
   runCommand(npmCmd, ['init', '-y'], { cwd: projectDir, env });
