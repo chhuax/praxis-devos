@@ -15,7 +15,7 @@ Praxis DevOS prepares an AI-friendly project workspace with:
 - an optional technology stack baseline such as `java-spring`
 - OpenSpec available for proposal and governance workflows when you need it
 
-The default install path is simple: run `setup`, confirm with `doctor`, add a small amount of project context, and start working with your agent. You do not need to understand foundations, overlays, or ECC internals to get value on day one.
+The default install path is simple: run `setup`, confirm with `doctor`, add a small amount of project context, and start working with your agent. You do not need to understand internal runtime structure to get value on day one.
 
 ## Quick Start
 
@@ -150,7 +150,7 @@ your-project/
 ## Focused Docs
 
 - [docs/getting-started.md](docs/getting-started.md): install, first use, and common onboarding scenarios
-- [docs/ecc-integration.md](docs/ecc-integration.md): ECC runtime binding flow, adapter artifacts, and day-1 usage
+- [docs/ecc-integration.md](docs/ecc-integration.md): internal runtime setup, repair flow, and generated adapter artifacts
 - [docs/dependency-management.md](docs/dependency-management.md): what `setup`, `doctor`, and `bootstrap` handle
 - [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md): command design model
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md): canonical layout and adapter model
@@ -161,7 +161,6 @@ your-project/
 Praxis automatically applies its built-in runtime baseline on the default path. If you need to inspect that layer, the advanced references are:
 
 - [foundations/README.md](foundations/README.md)
-- [profiles/README.md](profiles/README.md)
 - [overlays/README.md](overlays/README.md)
 
 Most users do not need these docs to get started.

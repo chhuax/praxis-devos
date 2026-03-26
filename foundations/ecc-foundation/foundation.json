@@ -1,5 +1,5 @@
 {
-  "description": "ECC-oriented runtime base with optional OpenSpec governance and placeholder internal extension seams.",
+  "description": "Built-in runtime defaults with optional OpenSpec governance and internal extension seams.",
   "runtimeBase": "ecc",
   "profile": "internal-base",
   "overlays": [

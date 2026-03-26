@@ -146,12 +146,11 @@ This directory is a generated compatibility marker for OpenCode.
 Canonical project assets stay in \`.praxis/\`, and the Praxis OpenCode plugin reads them directly.
 
 - Edit project skills in \`.praxis/skills/\`
-- Edit built-in runtime base assets in \`.praxis/foundation/\`
-- Edit runtime overlays in \`.praxis/overlays/\`
 - Edit stack metadata in \`.praxis/stack.md\`
 - Edit framework gates in \`.praxis/framework-rules.md\`
 - Compiled cross-agent rules live in \`.praxis/adapters/compiled-rules.md\`
 - Edit stack rules in \`.praxis/rules.md\`
+- Internal runtime guides may appear under \`.praxis/foundation/profile/\` for advanced repair, but they are not the normal editing surface
 - \`.opencode/\` no longer mirrors canonical skills, stack, or rules files by default
 - If you add OpenCode-only supplemental skills, place them in \`.opencode/skills/\`
 - The plugin prioritizes \`.praxis/skills/\` and treats \`.opencode/skills/\` as a supplemental layer
@@ -806,7 +805,7 @@ export const detectProjectStack = (projectDir) => {
 
 const resolveStackName = (projectDir, stackName) => stackName || detectProjectStack(projectDir);
 const DEFAULT_FOUNDATION_NAME = 'ecc-foundation';
-const DEFAULT_RUNTIME_BASE_LABEL = 'built-in Praxis runtime base';
+const DEFAULT_RUNTIME_BASE_LABEL = 'built-in runtime defaults';
 const ECC_HOOKS_DESCRIPTOR_FORMAT = 'praxis-ecc-hooks/v1';
 const ECC_HOOK_SLOT_DEFINITIONS = [
   {
@@ -1059,6 +1058,65 @@ const buildEccHooksAdapterDescriptor = ({ eccBinding, descriptorRelativePath }) 
   generatedAt: new Date().toISOString(),
 });
 
+const describeRuntimeBindingForUsers = (eccBinding) => {
+  if (!eccBinding?.required) {
+    return 'Built-in runtime defaults are not active for this project.';
+  }
+
+  if (eccBinding.status === 'ok') {
+    if (eccBinding.source === 'project-binding') {
+      return `Internal runtime is available via .praxis/${ECC_BINDING_CONFIG} at ${eccBinding.path}.`;
+    }
+    if (eccBinding.source === 'project-local') {
+      return `Internal runtime is available from the project-local install at ${eccBinding.command || eccBinding.path}.`;
+    }
+    if (eccBinding.source === 'path') {
+      return `Internal runtime is available on PATH via ${eccBinding.command || eccBinding.path}.`;
+    }
+    if (eccBinding.source.startsWith('env:')) {
+      return `Internal runtime is available via ${eccBinding.source.slice(4)} at ${eccBinding.path}.`;
+    }
+  }
+
+  if (eccBinding.source === 'project-binding' && eccBinding.path) {
+    return `Configured project runtime path .praxis/${ECC_BINDING_CONFIG} -> ${eccBinding.path} is not usable yet.`;
+  }
+
+  if (eccBinding.source.startsWith('env:') && eccBinding.path) {
+    return `Configured runtime path from ${eccBinding.source.slice(4)} -> ${eccBinding.path} is not usable yet.`;
+  }
+
+  return `Internal runtime is not ready. Run \`${ECC_BIND_COMMAND}\`, set PRAXIS_ECC_RUNTIME / ECC_RUNTIME_DIR / ECC_HOME, or expose the runtime on PATH.`;
+};
+
+const describeRuntimeCommandsAdapterForUsers = ({ status, detail }) => {
+  const readyPath = detail.match(/\bat (.+)$/)?.[1];
+  if (status === 'ok') {
+    return readyPath ? `Project runtime CLI is ready at ${readyPath}.` : 'Project runtime CLI is ready.';
+  }
+  if (status === 'warning') {
+    if (detail.includes('placeholder')) {
+      return `Project runtime CLI placeholder is present, but the internal runtime is not ready yet. Run \`${ECC_BIND_COMMAND}\`.`;
+    }
+    return 'Internal runtime is ready, but the project runtime CLI is missing. Re-run `npx praxis-devos sync`.';
+  }
+  return 'Project runtime CLI is missing. Re-run `npx praxis-devos sync` after runtime defaults are active.';
+};
+
+const describeRuntimeHooksAdapterForUsers = ({ status, detail }) => {
+  const readyPath = detail.match(/\bat (.+)$/)?.[1];
+  if (status === 'ok') {
+    return readyPath ? `Project runtime hooks are ready at ${readyPath}.` : 'Project runtime hooks are ready.';
+  }
+  if (status === 'warning') {
+    if (detail.includes('placeholder')) {
+      return `Project runtime hooks placeholder is present, but the internal runtime is not ready yet. Run \`${ECC_BIND_COMMAND}\`.`;
+    }
+    return 'Internal runtime is ready, but the project runtime hooks descriptor is missing. Re-run `npx praxis-devos sync`.';
+  }
+  return 'Project runtime hooks are missing. Re-run `npx praxis-devos sync` after runtime defaults are active.';
+};
+
 const writeExecutableText = (filePath, content) => {
   writeText(filePath, content);
   if (process.platform !== 'win32') {
@@ -1228,7 +1286,7 @@ const writeFoundationArtifacts = ({
       : null,
     appliedAt,
   });
-  writeText(paths.praxisFoundationReadme, `${renderFoundationReadme(definition, eccBinding)}\n`);
+  removePathIfExists(paths.praxisFoundationReadme);
 };
 
 const syncFoundationBindingState = ({ projectDir, foundationName }) => {
@@ -1264,7 +1322,7 @@ const syncFoundationBindingState = ({ projectDir, foundationName }) => {
 
 const describeRuntimeBaseSelection = (foundationName) => foundationName === DEFAULT_FOUNDATION_NAME
   ? DEFAULT_RUNTIME_BASE_LABEL
-  : `runtime base preset: ${foundationName}`;
+  : `runtime preset: ${foundationName}`;
 
 const NO_STACK_MARKER = '<!-- PRAXIS_NO_STACK -->';
 
@@ -1533,8 +1591,8 @@ function renderDependencyGateSummary(projectDir) {
 
   if (eccBinding.required) {
     lines.push(eccBinding.status === 'ok'
-      ? '- ECC runtime 已绑定；当前项目可以显式依赖 ECC runtime base。'
-      : `- ECC runtime base 已选中，但当前还没有检测到 runtime binding；开始依赖 ECC 之前，先执行 \`${ECC_BIND_COMMAND}\`，或绑定 \`PRAXIS_ECC_RUNTIME\`、\`ECC_RUNTIME_DIR\`、\`ECC_HOME\`，或把 \`ecc\` 放到 PATH。`);
+      ? '- 内部 runtime 已就绪；需要运行时能力时可以继续使用项目规则和已安装 skills。'
+      : `- 当前项目依赖内部 runtime，但还没有准备好；开始依赖该能力前，先执行 \`${ECC_BIND_COMMAND}\`，或绑定 \`PRAXIS_ECC_RUNTIME\`、\`ECC_RUNTIME_DIR\`、\`ECC_HOME\`，或把 runtime 放到 PATH。`);
   }
 
   lines.push('- 如果当前 agent 缺少所需 Superpowers，先停止实现并完成对应 bootstrap。');
@@ -2115,6 +2173,24 @@ const readFoundationDefinition = (foundationName) => {
   };
 };
 
+const resolveFoundationProfileSource = (definition) => {
+  const embeddedPath = definition?.profilePath
+    ? path.join(FOUNDATIONS_DIR, definition.name, definition.profilePath)
+    : null;
+
+  if (embeddedPath && fs.existsSync(embeddedPath)) {
+    return {
+      path: embeddedPath,
+      source: embeddedPath,
+    };
+  }
+
+  return {
+    path: path.join(PROFILES_DIR, definition.profile),
+    source: PROFILES_DIR,
+  };
+};
+
 export const listFoundationsDetailed = () => listDirs(FOUNDATIONS_DIR).map((name) => {
   const definition = readFoundationDefinition(name);
   return {
@@ -2190,7 +2266,7 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
   }
 
   if (!foundationName) {
-    throw new Error(`Runtime base preset name is required. Available: ${listDirs(FOUNDATIONS_DIR).join(', ')}`);
+    throw new Error(`Runtime preset name is required. Available: ${listDirs(FOUNDATIONS_DIR).join(', ')}`);
   }
 
   const definition = readFoundationDefinition(foundationName);
@@ -2200,24 +2276,24 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
 
   if (manifest?.selectedFoundation && manifest.selectedFoundation !== foundationName) {
     throw new Error(
-      `Switching runtime base presets from "${manifest.selectedFoundation}" to "${foundationName}" is not automatic yet. ` +
-      'Review and clean existing runtime base assets before applying a different preset.',
+      `Switching runtime presets from "${manifest.selectedFoundation}" to "${foundationName}" is not automatic yet. ` +
+      'Review and clean existing runtime defaults before applying a different preset.',
     );
   }
 
-  const profileSrc = path.join(PROFILES_DIR, definition.profile);
-  if (!fs.existsSync(profileSrc)) {
-    throw new Error(`Foundation profile "${definition.profile}" is missing from ${PROFILES_DIR}`);
+  const profileSource = resolveFoundationProfileSource(definition);
+  if (!fs.existsSync(profileSource.path)) {
+    throw new Error(`Foundation profile "${definition.profile}" is missing from ${profileSource.source}`);
   }
 
   ensureDir(paths.praxisFoundationDir);
   ensureDir(paths.praxisOverlaysDir);
 
-  const profileStatus = seedDirPreservingExisting(profileSrc, paths.praxisFoundationProfileDir);
+  const profileStatus = seedDirPreservingExisting(profileSource.path, paths.praxisFoundationProfileDir);
   if (profileStatus === 'created') {
-    log(`✓ .praxis/foundation/profile/ created from ${definition.profile}`);
+    log('✓ .praxis/foundation/profile/ created from built-in runtime defaults');
   } else {
-    log(`✓ .praxis/foundation/profile/ merged from ${definition.profile}`);
+    log('✓ .praxis/foundation/profile/ merged from built-in runtime defaults');
   }
 
   const eccBinding = resolveEccBinding({
@@ -2256,16 +2332,16 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
   if (definition.runtimeBase === 'ecc') {
     const remediation = buildEccRemediationPlan(eccBinding);
     if (eccBinding.status === 'ok') {
-      log(`✓ ECC runtime binding detected (${eccBinding.source})`);
+      log(`✓ Internal runtime detected (${eccBinding.source})`);
     } else if (eccBinding.status === 'warning') {
-      log(`! ECC runtime binding warning: ${eccBinding.detail}`);
+      log(`! Internal runtime warning: ${describeRuntimeBindingForUsers(eccBinding)}`);
     } else {
-      log(`⊘ ECC runtime binding not detected yet; run \`${ECC_BIND_COMMAND}\`, bind PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or put \`ecc\` on PATH`);
+      log(`⊘ Internal runtime not detected yet; run \`${ECC_BIND_COMMAND}\`, bind PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or put the runtime on PATH`);
     }
 
     if (remediation) {
       if (remediation.bindingTarget) {
-        log(`- Current ECC binding target: ${remediation.bindingTarget}`);
+        log(`- Current runtime binding target: ${remediation.bindingTarget}`);
       }
       log(`- ${remediation.action}`);
       log(`- ${remediation.verifyStatus}`);
@@ -2285,36 +2361,29 @@ const renderFoundationSection = (projectDir) => {
   const foundationManifest = readJson(paths.praxisFoundationManifestPath);
   const manifest = readJson(paths.manifestPath) || {};
   const foundationName = foundationManifest?.foundation || manifest.selectedFoundation || null;
-  const runtimeBase = foundationManifest?.runtimeBase || resolveFoundationRuntimeBase(foundationName);
   const eccBinding = resolveEccBinding({
     projectDir,
     foundationName,
   });
 
   const lines = [
-    '## Praxis Runtime Base',
+    '## Runtime Defaults',
     '',
   ];
 
   if (!foundationManifest) {
-    lines.push('- runtime base: not applied');
-    lines.push('- daily workflows can still run on stack/runtime defaults, but the built-in runtime base assets have not been synced yet.');
+    lines.push('- runtime defaults: not applied');
+    lines.push('- daily workflows can still run from stack rules and project skills, but built-in runtime defaults have not been synced yet.');
     return lines.join('\n');
   }
 
-  lines.push(`- runtime base: ${DEFAULT_RUNTIME_BASE_LABEL}`);
-  lines.push(`- runtime preset: \`${foundationName || 'unknown'}\``);
-  lines.push(`- runtime engine: \`${runtimeBase || 'unknown'}\``);
-  lines.push(`- runtime profile: \`${foundationManifest.profile || 'unknown'}\``);
-  lines.push(`- applied runtime overlays: ${(foundationManifest.overlays || []).map((name) => `\`${name}\``).join(', ') || 'none'}`);
-  if (runtimeBase === 'ecc') {
-    lines.push(`- ECC binding state: \`${eccBinding.state}\``);
-    lines.push(`- ECC binding source: \`${eccBinding.source}\``);
-    lines.push(`- ECC binding detail: ${eccBinding.detail}`);
-  }
+  lines.push(`- runtime defaults: ${DEFAULT_RUNTIME_BASE_LABEL}`);
+  lines.push(`- runtime status: \`${eccBinding.status === 'ok' ? 'ready' : 'needs-repair'}\``);
+  lines.push(`- runtime source: \`${eccBinding.source}\``);
+  lines.push(`- runtime note: ${describeRuntimeBindingForUsers(eccBinding)}`);
   lines.push('- daily implementation should usually start from `.praxis/rules.md` and installed stack skills.');
-  lines.push('- read `.praxis/foundation/README.md` only when the task touches runtime conventions, agent workflow behavior, or advanced troubleshooting.');
-  lines.push('- built-in conventions live in `.praxis/foundation/profile/branch-workflow.md`, `.praxis/foundation/profile/verification.md`, and `.praxis/foundation/profile/operating-agreements.md`.');
+  lines.push('- `.praxis/foundation/profile/` is a system-managed workflow guide directory, not the normal editing surface for project work.');
+  lines.push('- inspect those guides only when the task touches runtime behavior, agent workflow behavior, or advanced repair.');
   lines.push('- OpenSpec remains available for proposal and governance work, but it is not the mandatory front door for daily execution.');
   return lines.join('\n');
 };
@@ -2332,7 +2401,6 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   const activeChangesDir = path.join(paths.openspecDir, 'changes');
   const activeChanges = listDirs(activeChangesDir).filter((name) => !name.startsWith('.'));
   const projectSkills = listDirs(paths.praxisSkillsDir);
-  const appliedOverlays = listDirs(paths.praxisOverlaysDir);
   const adapterStatuses = [
     { name: 'codex', ok: fs.existsSync(paths.rootAgentsMd) },
     { name: 'claude', ok: fs.existsSync(paths.rootClaudeMd) },
@@ -2348,9 +2416,9 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
     foundationName,
   });
   const dependencyLines = [
-    `- ecc-runtime: [${formatStatus(eccBinding.status)}] ${eccBinding.detail}`,
-    `- ecc-commands: [${formatStatus(eccCommandsAdapter.status)}] ${eccCommandsAdapter.detail}`,
-    `- ecc-hooks: [${formatStatus(eccHooksAdapter.status)}] ${eccHooksAdapter.detail}`,
+    `- runtime: [${formatStatus(eccBinding.status)}] ${describeRuntimeBindingForUsers(eccBinding)}`,
+    `- runtime-cli: [${formatStatus(eccCommandsAdapter.status)}] ${describeRuntimeCommandsAdapterForUsers(eccCommandsAdapter)}`,
+    `- runtime-hooks: [${formatStatus(eccHooksAdapter.status)}] ${describeRuntimeHooksAdapterForUsers(eccHooksAdapter)}`,
     `- openspec: [${formatStatus(openspecRuntime.status)}] ${openspecRuntime.detail}`,
     ...selectedAgents.map((agent) => {
       const detection = detectSuperpowersForAgent(projectDir, agent);
@@ -2370,25 +2438,22 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   if (manifest) {
     lines.push(`- framework version: ${manifest.frameworkVersion || getPackageVersion()}`);
     lines.push(`- selected stack: ${manifest.selectedStack || 'unknown'}`);
-    lines.push(`- runtime base preset: ${manifest.selectedFoundation || 'none'}`);
-    lines.push(`- runtime profile: ${manifest.foundationProfile || 'none'}`);
-    lines.push(`- runtime overlays: ${(manifest.foundationOverlays || []).join(', ') || 'none'}`);
-    lines.push(`- ecc binding state: ${eccBinding.state}`);
-    lines.push(`- ecc binding source: ${eccBinding.source}`);
+    lines.push(`- runtime defaults: ${manifest.selectedFoundation ? 'active' : 'none'}`);
+    lines.push(`- runtime status: ${eccBinding.status === 'ok' ? 'ready' : 'needs-repair'}`);
+    lines.push(`- runtime source: ${eccBinding.source}`);
     lines.push(`- configured agents: ${(manifest.agents || []).join(', ') || 'none'}`);
   }
 
   lines.push(`- project skills: ${projectSkills.length > 0 ? projectSkills.join(', ') : 'none'}`);
-  lines.push(`- overlay directories: ${appliedOverlays.length > 0 ? appliedOverlays.join(', ') : 'none'}`);
   lines.push(`- adapters: ${adapterStatuses.map((adapter) => `${adapter.name}=${adapter.ok ? 'ready' : 'missing'}`).join(', ')}`);
   lines.push(`- active changes: ${activeChanges.length > 0 ? activeChanges.join(', ') : 'none'}`);
   if (eccBinding.required && eccBinding.status !== 'ok') {
     const remediation = buildEccRemediationPlan(eccBinding);
     if (remediation?.bindingTarget) {
-      lines.push(`- ecc current binding: ${remediation.bindingTarget}`);
+      lines.push(`- runtime current binding: ${remediation.bindingTarget}`);
     }
-    lines.push(`- ecc remediation: ${remediation?.action || `Bind ECC with \`${ECC_BIND_COMMAND}\``}`);
-    lines.push(`- ecc verify: ${remediation?.verifyStatus || 'Verify with `npx praxis-devos status`'}`);
+    lines.push(`- runtime repair: ${remediation?.action || `Bind the project runtime with \`${ECC_BIND_COMMAND}\``}`);
+    lines.push(`- runtime verify: ${remediation?.verifyStatus || 'Verify with `npx praxis-devos status`'}`);
   }
   lines.push('');
   lines.push('Dependencies:');
@@ -2951,9 +3016,9 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
   });
 
   results.push({
-    name: 'ecc-runtime',
+    name: 'runtime',
     status: eccBinding.status,
-    detail: eccBinding.detail,
+    detail: describeRuntimeBindingForUsers(eccBinding),
   });
 
   const eccHooksAdapter = resolveEccHooksAdapterStatus({
@@ -2961,9 +3026,9 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
     foundationName,
   });
   results.push({
-    name: 'ecc-hooks',
+    name: 'runtime-hooks',
     status: eccHooksAdapter.status,
-    detail: eccHooksAdapter.detail,
+    detail: describeRuntimeHooksAdapterForUsers(eccHooksAdapter),
   });
 
   const openspecRuntime = resolveOpenSpecRuntime(projectDir);
@@ -2993,13 +3058,13 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
   if (eccRemediation) {
     lines.push(`- ${eccRemediation.action}`);
     if (eccRemediation.bindingTarget) {
-      lines.push(`- Current ECC binding target: ${eccRemediation.bindingTarget}`);
+      lines.push(`- Current runtime binding target: ${eccRemediation.bindingTarget}`);
     }
     lines.push(`- ${eccRemediation.verifyDoctor}`);
     lines.push(`- ${eccRemediation.alternative}`);
   }
 
-  const setupRequired = results.some((result) => !result.name.startsWith('ecc-') && result.status !== 'ok');
+  const setupRequired = results.some((result) => !result.name.startsWith('runtime') && result.status !== 'ok');
   if (setupRequired) {
     lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
   }
@@ -3529,11 +3594,11 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-  bind           Bind an ECC runtime into the current project and refresh manifest state
-  setup          Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base, and optionally apply a stack
-  init           Initialize the framework skeleton and apply the built-in Praxis runtime base in the current project
+  bind           Bind or repair the internal runtime for the current project
+  setup          Bootstrap dependencies, initialize framework files, apply built-in runtime defaults, and optionally apply a stack
+  init           Initialize the framework skeleton and apply built-in runtime defaults in the current project
   use-stack      Apply a technology stack after setup or init
-  use-foundation Advanced: re-apply internal runtime-base assets
+  use-foundation Internal: re-apply built-in runtime defaults
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold for governance-oriented work
@@ -3544,13 +3609,13 @@ Commands:
   openspec       Run governance-oriented OpenSpec commands through the Praxis wrapper
   validate-session  Validate a transcript against Praxis evidence hooks
   list-stacks    List available technology stacks
-  list-foundations Advanced: list internal runtime-base presets
+  list-foundations Internal: list runtime presets
   help           Show this help
 
 Options:
-  --ecc-runtime <path>  ECC runtime root or executable path for \`bind\`
+  --ecc-runtime <path>  Internal runtime root or executable path for \`bind\`
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
-  --foundation <name>    Select a runtime base for setup/init, or pass it positionally to use-foundation
+  --foundation <name>    Internal runtime preset for setup/init, or pass it positionally to use-foundation
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
@@ -3571,7 +3636,7 @@ export const bindProject = ({ projectDir, eccRuntimePath, agents = SUPPORTED_AGE
 
   const rawPath = String(eccRuntimePath || '').trim();
   if (!rawPath) {
-    throw new Error('ECC runtime path is required. Use `npx praxis-devos bind --ecc-runtime <path>`.');
+    throw new Error('Runtime path is required. Use `npx praxis-devos bind --ecc-runtime <path>`.');
   }
 
   if (!fs.existsSync(paths.praxisDir)) {
@@ -3581,12 +3646,12 @@ export const bindProject = ({ projectDir, eccRuntimePath, agents = SUPPORTED_AGE
   const resolvedPath = path.isAbsolute(rawPath) ? rawPath : path.resolve(projectDir, rawPath);
   const stats = pathStats(resolvedPath);
   if (!stats.exists) {
-    throw new Error(`ECC runtime path does not exist: ${resolvedPath}`);
+    throw new Error(`Runtime path does not exist: ${resolvedPath}`);
   }
 
   const command = stats.isDirectory ? resolveExecutableFromDir(resolvedPath, ECC_EXECUTABLE) : resolvedPath;
   if (stats.isDirectory && !command) {
-    throw new Error(`ECC runtime directory does not contain \`${ECC_EXECUTABLE}\`: ${resolvedPath}`);
+    throw new Error(`Runtime directory does not contain \`${ECC_EXECUTABLE}\`: ${resolvedPath}`);
   }
 
   writeJson(paths.praxisEccBindingPath, {
@@ -3615,11 +3680,11 @@ export const bindProject = ({ projectDir, eccRuntimePath, agents = SUPPORTED_AGE
   });
 
   const lines = [
-    `✓ ECC runtime bound via .praxis/${ECC_BINDING_CONFIG}`,
+    `✓ Project runtime bound via .praxis/${ECC_BINDING_CONFIG}`,
     `- path: ${resolvedPath}`,
     `- command: ${command || 'none'}`,
-    `- binding state: ${eccBinding.state}`,
-    `- binding source: ${eccBinding.source}`,
+    `- runtime status: ${eccBinding.state === 'bound' ? 'ready' : 'needs-repair'}`,
+    `- runtime source: ${eccBinding.source}`,
   ];
 
   return lines.join('\n');
@@ -3653,7 +3718,7 @@ export const runCli = (argv) => {
 
   if (parsed.command === 'list-foundations') {
     const foundations = listFoundationsDetailed();
-    return `Available runtime base presets:\n${foundations.map((foundation) => `  ${foundation.name} — ${foundation.description}`).join('\n')}`;
+    return `Available runtime presets:\n${foundations.map((foundation) => `  ${foundation.name} — ${foundation.description}`).join('\n')}`;
   }
 
   if (parsed.command === 'status') {
@@ -3723,7 +3788,7 @@ export const runCli = (argv) => {
 
   if (parsed.command === 'use-foundation') {
     if (!parsed.foundation) {
-      throw new Error('Runtime base preset name is required. Use the advanced command `npx praxis-devos use-foundation <name>`.');
+      throw new Error('Runtime preset name is required. Use the internal command `npx praxis-devos use-foundation <name>`.');
     }
 
     return useFoundationProject({

@@ -15,7 +15,7 @@ Praxis DevOS 会把一个仓库准备成更适合 AI agent 协作的项目工作
 - 可选的技术栈基线，例如 `java-spring`
 - 需要时可进入的 OpenSpec 治理流程
 
-默认安装路径很简单：执行 `setup`，用 `doctor` 确认环境，补少量项目上下文，然后直接开始使用 agent。你不需要先理解 foundation、overlay 或 ECC 这些内部概念。
+默认安装路径很简单：执行 `setup`，用 `doctor` 确认环境，补少量项目上下文，然后直接开始使用 agent。你不需要先理解内部 runtime 结构。
 
 ## 快速开始
 
@@ -150,7 +150,7 @@ your-project/
 ## 聚焦文档
 
 - [docs/getting-started.zh-CN.md](docs/getting-started.zh-CN.md)：安装、第一次使用、常见接入场景
-- [docs/ecc-integration.zh-CN.md](docs/ecc-integration.zh-CN.md)：ECC runtime 绑定路径、adapter 产物和实际使用方式
+- [docs/ecc-integration.zh-CN.md](docs/ecc-integration.zh-CN.md)：内部 runtime 的接入、修复路径，以及生成的 adapter 产物
 - [docs/dependency-management.md](docs/dependency-management.md)：`setup`、`doctor`、`bootstrap` 分别处理什么
 - [docs/architecture/command-scenarios.md](docs/architecture/command-scenarios.md)：命令设计模型
 - [docs/architecture/multi-agent.md](docs/architecture/multi-agent.md)：canonical layout 与 adapter 模型
@@ -161,7 +161,6 @@ your-project/
 Praxis 默认会自动应用内置 runtime baseline。如果你确实要看这层内部结构，可参考：
 
 - [foundations/README.md](foundations/README.md)
-- [profiles/README.md](profiles/README.md)
 - [overlays/README.md](overlays/README.md)
 
 大多数用户上手时不需要先看这些文档。
