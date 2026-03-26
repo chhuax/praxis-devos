@@ -510,9 +510,13 @@ const uniqueAgents = (agents = []) => {
   return deduped;
 };
 
+const isShortOptionToken = (value) => /^-[A-Za-z]/.test(String(value || ''));
+const isLongOptionToken = (value) => String(value || '').startsWith('--');
+const isOptionToken = (value) => isLongOptionToken(value) || isShortOptionToken(value);
+
 const shiftOptionValue = (args, optionName) => {
   const value = args.shift();
-  if (!value || value.startsWith('--')) {
+  if (!value || isOptionToken(value)) {
     throw new Error(`Missing value for ${optionName}`);
   }
 
@@ -2133,7 +2137,7 @@ export const parseCliArgs = (argv) => {
       throw new Error('`--openspec` has been removed. `bootstrap` always includes OpenSpec. Use `npx praxis-devos bootstrap --agent <name>` or `npx praxis-devos setup --agent <name>`.');
     }
 
-    if (token.startsWith('--')) {
+    if (isOptionToken(token)) {
       throwUnknownOption(parsed.command, token);
     }
 
@@ -2230,7 +2234,7 @@ const parseChangeCliArgs = (commandName, argv) => {
       continue;
     }
 
-    if (token.startsWith('--')) {
+    if (isOptionToken(token)) {
       throwUnknownOption(commandName, token);
     }
 

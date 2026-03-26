@@ -457,6 +457,13 @@ test('runCli rejects missing values for agent flags before consuming the next op
   );
 });
 
+test('runCli rejects missing values for agent flags before consuming the next short option', () => {
+  assert.throws(
+    () => runCli(['doctor', '--agent', '-h']),
+    /Missing value for --agent/,
+  );
+});
+
 test('runCli rejects missing values for openspec project-dir flag', () => {
   assert.throws(
     () => runCli(['openspec', '--project-dir']),
@@ -478,10 +485,24 @@ test('runCli rejects unknown long options for core commands', () => {
   );
 });
 
+test('runCli rejects unknown short options for core commands', () => {
+  assert.throws(
+    () => runCli(['doctor', '-s']),
+    /Unknown option for doctor: -s/,
+  );
+});
+
 test('runCli rejects unknown long options for change scaffold commands', () => {
   assert.throws(
     () => runCli(['change', 'create', '--summry', 'tighten cli validation']),
     /Unknown option for change: --summry/,
+  );
+});
+
+test('runCli rejects unknown short options for change scaffold commands', () => {
+  assert.throws(
+    () => runCli(['change', 'create', '-s']),
+    /Unknown option for change: -s/,
   );
 });
 
