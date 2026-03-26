@@ -9,3 +9,4 @@ This foundation currently wires together:
 - profile: `internal-base`
 - overlays: `ecc-runtime-base`, `internal-extension-points`
 - OpenSpec mode: optional governance
+- ECC binding contract: detect `PRAXIS_ECC_RUNTIME`, `ECC_RUNTIME_DIR`, `ECC_HOME`, or `ecc` on `PATH`

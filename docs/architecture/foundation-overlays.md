@@ -100,7 +100,7 @@ Those seams live in `overlays/internal-extension-points/` today and are scaffold
 Stage 1 keeps the public path intentionally simple:
 
 - `npx praxis-devos setup` and `npx praxis-devos init` automatically apply the built-in `ecc-foundation`
-- `npx praxis-devos status` reports the selected foundation, profile, and overlays after scaffolding
+- `npx praxis-devos status` reports the selected foundation, profile, overlays, and ECC binding state after scaffolding
 
 Advanced or secondary commands still exist for inspection and recovery:
 
@@ -108,3 +108,15 @@ Advanced or secondary commands still exist for inspection and recovery:
 - `npx praxis-devos use-foundation ecc-foundation`
 
 That keeps the internal foundation architecture available without making users choose a foundation during the default onboarding flow.
+
+## Stage 2 First Slice
+
+The next step is no longer only about scaffolding preset names.
+
+Praxis now starts to treat ECC as a real dependency surface by:
+
+- recording ECC dependency metadata in `.praxis/manifest.json`
+- detecting ECC runtime presence from `PRAXIS_ECC_RUNTIME`, `ECC_RUNTIME_DIR`, `ECC_HOME`, or `ecc` on `PATH`
+- surfacing ECC binding state in `use-foundation`, `status`, and `doctor`
+
+This is still intentionally small, but it changes ECC from a pure placeholder into an explicit runtime binding contract.

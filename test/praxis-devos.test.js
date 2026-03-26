@@ -109,6 +109,24 @@ echo "${label}:$*"
   return scriptPath;
 };
 
+const installFakeEcc = (projectDir, location = 'path') => {
+  const binDir = location === 'local'
+    ? path.join(projectDir, 'node_modules', '.bin')
+    : path.join(projectDir, 'fake-ecc-bin');
+  const scriptPath = path.join(binDir, 'ecc');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+echo "ECC:$*"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return binDir;
+};
+
 const installFakeProjectLocalOpenSpecTelemetryProbe = (projectDir) => {
   const binDir = path.join(projectDir, 'node_modules', '.bin');
   const scriptPath = path.join(binDir, 'openspec');
@@ -749,10 +767,16 @@ test('initProject applies the built-in runtime base by default', () => {
     const operatingAgreements = fs.readFileSync(path.join(projectDir, '.praxis', 'foundation', 'profile', 'operating-agreements.md'), 'utf8');
 
     assert.match(output, /Applying built-in Praxis runtime base/);
+    assert.match(output, /ECC runtime binding not detected yet/);
     assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.equal(manifest.foundationProfile, 'internal-base');
     assert.deepEqual(manifest.foundationOverlays, ['ecc-runtime-base', 'internal-extension-points']);
+    assert.equal(manifest.dependencies.ecc.required, true);
+    assert.equal(manifest.dependencies.ecc.binding.state, 'unbound');
+    assert.equal(manifest.dependencies.ecc.binding.source, 'missing');
     assert.equal(foundationManifest.runtimeBase, 'ecc');
+    assert.equal(foundationManifest.binding.state, 'unbound');
+    assert.equal(foundationManifest.binding.source, 'missing');
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'profile', 'runtime-base.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'profile', 'branch-workflow.md')));
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'profile', 'verification.md')));
@@ -767,6 +791,7 @@ test('initProject applies the built-in runtime base by default', () => {
     assert.match(foundationReadme, /This project is provisioned with the built-in Praxis runtime base/);
     assert.match(foundationReadme, /Built-in baseline conventions/);
     assert.match(foundationReadme, /branch-workflow\.md/);
+    assert.match(foundationReadme, /ECC binding state: `unbound`/);
     assert.match(foundationReadme, /not the required front door for every daily task/);
   });
 });
@@ -1055,10 +1080,60 @@ test('statusProject summarizes initialized project state', () => {
     assert.match(output, /selected stack: java-spring/);
     assert.match(output, /runtime base preset: ecc-foundation/);
     assert.match(output, /runtime profile: internal-base/);
+    assert.match(output, /ecc binding state: unbound/);
+    assert.match(output, /ecc binding source: missing/);
     assert.match(output, /overlay directories: ecc-runtime-base, internal-extension-points/);
     assert.match(output, /configured agents: codex, claude/);
     assert.match(output, /active changes: add-login-audit/);
     assert.match(output, /Dependencies:/);
+    assert.match(output, /ecc-runtime: \[MISSING\]/);
+  });
+});
+
+test('statusProject reports bound ECC runtime when ecc is available on PATH', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-status-ecc-bound-'));
+  const fakeOpenSpecDir = installFakeOpenSpec(projectDir);
+  const fakeEccDir = installFakeEcc(projectDir);
+
+  withTempPath(fakeOpenSpecDir, () => withTempPath(fakeEccDir, () => {
+    initProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const output = statusProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.equal(manifest.dependencies.ecc.required, true);
+    assert.equal(manifest.dependencies.ecc.binding.state, 'bound');
+    assert.equal(manifest.dependencies.ecc.binding.source, 'path');
+    assert.match(output, /ecc binding state: bound/);
+    assert.match(output, /ecc binding source: path/);
+    assert.match(output, /ecc-runtime: \[OK\] ECC runtime CLI is available on PATH/);
+  }));
+});
+
+test('doctorProject strict fails when ECC runtime is missing for an ECC-bound project', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-ecc-missing-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+    bootstrapProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.throws(
+      () => doctorProject({ projectDir, agents: ['opencode'], strict: true }),
+      /Bind ECC with PRAXIS_ECC_RUNTIME=\/path\/to\/ecc-runtime/,
+    );
   });
 });
 
