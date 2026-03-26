@@ -1366,3 +1366,24 @@ test('runCli rejects removed --openspec flag with migration guidance', () => {
     /`--openspec` has been removed/,
   );
 });
+
+test('runCli rejects unexpected positional args for core commands', () => {
+  assert.throws(
+    () => runCli(['doctor', 'codex']),
+    /Unexpected positional argument for doctor: codex/,
+  );
+});
+
+test('runCli rejects extra positional args for use-stack', () => {
+  assert.throws(
+    () => runCli(['use-stack', 'java-spring', 'starter']),
+    /Unexpected positional argument for use-stack: starter/,
+  );
+});
+
+test('runCli rejects positional args when use-stack already received --stack', () => {
+  assert.throws(
+    () => runCli(['use-stack', '--stack', 'java-spring', 'starter']),
+    /Unexpected positional argument for use-stack: starter/,
+  );
+});

@@ -527,6 +527,10 @@ const throwUnknownOption = (commandName, token) => {
   throw new Error(`Unknown option for ${commandName}: ${token}`);
 };
 
+const throwUnexpectedPositionalArgs = (commandName, positional) => {
+  throw new Error(`Unexpected positional argument${positional.length > 1 ? 's' : ''} for ${commandName}: ${positional.join(' ')}`);
+};
+
 const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fallbackContent = '') => {
   const existing = readFile(filePath);
   const managedBlock = `${startMarker}\n${blockContent.trim()}\n${endMarker}`;
@@ -2144,12 +2148,34 @@ export const parseCliArgs = (argv) => {
     parsed.positional.push(token);
   }
 
-  if (parsed.command === 'use-stack' && !parsed.stack && parsed.positional.length > 0) {
+  const usedPositionalStack = parsed.command === 'use-stack' && !parsed.stack && parsed.positional.length > 0;
+  if (usedPositionalStack) {
     parsed.stack = parsed.positional[0];
   }
 
-  if (parsed.command === 'use-foundation' && !parsed.foundation && parsed.positional.length > 0) {
+  const usedPositionalFoundation = parsed.command === 'use-foundation' && !parsed.foundation && parsed.positional.length > 0;
+  if (usedPositionalFoundation) {
     parsed.foundation = parsed.positional[0];
+  }
+
+  if (parsed.command === 'use-stack') {
+    const allowedPositionals = usedPositionalStack ? 1 : 0;
+    if (parsed.positional.length > allowedPositionals) {
+      throwUnexpectedPositionalArgs(parsed.command, parsed.positional.slice(allowedPositionals));
+    }
+    return parsed;
+  }
+
+  if (parsed.command === 'use-foundation') {
+    const allowedPositionals = usedPositionalFoundation ? 1 : 0;
+    if (parsed.positional.length > allowedPositionals) {
+      throwUnexpectedPositionalArgs(parsed.command, parsed.positional.slice(allowedPositionals));
+    }
+    return parsed;
+  }
+
+  if (parsed.positional.length > 0) {
+    throwUnexpectedPositionalArgs(parsed.command, parsed.positional);
   }
 
   return parsed;
