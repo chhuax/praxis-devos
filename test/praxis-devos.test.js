@@ -443,6 +443,22 @@ test('doctor output recommends setup as the primary fix path', () => {
   assert.match(output, /- npx praxis-devos bootstrap --agents opencode,codex,claude/);
 });
 
+test('runCli rejects unsupported agent names instead of ignoring them', () => {
+  assert.throws(
+    () => runCli(['status', '--agent', 'cursor']),
+    /Unsupported agent: cursor\. Supported agents: opencode, codex, claude/,
+  );
+});
+
+test('doctorProject rejects mixed agent lists with unsupported entries', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-invalid-agents-'));
+
+  assert.throws(
+    () => doctorProject({ projectDir, agents: ['codex', 'cursor', 'amp'] }),
+    /Unsupported agents: cursor, amp\. Supported agents: opencode, codex, claude/,
+  );
+});
+
 test('initProject creates canonical assets and managed adapters', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);

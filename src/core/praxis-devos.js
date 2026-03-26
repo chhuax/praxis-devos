@@ -494,9 +494,20 @@ const uniqueAgents = (agents = []) => {
     .map((agent) => agent.trim().toLowerCase())
     .filter(Boolean);
 
-  const values = normalized.length > 0 ? normalized : [...SUPPORTED_AGENTS];
-  const deduped = [...new Set(values)];
-  return deduped.filter((agent) => SUPPORTED_AGENTS.includes(agent));
+  if (normalized.length === 0) {
+    return [...SUPPORTED_AGENTS];
+  }
+
+  const deduped = [...new Set(normalized)];
+  const unsupported = deduped.filter((agent) => !SUPPORTED_AGENTS.includes(agent));
+  if (unsupported.length > 0) {
+    throw new Error(
+      `Unsupported agent${unsupported.length > 1 ? 's' : ''}: ${unsupported.join(', ')}. ` +
+      `Supported agents: ${SUPPORTED_AGENTS.join(', ')}`,
+    );
+  }
+
+  return deduped;
 };
 
 const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fallbackContent = '') => {
