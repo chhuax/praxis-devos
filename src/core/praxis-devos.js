@@ -1476,11 +1476,18 @@ const renderTasksContent = () => `## 1. 实现任务
 
 const renderSpecDeltaContent = ({ title }) => `## ADDED Requirements
 ### Requirement: ${title}
-TODO: 补充该需求的规范性描述，使用 MUST / SHALL 表达行为约束。
+系统 MUST 支持“${title}”对应的目标能力，并提供可验证的主流程结果。
+系统 SHALL 在输入不满足前置条件、权限不足或命中边界约束时，返回明确且可验证的处理结果。
 
-#### Scenario: 待补充主场景
-- **WHEN** 待补充触发条件
-- **THEN** 待补充预期结果
+#### Scenario: 主流程待细化
+- **WHEN** 触发“${title}”对应的主流程
+- **THEN** 系统返回与该能力一致的预期结果
+- **AND** 响应或副作用可被验证
+
+#### Scenario: 边界条件待细化
+- **WHEN** 输入不满足前置条件、权限要求或边界约束
+- **THEN** 系统返回明确的失败或降级结果
+- **AND** 不产生未声明的副作用
 `;
 
 export const createChangeScaffold = ({

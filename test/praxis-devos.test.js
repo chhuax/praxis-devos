@@ -333,10 +333,16 @@ test('createChangeScaffold creates a full change by default', () => {
     capability: 'auth',
   });
 
+  const specPath = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'specs', 'auth', 'spec.md');
+  const specContent = fs.readFileSync(specPath, 'utf8');
+
   assert.match(output, /type: auto -> full/);
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'proposal.md')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'tasks.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'specs', 'auth', 'spec.md')));
+  assert.ok(fs.existsSync(specPath));
+  assert.match(specContent, /MUST 支持/);
+  assert.match(specContent, /SHALL/);
+  assert.doesNotMatch(specContent, /TODO:/);
 });
 
 test('proposal alias creates a lightweight scaffold without tasks', () => {
