@@ -40,12 +40,24 @@ const normalizeEnvFlag = (value) => String(value || '').trim().toLowerCase();
 const isEnvFlagUnset = (value) => value == null || String(value).trim() === '';
 const isEnvFlagEnabled = (value) => ['1', 'true', 'yes', 'on'].includes(normalizeEnvFlag(value));
 const isEnvFlagDisabled = (value) => ['0', 'false', 'no', 'off'].includes(normalizeEnvFlag(value));
+const canonicalizeEnvFlag = (value) => {
+  if (isEnvFlagEnabled(value)) {
+    return '1';
+  }
+  if (isEnvFlagDisabled(value)) {
+    return '0';
+  }
+  return value;
+};
 
 const buildOpenSpecExecOptions = (opts = {}) => {
   const env = {
     ...process.env,
     ...opts.env,
   };
+
+  env.OPENSPEC_TELEMETRY = canonicalizeEnvFlag(env.OPENSPEC_TELEMETRY);
+  env.DO_NOT_TRACK = canonicalizeEnvFlag(env.DO_NOT_TRACK);
 
   const openspecTelemetryUnset = isEnvFlagUnset(env.OPENSPEC_TELEMETRY);
   const doNotTrackUnset = isEnvFlagUnset(env.DO_NOT_TRACK);

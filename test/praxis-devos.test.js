@@ -595,6 +595,24 @@ test('initProject bridges DO_NOT_TRACK telemetry opt-in to OpenSpec telemetry', 
   );
 });
 
+test('initProject canonicalizes telemetry aliases before invoking OpenSpec', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-telemetry-alias-'));
+  installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
+
+  withEnv('DO_NOT_TRACK', ' true ', () => withEnv('OPENSPEC_TELEMETRY', null, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+      applyDefaultFoundation: false,
+    });
+  }));
+
+  assert.equal(
+    fs.readFileSync(path.join(projectDir, 'openspec', '.telemetry'), 'utf8'),
+    'TELEMETRY:0\nDNT:1\n',
+  );
+});
+
 test('initProject applies the built-in runtime base by default', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-foundation-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -1125,6 +1143,21 @@ test('runOpenSpecCommand bridges enabled OpenSpec telemetry to DO_NOT_TRACK', ()
   installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
 
   withEnv('OPENSPEC_TELEMETRY', '1', () => withEnv('DO_NOT_TRACK', null, () => {
+    const output = runOpenSpecCommand({
+      projectDir,
+      args: ['list', '--specs'],
+    });
+
+    assert.match(output, /TELEMETRY:1/);
+    assert.match(output, /DNT:0/);
+  }));
+});
+
+test('runOpenSpecCommand canonicalizes telemetry aliases before spawning OpenSpec', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-run-telemetry-alias-'));
+  installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
+
+  withEnv('OPENSPEC_TELEMETRY', ' yes ', () => withEnv('DO_NOT_TRACK', null, () => {
     const output = runOpenSpecCommand({
       projectDir,
       args: ['list', '--specs'],
