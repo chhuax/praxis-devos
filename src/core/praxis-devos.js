@@ -805,6 +805,27 @@ export const detectProjectStack = (projectDir) => {
 const resolveStackName = (projectDir, stackName) => stackName || detectProjectStack(projectDir);
 const DEFAULT_FOUNDATION_NAME = 'ecc-foundation';
 const DEFAULT_RUNTIME_BASE_LABEL = 'built-in Praxis runtime base';
+const ECC_HOOKS_DESCRIPTOR_FORMAT = 'praxis-ecc-hooks/v1';
+const ECC_HOOK_SLOT_DEFINITIONS = [
+  {
+    id: 'pre-task-environment',
+    stage: 'pre-task',
+    label: 'Pre-task environment validation',
+    description: 'Validate ECC binding and runtime availability before ECC-dependent work starts.',
+  },
+  {
+    id: 'post-change-audit',
+    stage: 'post-change',
+    label: 'Post-change audit',
+    description: 'Capture ECC binding metadata after changes that touch ECC-dependent workflow paths.',
+  },
+  {
+    id: 'session-evidence',
+    stage: 'session',
+    label: 'Adapter-specific session evidence',
+    description: 'Bridge ECC adapter activity into project-level session validation and transcript evidence flows.',
+  },
+];
 const resolveFoundationRuntimeBase = (foundationName) => foundationName
   ? readFoundationDefinition(foundationName)?.runtimeBase || null
   : null;
@@ -906,10 +927,17 @@ const renderEccHooksAdapterReadme = ({ eccBinding, descriptorRelativePath }) => 
     `- binding detail: ${eccBinding.detail}`,
   ];
 
+  lines.push(eccBinding.status === 'ok' ? '- hook slots:' : '- planned hook slots:');
+  lines.push(
+    ...ECC_HOOK_SLOT_DEFINITIONS.map(
+      (slot) => `  - \`${slot.id}\` (${slot.stage}): ${slot.label}`,
+    ),
+  );
+
   if (eccBinding.status === 'ok' && eccBinding.command) {
     lines.push(`- descriptor: \`${descriptorRelativePath}\``);
     lines.push(`- target command: \`${eccBinding.command}\``);
-    lines.push('- usage: wire the descriptor into project workflow nodes that need a project-local ECC hook placeholder.');
+    lines.push('- usage: wire one or more declared hook slots into project workflow nodes that need a project-local ECC hook bridge.');
   } else {
     lines.push(`- descriptor: unavailable until ECC is bound with \`${ECC_BIND_COMMAND}\``);
   }
@@ -918,10 +946,21 @@ const renderEccHooksAdapterReadme = ({ eccBinding, descriptorRelativePath }) => 
   return `${lines.join('\n')}\n`;
 };
 
+const buildEccHookSlots = ({ eccBinding, descriptorRelativePath }) => ECC_HOOK_SLOT_DEFINITIONS.map((slot) => ({
+  id: slot.id,
+  stage: slot.stage,
+  label: slot.label,
+  description: slot.description,
+  wiring: 'manual',
+  path: descriptorRelativePath,
+  command: eccBinding.command,
+}));
+
 const buildEccHooksAdapterDescriptor = ({ eccBinding, descriptorRelativePath }) => ({
   adapter: 'ecc-hooks',
   runtimeBase: eccBinding.runtimeBase,
   mode: 'descriptor',
+  format: ECC_HOOKS_DESCRIPTOR_FORMAT,
   binding: {
     state: eccBinding.state,
     status: eccBinding.status,
@@ -933,10 +972,12 @@ const buildEccHooksAdapterDescriptor = ({ eccBinding, descriptorRelativePath }) 
   hook: {
     name: 'ecc-runtime-bound',
     trigger: 'manual-wiring-required',
-    description: 'Project-level ECC hook placeholder generated after runtime binding.',
+    description: 'Project-level ECC hook descriptor bundle generated after runtime binding.',
     path: descriptorRelativePath,
     command: eccBinding.command,
+    slots: ECC_HOOK_SLOT_DEFINITIONS.map((slot) => slot.id),
   },
+  slots: buildEccHookSlots({ eccBinding, descriptorRelativePath }),
   generatedAt: new Date().toISOString(),
 });
 
@@ -1565,10 +1606,17 @@ const syncEccHooksAdapter = ({ projectDir, foundationName, log }) => {
       path: eccBinding.path,
       command: eccBinding.command,
     },
+    plannedSlots: ECC_HOOK_SLOT_DEFINITIONS.map((slot) => ({
+      id: slot.id,
+      stage: slot.stage,
+      label: slot.label,
+    })),
     descriptor: eccBinding.status === 'ok' && eccBinding.command
       ? {
         path: descriptorRelativePath,
         command: eccBinding.command,
+        format: ECC_HOOKS_DESCRIPTOR_FORMAT,
+        slots: ECC_HOOK_SLOT_DEFINITIONS.map((slot) => slot.id),
       }
       : null,
     updatedAt: new Date().toISOString(),

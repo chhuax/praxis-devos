@@ -874,7 +874,15 @@ test('initProject seeds an ECC hooks adapter placeholder before runtime binding 
     assert.equal(adapterManifest.status, 'placeholder');
     assert.equal(adapterManifest.binding.state, 'unbound');
     assert.equal(adapterManifest.binding.source, 'missing');
+    assert.deepEqual(
+      adapterManifest.plannedSlots.map((slot) => slot.id),
+      ['pre-task-environment', 'post-change-audit', 'session-evidence'],
+    );
     assert.equal(adapterManifest.descriptor, null);
+    assert.match(adapterReadme, /planned hook slots:/);
+    assert.match(adapterReadme, /pre-task-environment/);
+    assert.match(adapterReadme, /post-change-audit/);
+    assert.match(adapterReadme, /session-evidence/);
     assert.match(adapterReadme, /descriptor: unavailable until ECC is bound/);
     assert.ok(!fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
     assert.match(status, /ecc-hooks: \[WARN\] ECC hooks adapter placeholder is present/);
@@ -915,6 +923,11 @@ test('initProject closes the ECC loop immediately when the runtime is already av
     assert.equal(hooksAdapterManifest.status, 'ready');
     assert.equal(hooksAdapterManifest.binding.source, 'path');
     assert.equal(hooksAdapterManifest.descriptor?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(hooksAdapterManifest.descriptor?.format, 'praxis-ecc-hooks/v1');
+    assert.deepEqual(
+      hooksAdapterManifest.descriptor?.slots,
+      ['pre-task-environment', 'post-change-audit', 'session-evidence'],
+    );
     assert.ok(fs.existsSync(eccCommandsAdapterShimPath(projectDir)));
     assert.ok(fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
     assert.match(status, /ecc binding state: bound/);
@@ -1373,12 +1386,27 @@ test('runCli bind stores project-level ECC binding and refreshes manifest state'
     assert.equal(hooksAdapterManifest.binding.state, 'bound');
     assert.equal(hooksAdapterManifest.binding.source, 'project-binding');
     assert.equal(hooksAdapterManifest.descriptor?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(hooksAdapterManifest.descriptor?.format, 'praxis-ecc-hooks/v1');
+    assert.deepEqual(
+      hooksAdapterManifest.descriptor?.slots,
+      ['pre-task-environment', 'post-change-audit', 'session-evidence'],
+    );
     assert.ok(fs.existsSync(shimPath));
     assert.ok(fs.existsSync(hooksDescriptorPath));
     assert.equal(hooksDescriptor.adapter, 'ecc-hooks');
+    assert.equal(hooksDescriptor.format, 'praxis-ecc-hooks/v1');
     assert.equal(hooksDescriptor.binding.state, 'bound');
     assert.equal(hooksDescriptor.binding.source, 'project-binding');
     assert.equal(hooksDescriptor.hook.command, path.join(fakeEccDir, 'ecc'));
+    assert.deepEqual(
+      hooksDescriptor.hook.slots,
+      ['pre-task-environment', 'post-change-audit', 'session-evidence'],
+    );
+    assert.deepEqual(
+      hooksDescriptor.slots.map((slot) => slot.id),
+      ['pre-task-environment', 'post-change-audit', 'session-evidence'],
+    );
+    assert.equal(hooksDescriptor.slots[0].command, path.join(fakeEccDir, 'ecc'));
     assert.match(status, /ecc binding state: bound/);
     assert.match(status, /ecc binding source: project-binding/);
     assert.match(status, /ecc-commands: \[OK\] ECC commands shim is ready/);
