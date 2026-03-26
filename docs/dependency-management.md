@@ -1,124 +1,39 @@
-# 依赖管理
+# Dependency Management
 
-Praxis DevOS 强依赖两类外部能力：
-
-- `openspec`：CLI 依赖
-- `superpowers`：agent runtime 依赖
-
-这两类依赖的管理方式不同，不能混在一起处理。
-
-## 依赖分层
-
-### OpenSpec
-
-- 类型：CLI
-- 用途：规范初始化、校验、归档
-- 特征：与具体 agent 无关
-- 当前策略：统一通过 `npx praxis-devos openspec ...` 调用，优先使用项目本地安装，找不到时才回退到全局安装
-
-### Superpowers
-
-- 类型：agent runtime
-- 用途：提供 TDD、调试、验证、计划、子代理等能力
-- 特征：安装方式因 agent 不同而不同
-- 当前策略：按 agent 分别检测与引导安装
-
-说明：
-
-- Praxis 依赖的是 Superpowers 提供的执行能力集合
-- 其中 `verification-before-completion` 是框架硬要求
-- `test-driven-development` 是高风险变更的优先策略，但不是所有场景的强制要求
-
-## 推荐入口
-
-对大多数用户，不要先区分 `bootstrap` 和 `init`。推荐直接使用：
+Most users only need two commands:
 
 ```bash
 npx praxis-devos setup --agent codex --stack java-spring
-```
-
-`setup` 是用户入口；`bootstrap` 和 `init` 是更底层的拆分命令。
-
-当前发布支持范围：
-
-- 发布支持：macOS、Linux、Windows PowerShell
-- Windows 下推荐通过 PowerShell 执行 `setup` / `bootstrap`，尤其是 Codex 的 SuperPowers junction 创建步骤
-
-## 为什么不能把 Superpowers 放进 `.praxis/`
-
-`.praxis/` 负责保存项目的 canonical state，但 `superpowers` 是运行时能力，不是项目资产。
-
-不能直接把它复制进 `.praxis/` 的原因：
-
-- OpenCode 依赖插件接入
-- Codex 依赖本地 skills 目录和 symlink
-- Claude Code 依赖 marketplace 安装
-
-所以 Praxis 只做三件事：
-
-1. 声明依赖
-2. 检测依赖
-3. 引导安装
-
-而不是替代官方安装方式。
-
-## doctor
-
-使用：
-
-```bash
-npx praxis-devos status
-npx praxis-devos doctor
-npx praxis-devos doctor --agents opencode,codex
 npx praxis-devos doctor --strict
 ```
 
-其中 `status` 更偏向项目运行态总览，`doctor` 更偏向依赖门禁检查。
+This document explains what Praxis manages behind those commands and when to reach for repair commands.
 
-检查内容：
+## What Praxis Depends On
 
-- `openspec` 是否可被 `npx praxis-devos openspec ...` 成功解析
-- OpenCode 是否在 `opencode.json` 中声明了 `superpowers` 插件
-- Codex 是否检测到 `~/.agents/skills/superpowers`
-- Claude Code 安装是否需要人工确认
+Praxis DevOS needs two kinds of external tooling:
 
-说明：
+- `openspec`: a CLI dependency used for governance-oriented proposal, validation, and archive workflows
+- `superpowers`: an agent runtime dependency used by OpenCode, Codex, and Claude Code
 
-- Claude Code 的 marketplace 安装当前无法从项目工作区做稳定、可移植的自动检测
-- 因此普通 `doctor` 会标记为 `UNKNOWN`
-- `doctor --strict` 会把 `UNKNOWN` 视为失败，提醒用户手动确认
+These dependencies are managed differently, so Praxis keeps them separate.
 
-## bootstrap
+## Recommended Path
 
-使用：
+For normal onboarding, do this:
 
 ```bash
-npx praxis-devos bootstrap --agents codex
-npx praxis-devos bootstrap --agents opencode,codex,claude
-npx praxis-devos bootstrap --agent opencode
-npx praxis-devos bootstrap --agent codex
-npx praxis-devos bootstrap --agent claude
+npx praxis-devos setup --agent codex --stack java-spring
+npx praxis-devos doctor --strict
 ```
 
-行为：
+`setup` is the productized entrypoint. It handles installation, initialization, and agent setup in one flow.
 
-- `bootstrap` 会同时给出 OpenSpec 和所选 agent 的依赖引导
-- `--agent` / `--agents`：决定要输出哪些 runtime 的 SuperPowers 指引
-- 推荐把它视为高级修复命令，而不是 Quick Start 主入口
-- `opencode`：自动写入或更新项目根目录 `opencode.json`
-- `codex`：输出官方安装步骤
-- `claude`：输出官方 marketplace 安装命令
-
-而 `setup` 与 `bootstrap` 的区别是：
-
-- `setup`：会先检查，再实际执行 OpenSpec 安装、OpenCode 配置和 Codex SuperPowers 安装
-- `bootstrap`：只输出底层依赖引导，适合排障和手工修复
+Use `doctor` to confirm the current machine is actually ready to work in the repo.
 
 ## OpenSpec
 
-OpenSpec 是 Praxis DevOS 的硬依赖，不再提供“无 OpenSpec 的降级初始化”。
-
-所有 OpenSpec 命令统一使用：
+OpenSpec is included because some teams want proposal and governance workflows. It is available through the Praxis wrapper:
 
 ```bash
 npx praxis-devos openspec list --specs
@@ -126,109 +41,94 @@ npx praxis-devos openspec validate <change-id> --strict --no-interactive
 npx praxis-devos openspec archive <change-id> --yes
 ```
 
-解析顺序：
+Praxis resolves OpenSpec in this order:
 
-1. 项目本地 `node_modules/.bin/openspec`
-2. 全局 `openspec`
+1. project-local `node_modules/.bin/openspec`
+2. global `openspec`
 
-推荐安装：
+For most users, no separate install step is needed because `setup` installs project-local OpenSpec automatically when required.
+
+OpenSpec is governance-oriented. It is not the required starting point for ordinary implementation, debugging, or review work.
+
+## SuperPowers
+
+SuperPowers provides runtime skills such as debugging, planning, verification, and review support.
+
+Its installation differs by agent:
+
+- OpenCode: project plugin configuration
+- Codex: local skills install/link
+- Claude Code: marketplace install
+
+Because of that, Praxis does not copy SuperPowers into `.praxis/`. Instead it detects and configures it per agent where possible.
+
+## What `setup` Covers
+
+`setup` is the default answer for:
+
+- first-time onboarding
+- setting up a new machine
+- adding another agent
+- fixing missing OpenSpec or SuperPowers dependencies
+
+It will:
+
+- install or reuse OpenSpec
+- configure OpenCode plugin settings
+- install Codex SuperPowers automatically when possible
+- leave Claude Code on an explicit manual marketplace step
+- initialize or refresh project files
+
+## What `doctor` Checks
+
+Examples:
 
 ```bash
-npm install -D @fission-ai/openspec
+npx praxis-devos doctor
+npx praxis-devos doctor --strict
+npx praxis-devos status
 ```
 
-但对大多数用户，这一步不需要单独执行，因为 `npx praxis-devos setup ...` 会先检查，缺失时再自动安装项目本地 OpenSpec。
+`doctor` focuses on dependency readiness:
 
-全局安装只作为兼容兜底：
+- whether OpenSpec is callable through Praxis
+- whether each selected agent has the expected SuperPowers dependency state
+
+`status` is broader project state. `doctor` is the readiness gate.
+
+## When To Use `bootstrap`
+
+Examples:
 
 ```bash
-npm install -g @fission-ai/openspec
+npx praxis-devos bootstrap --agent codex
+npx praxis-devos bootstrap --agents opencode,codex,claude
 ```
 
-如果当前环境无法解析 OpenSpec，`npx praxis-devos init` 会直接失败。
+Use `bootstrap` when you need lower-level repair guidance or want to inspect dependency setup without relying on the higher-level `setup` flow.
 
-## OpenCode
+In practice:
 
-OpenCode 当前采用项目级插件配置。`bootstrap --agent opencode` 会把以下插件写入 `opencode.json`：
+- `setup`: primary user path
+- `doctor`: verification
+- `bootstrap`: advanced repair and debugging
 
-- `praxis-devos`
-- `superpowers@git+https://github.com/obra/superpowers.git`
+## Agent Notes
 
-之后需要重启 OpenCode。
+### OpenCode
 
-参考：
+Praxis manages OpenCode via project plugin configuration in `opencode.json`.
 
-- https://github.com/obra/superpowers/blob/main/docs/README.opencode.md
+### Codex
 
-## Codex
+Praxis can install the required SuperPowers layout automatically on the standard path.
 
-Codex 当前采用本地 clone + skills link 方式。
+### Claude Code
 
-Praxis 的 `bootstrap --agent codex` 会按当前平台输出官方推荐步骤：
-
-### macOS / Linux
-
-1. clone superpowers 仓库到 `~/.codex/superpowers`
-2. 创建 `~/.agents/skills/superpowers` 指向其 `skills/` 的 symlink
-3. 重启 Codex
-
-### Windows PowerShell
-
-1. clone superpowers 仓库到 `$HOME/.codex/superpowers`
-2. 创建 `$HOME/.agents/skills`
-3. 用 `New-Item -ItemType Junction` 建立 `$HOME/.agents/skills/superpowers`
-4. 重启 Codex
-
-参考：
-
-- https://github.com/obra/superpowers/blob/main/docs/README.codex.md
-
-## Claude Code
-
-Claude Code 当前通过插件市场安装。
-
-可选方式：
-
-### 官方市场
+Claude Code still needs a manual marketplace action:
 
 ```text
 /plugin install superpowers@claude-plugins-official
 ```
 
-### Marketplace 注册方式
-
-```text
-/plugin marketplace add obra/superpowers-marketplace
-/plugin install superpowers@superpowers-marketplace
-```
-
-由于该安装方式对本地工作区不可见，Praxis 当前只提供命令提示，不做自动化安装。
-
-## manifest 中的声明
-
-Praxis 会在 `.praxis/manifest.json` 中声明这两个依赖是必需项。
-
-该声明的目的不是记录“安装在哪里”，而是记录：
-
-- 这个项目依赖哪些外部能力
-- 哪些 agent 运行时必须具备 `superpowers`
-
-## 与规则门控的关系
-
-Praxis 不只提供 `doctor` 和 `bootstrap` 命令，还会把依赖状态摘要编译进：
-
-- `.praxis/adapters/compiled-rules.md`
-- `AGENTS.md` 的托管区
-- `CLAUDE.md` 的托管区
-
-这意味着 agent 在读取项目入口规则时，会直接看到：
-
-- `openspec` 是否缺失
-- 各 agent 的 `superpowers` 是否已安装
-- 缺失依赖时应先安装，不要直接进入实现
-
-## 建议
-
-- 新项目初始化后，第一时间执行 `npx praxis-devos doctor`
-- 在 CI 或发布前，可执行 `npx praxis-devos doctor --strict`
-- 对 Claude Code，团队应在 onboarding 文档中补充人工确认步骤
+That step should be treated as part of onboarding.

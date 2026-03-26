@@ -315,10 +315,10 @@ const findSkillMarkdown = (rootDir) => {
 test('renderHelp exposes change and proposal commands', () => {
   const help = renderHelp();
   assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base/);
-  assert.match(help, /change\s+Create an OpenSpec change scaffold/);
+  assert.match(help, /change\s+Create an OpenSpec change scaffold for governance-oriented work/);
   assert.match(help, /proposal\s+Compatibility alias of `change`/);
   assert.match(help, /use-foundation\s+Advanced: re-apply internal runtime-base assets/);
-  assert.match(help, /use-stack\s+Apply a technology stack to an initialized project/);
+  assert.match(help, /use-stack\s+Apply a technology stack after setup or init/);
   assert.match(help, /list-foundations\s+Advanced: list internal runtime-base presets/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
   assert.doesNotMatch(help, /--foundation <name>/);
@@ -435,13 +435,16 @@ test('initProject creates canonical assets and managed adapters', () => {
     assert.match(agentsMd, /proposal flow/);
     assert.match(agentsMd, /implementation flow/);
     assert.match(agentsMd, /review flow/);
-    assert.match(agentsMd, /治理 \/ proposal 场景统一通过 `npx praxis-devos openspec/);
+    assert.match(agentsMd, /当任务需要提案、校验或归档治理时，统一通过 `npx praxis-devos openspec/);
     assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`，然后必须加载 `openspec` skill/);
     assert.match(agentsMd, /先做轻量 `Proposal Intake`/);
     assert.match(agentsMd, /`change target`、`intended behavior`、`scope\/risk`、`open questions`/);
     assert.match(agentsMd, /才升级进入 `brainstorming`/);
     assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`；如果当前工作来自已批准 proposal/);
-    assert.match(agentsMd, /implementation flow: 如果项目已同步 built-in runtime base/);
+    assert.match(agentsMd, /日常任务通常走 implementation 或 review；只有明确进入治理流程时才走 proposal/);
+    assert.match(agentsMd, /优先把 `\.praxis\/rules\.md`、`\.praxis\/stack\.md`、`\.praxis\/skills\/` 当作日常执行基线/);
+    assert.match(agentsMd, /如果项目已应用 built-in runtime base，开始实现前优先检查其中的 `branch-workflow\.md`、`verification\.md`、`operating-agreements\.md`/);
+    assert.match(agentsMd, /OpenSpec 主要用于治理 \/ proposal 场景，不是日常实现的默认前门/);
     assert.match(agentsMd, /技术栈 skill 保持按需加载/);
     assert.match(agentsMd, /`openspec`、`git-workflow`、`verification-before-completion` 是硬门禁/);
     assert.match(agentsMd, /`brainstorming`、`writing-plans`、`systematic-debugging`、`subagent-driven-development` 则由/);
