@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-27
+
+### Fixed
+- preserved YAML frontmatter at the top of projected OpenSpec skill files so Codex can load `opsx-*` skills after `setup` or `sync`
+- made projection marker detection compatible with marker placement after frontmatter instead of only at the first line
+- resolved projection adapter path handling so runtime home-directory resolution is not frozen at module load time
+
 ## [0.4.0] - 2026-03-27
 
 ### Added

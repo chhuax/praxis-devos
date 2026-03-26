@@ -1,9 +1,9 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
-import { buildMarker, isProjection } from './markers.js';
+import { buildMarker, injectMarker, isProjection } from './markers.js';
+import { resolveUserHomeDir } from '../support/home.js';
 
-const CLAUDE_COMMANDS_DIR = path.join(os.homedir(), '.claude', 'commands');
+const claudeCommandsDir = () => path.join(resolveUserHomeDir(), '.claude', 'commands');
 
 const ensureDir = (dirPath) => {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -14,14 +14,14 @@ const ensureDir = (dirPath) => {
  * Claude Code discovers these as native slash commands (e.g. /opsx-propose).
  */
 export const projectSkills = ({ skillSources, version, log }) => {
-  ensureDir(CLAUDE_COMMANDS_DIR);
+  ensureDir(claudeCommandsDir());
   const results = [];
 
   for (const { name, sourcePath } of skillSources) {
-    const targetPath = path.join(CLAUDE_COMMANDS_DIR, `${name}.md`);
+    const targetPath = path.join(claudeCommandsDir(), `${name}.md`);
     const content = fs.readFileSync(sourcePath, 'utf8');
     const marker = buildMarker({ source: path.relative(process.cwd(), sourcePath), version });
-    const projected = `${marker}\n${content}`;
+    const projected = injectMarker(content, marker);
 
     fs.writeFileSync(targetPath, projected, 'utf8');
     results.push({ name, targetPath, status: 'projected' });
@@ -35,13 +35,13 @@ export const projectSkills = ({ skillSources, version, log }) => {
  * Detect existing Claude projections.
  */
 export const detectProjections = () => {
-  if (!fs.existsSync(CLAUDE_COMMANDS_DIR)) {
+  if (!fs.existsSync(claudeCommandsDir())) {
     return [];
   }
-  const files = fs.readdirSync(CLAUDE_COMMANDS_DIR).filter((f) => f.startsWith('opsx-') && f.endsWith('.md'));
+  const files = fs.readdirSync(claudeCommandsDir()).filter((f) => f.startsWith('opsx-') && f.endsWith('.md'));
   return files
     .map((f) => {
-      const fullPath = path.join(CLAUDE_COMMANDS_DIR, f);
+      const fullPath = path.join(claudeCommandsDir(), f);
       return { name: f.replace('.md', ''), path: fullPath, isProjection: isProjection(fullPath) };
     })
     .filter((entry) => entry.isProjection);
