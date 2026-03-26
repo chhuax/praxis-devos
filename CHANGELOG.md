@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-27
+
+### Added
+- automatic Claude Code SuperPowers installation through `claude plugin install ... --scope user`
+- install smoke coverage aligned with the current project structure and agent setup paths
+- README positioning for near-term enterprise extension pack integration such as `praxis-devos install-rules`
+
+### Changed
+- simplified project model around `openspec/`, `AGENTS.md`, `CLAUDE.md`, `.opencode/`, and runtime-managed SuperPowers installs
+- tightened managed entry blocks so OpenSpec flow gates now explicitly bind to SuperPowers skills such as `brainstorming`, `writing-plans`, `systematic-debugging`, and `verification-before-completion`
+- rewrote tests and CI to match the current CLI and runtime behavior
+- moved install smoke tooling under `test/`
+- rewrote English and Chinese README content around the current product contract
+
+### Removed
+- stale `.praxis`-centric project model, historical docs, release notes, stack scaffolding, and legacy repository-only adapter files
+- deprecated `change` / `proposal` CLI entrypoints from the public command surface
+- root repository `AGENTS.md`, `CLAUDE.md`, and `RULES.md` artifacts that were no longer part of the shipped product model
+
 ## [0.2.7] - 2026-03-25
 
 ### Added

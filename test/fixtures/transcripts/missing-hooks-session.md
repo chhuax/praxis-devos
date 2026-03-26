@@ -1,4 +1,4 @@
-User: /change add order search filters
+User: /opsx:propose add order search filters
 
 Assistant: 我已进入 proposal flow，并直接创建 proposal.md 和 spec delta。
 

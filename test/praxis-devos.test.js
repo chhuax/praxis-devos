@@ -1,54 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   PRAXIS_ROOT,
   analyzeSessionTranscript,
   bootstrapOpenSpec,
   bootstrapProject,
-  collectSkillsPaths,
   createChangeScaffold,
   doctorProject,
   initProject,
   migrateProject,
+  parseCliArgs,
   renderHelp,
-  runOpenSpecCommand,
   runCli,
+  runOpenSpecCommand,
   setupProject,
   statusProject,
   syncProject,
-  useStackProject,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
 
-const makeTempProject = () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-test-'));
-  fs.mkdirSync(path.join(projectDir, 'openspec', 'changes'), { recursive: true });
-  return projectDir;
-};
-
-const withTempPath = (binDir, fn) => {
-  const previousPath = process.env.PATH;
-  process.env.PATH = `${binDir}${path.delimiter}${previousPath || ''}`;
-  try {
-    return fn();
-  } finally {
-    process.env.PATH = previousPath;
-  }
-};
-
-const withPlatform = (platform, fn) => {
-  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
-  Object.defineProperty(process, 'platform', { value: platform });
-  try {
-    return fn();
-  } finally {
-    Object.defineProperty(process, 'platform', descriptor);
-  }
-};
+const makeTempProject = () => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-test-'));
 
 const withEnv = (name, value, fn) => {
   const previous = process.env[name];
@@ -69,30 +44,13 @@ const withEnv = (name, value, fn) => {
   }
 };
 
-const installFakeOpenSpec = (projectDir) => {
-  const binDir = path.join(projectDir, 'fake-bin');
-  const scriptPath = path.join(binDir, 'openspec');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-cmd="$1"
-target="$2"
-if [ "$cmd" = "init" ]; then
-  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
-  exit 0
-fi
-echo "unsupported" >&2
-exit 1
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return binDir;
-};
+const withPrependedPath = (binDir, fn) => withEnv(
+  'PATH',
+  `${binDir}${path.delimiter}${process.env.PATH || ''}`,
+  fn,
+);
 
-const installFakeProjectLocalOpenSpec = (projectDir, label = 'LOCAL') => {
+const installFakeOpenSpec = (projectDir, label = 'LOCAL') => {
   const binDir = path.join(projectDir, 'node_modules', '.bin');
   const scriptPath = path.join(binDir, 'openspec');
   fs.mkdirSync(binDir, { recursive: true });
@@ -100,133 +58,16 @@ const installFakeProjectLocalOpenSpec = (projectDir, label = 'LOCAL') => {
     scriptPath,
     `#!/bin/sh
 set -eu
-echo "${label}:$*"
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return scriptPath;
-};
-
-const installFakeWindowsOpenSpec = (projectDir, location = 'local') => {
-  const baseDir = location === 'local'
-    ? path.join(projectDir, 'node_modules', '.bin')
-    : path.join(projectDir, 'fake-win-bin');
-  const scriptPath = path.join(baseDir, 'openspec.cmd');
-  fs.mkdirSync(baseDir, { recursive: true });
-  fs.writeFileSync(scriptPath, '@echo off\r\n');
-  return scriptPath;
-};
-
-const installFakeWhereWithMap = (projectDir, mappings) => {
-  const binDir = path.join(projectDir, 'fake-where-bin');
-  const scriptPath = path.join(binDir, 'where');
-  fs.mkdirSync(binDir, { recursive: true });
-  const cases = Object.entries(mappings)
-    .map(([command, resolvedPath]) => `if [ "$1" = "${command}" ]; then
-  printf '%s\\n' "${resolvedPath}"
-  exit 0
-fi`)
-    .join('\n');
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-${cases}
-exit 1
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return binDir;
-};
-
-const installFakeWhere = (projectDir, resolvedPath) => installFakeWhereWithMap(projectDir, {
-  openspec: resolvedPath,
-});
-
-const installFakeWhich = (projectDir, openspecPath = null) => {
-  const binDir = path.join(projectDir, 'fake-which-bin');
-  const scriptPath = path.join(binDir, 'which');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-if [ "$1" = "openspec" ]; then
-  if [ -n "${openspecPath || ''}" ]; then
-    printf '%s\\n' "${openspecPath || ''}"
-    exit 0
-  fi
-  exit 1
-fi
-/usr/bin/which "$@"
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return binDir;
-};
-
-const installFakeCmdShell = (projectDir) => {
-  const binDir = path.join(projectDir, 'fake-cmd-bin');
-  const scriptPath = path.join(binDir, 'cmd-shim');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-printf '%s' "$4"
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return scriptPath;
-};
-
-const installFakeCmdRunner = (projectDir) => {
-  const binDir = path.join(projectDir, 'fake-cmd-runner-bin');
-  const scriptPath = path.join(binDir, 'cmd-shim');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-eval "set -- $4"
-"$@"
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return scriptPath;
-};
-
-const installFakeWindowsNpm = (projectDir) => {
-  const binDir = path.join(projectDir, 'fake-win-npm-bin');
-  const scriptPath = path.join(binDir, 'npm.cmd');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
-  mkdir -p "$PWD/node_modules/.bin"
-  cat > "$PWD/node_modules/.bin/openspec.cmd" <<'EOF'
-#!/bin/sh
-set -eu
-cmd="$1"
-target="$2"
+cmd="\${1:-}"
 if [ "$cmd" = "init" ]; then
-  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
-  exit 0
-fi
-echo "LOCAL:$*"
+  target="$2"
+  mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive"
+  cat > "$target/openspec/config.yaml" <<'EOF'
+# context:
 EOF
-  chmod +x "$PWD/node_modules/.bin/openspec.cmd"
   exit 0
 fi
-echo "unsupported npm invocation: $*" >&2
-exit 1
+printf '${label}:%s\\n' "$*"
 `,
     { mode: 0o755 },
   );
@@ -234,23 +75,33 @@ exit 1
   return scriptPath;
 };
 
-const installFakeGit = (projectDir) => {
-  const binDir = path.join(projectDir, 'fake-git-bin');
-  const scriptPath = path.join(binDir, 'git');
+const ensureOpenSpecWorkspace = (projectDir) => {
+  fs.mkdirSync(path.join(projectDir, 'openspec', 'changes'), { recursive: true });
+};
+
+const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+const installFakeClaude = (homeDir) => {
+  const binDir = path.join(homeDir, 'fake-claude-bin');
+  const scriptPath = path.join(binDir, 'claude');
   fs.mkdirSync(binDir, { recursive: true });
   fs.writeFileSync(
     scriptPath,
     `#!/bin/sh
 set -eu
-if [ "$1" = "clone" ]; then
-  target="$3"
-  mkdir -p "$target/skills/example-skill"
-  cat > "$target/skills/example-skill/SKILL.md" <<'EOF'
-# Example Skill
+if [ "$1" = "plugin" ] && [ "$2" = "install" ] && [ "$3" = "superpowers@claude-plugins-official" ] && [ "$4" = "--scope" ] && [ "$5" = "user" ]; then
+  mkdir -p "$HOME/.claude"
+  cat > "$HOME/.claude/settings.json" <<'EOF'
+{
+  "enabledPlugins": [
+    "superpowers@claude-plugins-official"
+  ]
+}
 EOF
+  printf 'installed\\n'
   exit 0
 fi
-echo "unsupported git invocation: $*" >&2
+echo "unsupported claude invocation: $*" >&2
 exit 1
 `,
     { mode: 0o755 },
@@ -259,637 +110,294 @@ exit 1
   return binDir;
 };
 
-const installFakeNpm = (projectDir) => {
-  const binDir = path.join(projectDir, 'fake-npm-bin');
-  const scriptPath = path.join(binDir, 'npm');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
-set -eu
-if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
-  mkdir -p "$PWD/node_modules/.bin"
-  cat > "$PWD/node_modules/.bin/openspec" <<'EOF'
-#!/bin/sh
-set -eu
-cmd="$1"
-target="$2"
-if [ "$cmd" = "init" ]; then
-  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
-  exit 0
-fi
-echo "LOCAL:$*"
-EOF
-  chmod +x "$PWD/node_modules/.bin/openspec"
-  exit 0
-fi
-echo "unsupported npm invocation: $*" >&2
-exit 1
-`,
-    { mode: 0o755 },
-  );
-  fs.chmodSync(scriptPath, 0o755);
-  return binDir;
-};
-
-const readJsonFile = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-const findSkillMarkdown = (rootDir) => {
-  const pending = [rootDir];
-  while (pending.length > 0) {
-    const currentDir = pending.pop();
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-      const entryPath = path.join(currentDir, entry.name);
-      if (entry.isFile() && entry.name === 'SKILL.md') {
-        return entryPath;
-      }
-      if (entry.isDirectory()) {
-        pending.push(entryPath);
-      }
-    }
-  }
-  return null;
-};
-
-test('renderHelp exposes change and proposal commands', () => {
+test('renderHelp reflects the current CLI surface', () => {
   const help = renderHelp();
-  assert.match(help, /setup\s+Bootstrap dependencies, initialize framework files/);
-  assert.match(help, /change\s+Create an OpenSpec change scaffold/);
-  assert.match(help, /proposal\s+Compatibility alias of `change`/);
-  assert.match(help, /use-stack\s+Apply a technology stack to an initialized project/);
-  assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
-  assert.doesNotMatch(help, /--openspec/);
+
+  assert.match(help, /setup/);
+  assert.match(help, /validate-session/);
+  assert.doesNotMatch(help, /change\s+Create an OpenSpec change scaffold/);
+  assert.doesNotMatch(help, /proposal\s+Compatibility alias/);
+  assert.doesNotMatch(help, /list-stacks/);
+  assert.doesNotMatch(help, /use-stack/);
 });
 
-test('createChangeScaffold creates a full change by default', () => {
-  const projectDir = makeTempProject();
-  const output = createChangeScaffold({
-    projectDir,
-    title: 'Add two factor auth',
-    capability: 'auth',
-  });
-
-  assert.match(output, /type: auto -> full/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'proposal.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'tasks.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'specs', 'auth', 'spec.md')));
-});
-
-test('proposal alias creates a lightweight scaffold without tasks', () => {
-  const projectDir = makeTempProject();
-  const output = runCli([
-    'proposal',
-    'create',
-    '--type',
-    'lite',
-    '--capability',
-    'order-query',
+test('parseCliArgs parses current flags and rejects removed --openspec', () => {
+  const parsed = parseCliArgs([
+    'doctor',
+    '--agents',
+    'codex,claude',
+    '--agent',
+    'opencode',
     '--project-dir',
-    projectDir,
-    'Adjust order query filters',
+    'tmp/project',
+    '--file',
+    'tmp/session.md',
+    '--strict',
   ]);
 
-  assert.match(output, /lightweight change scaffold/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'adjust-order-query-filters', 'proposal.md')));
-  assert.ok(!fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'adjust-order-query-filters', 'tasks.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'adjust-order-query-filters', 'specs', 'order-query', 'spec.md')));
-});
-
-test('list-stacks remains callable through runCli', () => {
-  const output = runCli(['list-stacks']);
-  assert.match(output, /java-spring/);
-  assert.match(output, /starter/);
-});
-
-test('doctor strict fails when openspec is missing', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-'));
+  assert.equal(parsed.command, 'doctor');
+  assert.deepEqual(parsed.agents, ['codex', 'claude', 'opencode']);
+  assert.equal(parsed.projectDir, path.resolve('tmp/project'));
+  assert.equal(parsed.file, path.resolve('tmp/session.md'));
+  assert.equal(parsed.strict, true);
 
   assert.throws(
-    () => doctorProject({ projectDir, agents: ['opencode'], strict: true }),
-    /Strict dependency check failed/,
+    () => parseCliArgs(['bootstrap', '--openspec']),
+    /`--openspec` has been removed/,
   );
 });
 
-test('doctor output recommends setup as the primary fix path', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-output-'));
-  const output = doctorProject({ projectDir, agents: ['opencode', 'codex', 'claude'] });
+test('syncProject refreshes adapters and preserves user-owned content', () => {
+  const projectDir = makeTempProject();
+  const agentsPath = path.join(projectDir, 'AGENTS.md');
+  fs.writeFileSync(agentsPath, '# Project Notes\n\nKeep this section.\n', 'utf8');
 
-  assert.match(output, /Recommended next step:/);
-  assert.match(output, /- npx praxis-devos setup --agents opencode,codex,claude/);
-  assert.match(output, /Advanced repair command:/);
-  assert.match(output, /- npx praxis-devos bootstrap --agents opencode,codex,claude/);
-});
-
-test('initProject creates canonical assets and managed adapters', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-
-  withTempPath(fakeBinDir, () => {
-    const output = initProject({
-      projectDir,
-      stackName: 'java-spring',
-      agents: ['codex', 'claude'],
-    });
-
-    assert.match(output, /Selected stack: java-spring/);
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'manifest.json')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'INDEX.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
-
-    const skillsIndex = fs.readFileSync(path.join(projectDir, '.praxis', 'skills', 'INDEX.md'), 'utf8');
-    const agentsMd = fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8');
-
-    assert.match(skillsIndex, /java-security/);
-    assert.match(skillsIndex, /Project Skills Index/);
-    assert.match(skillsIndex, /Java \+ Spring Boot 安全编码规范/);
-    assert.match(agentsMd, /^<!-- PRAXIS_DEVOS_START -->/);
-    assert.match(agentsMd, /项目 Skills/);
-    assert.match(agentsMd, /java-security/);
-    assert.match(agentsMd, /## AI Dispatch/);
-    assert.match(agentsMd, /proposal flow/);
-    assert.match(agentsMd, /implementation flow/);
-    assert.match(agentsMd, /review flow/);
-    assert.match(agentsMd, /OpenSpec 命令统一通过 `npx praxis-devos openspec/);
-    assert.match(agentsMd, /proposal flow: 先读取 `openspec\/AGENTS\.md`，然后必须加载 `openspec` skill/);
-    assert.match(agentsMd, /先做轻量 `Proposal Intake`/);
-    assert.match(agentsMd, /`change target`、`intended behavior`、`scope\/risk`、`open questions`/);
-    assert.match(agentsMd, /才升级进入 `brainstorming`/);
-    assert.match(agentsMd, /implementation flow: 先读取 `\.praxis\/rules\.md`；如果当前工作来自已批准 proposal/);
-    assert.match(agentsMd, /技术栈 skill 保持按需加载/);
-    assert.match(agentsMd, /`openspec`、`git-workflow`、`verification-before-completion` 是硬门禁/);
-    assert.match(agentsMd, /`brainstorming`、`writing-plans`、`systematic-debugging`、`subagent-driven-development` 则由/);
-    assert.match(agentsMd, /`\.opencode\/skills\/` 仍可作为 OpenCode supplemental layer/);
-    assert.match(agentsMd, /Codex：`npx praxis-devos bootstrap --agent codex`/);
-    assert.match(agentsMd, /Claude Code：`npx praxis-devos bootstrap --agent claude`/);
-    assert.match(agentsMd, /OpenCode：`npx praxis-devos bootstrap --agent opencode`/);
-    assert.doesNotMatch(agentsMd, /当前入口按 `codex` 处理/);
-    assert.doesNotMatch(agentsMd, /Spring Boot 代码组织/);
-  });
-});
-
-test('initProject can initialize framework files without applying a stack', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-nostack-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-
-  withTempPath(fakeBinDir, () => {
-    const output = initProject({
-      projectDir,
-      agents: ['codex'],
-    });
-
-    assert.match(output, /No stack selected during init/);
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'manifest.json')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'framework-rules.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
-
-    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
-    const stackMd = fs.readFileSync(path.join(projectDir, '.praxis', 'stack.md'), 'utf8');
-    const rulesMd = fs.readFileSync(path.join(projectDir, '.praxis', 'rules.md'), 'utf8');
-
-    assert.equal(manifest.selectedStack, null);
-    assert.match(stackMd, /No Stack Selected/);
-    assert.match(rulesMd, /No Stack Rules Installed/);
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow', 'SKILL.md')));
-  });
-});
-
-test('useStackProject applies a stack after framework init', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-use-stack-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-
-  withTempPath(fakeBinDir, () => {
-    initProject({
-      projectDir,
-      agents: ['codex'],
-    });
-
-    const output = useStackProject({
-      projectDir,
-      stackName: 'java-spring',
-      agents: ['codex'],
-    });
-
-    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
-    const stackMd = fs.readFileSync(path.join(projectDir, '.praxis', 'stack.md'), 'utf8');
-    const rulesMd = fs.readFileSync(path.join(projectDir, '.praxis', 'rules.md'), 'utf8');
-
-    assert.match(output, /Applying stack: java-spring/);
-    assert.equal(manifest.selectedStack, 'java-spring');
-    assert.match(stackMd, /Java \+ Spring Boot/);
-    assert.match(rulesMd, /Spring Boot/);
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
-  });
-});
-
-test('setupProject installs Codex superpowers, initializes, and applies a requested stack', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-'));
-  const fakeGitDir = installFakeGit(projectDir);
-  const fakeNpmDir = installFakeNpm(projectDir);
-  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-'));
-
-  withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
-    const output = setupProject({
-      projectDir,
-      stackName: 'java-spring',
-      agents: ['opencode', 'codex'],
-    });
-
-    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
-    const codexSkillsPath = path.join(fakeHomeDir, '.agents', 'skills', 'superpowers');
-
-    assert.match(output, /== openspec ==/);
-    assert.match(output, /== opencode ==/);
-    assert.match(output, /Configured OpenCode plugins/);
-    assert.match(output, /== codex ==/);
-    assert.match(output, /Cloned Codex SuperPowers/);
-    assert.match(output, /Linked Codex SuperPowers skills/);
-    assert.match(output, /== setup ==/);
-    assert.match(output, /Dependency doctor:/);
-    assert.equal(manifest.selectedStack, 'java-spring');
-    assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
-    assert.ok(fs.existsSync(codexSkillsPath));
-    assert.ok(findSkillMarkdown(codexSkillsPath));
-    assert.doesNotMatch(output, /\[MISSING\] superpowers:codex/);
-  })));
-});
-
-test('setupProject installs OpenSpec locally when runtime is missing', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-install-openspec-'));
-  const fakeGitDir = installFakeGit(projectDir);
-  const fakeNpmDir = installFakeNpm(projectDir);
-  const fakeWhichDir = installFakeWhich(projectDir, null);
-  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-install-'));
-
-  withTempPath(fakeWhichDir, () => withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
-    const output = setupProject({
-      projectDir,
-      agents: ['codex'],
-    });
-
-    assert.match(output, /Installed OpenSpec locally with npm/);
-    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec')));
-  }))));
-});
-
-test('setupProject installs OpenSpec locally on Windows via npm.cmd when runtime is missing', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos setup win openspec-'));
-  const fakeGitDir = installFakeGit(projectDir);
-  const fakeNpmPath = installFakeWindowsNpm(projectDir);
-  const fakeWhereDir = installFakeWhereWithMap(projectDir, {
-    npm: fakeNpmPath.replace(/\.cmd$/i, ''),
-    'npm.cmd': fakeNpmPath,
-  });
-  const fakeCmdShell = installFakeCmdRunner(projectDir);
-  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-win-install-'));
-
-  withPlatform('win32', () => withTempPath(fakeWhereDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => withEnv('ComSpec', fakeCmdShell, () => {
-    const output = setupProject({
-      projectDir,
-      agents: ['claude'],
-    });
-
-    assert.match(output, /Installed OpenSpec locally with npm/);
-    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd')));
-  })))));
-});
-
-test('setupProject skips OpenSpec install when project-local runtime already exists', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-existing-openspec-'));
-  const fakeGitDir = installFakeGit(projectDir);
-  const fakeNpmDir = installFakeNpm(projectDir);
-  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-existing-'));
-  installFakeProjectLocalOpenSpec(projectDir, 'LOCAL');
-
-  withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
-    const output = setupProject({
-      projectDir,
-      agents: ['codex'],
-    });
-
-    assert.match(output, /OpenSpec already available \(project-local\)/);
-    assert.doesNotMatch(output, /Installed OpenSpec locally with npm/);
-  })));
-});
-
-test('doctor warns when Codex superpowers path has no skill content', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-codex-empty-'));
-  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-codex-empty-'));
-  const codexSkillsPath = path.join(fakeHomeDir, '.agents', 'skills', 'superpowers');
-
-  fs.mkdirSync(codexSkillsPath, { recursive: true });
-
-  withEnv('HOME', fakeHomeDir, () => {
-    const output = doctorProject({
-      projectDir,
-      agents: ['codex'],
-    });
-
-    assert.match(output, /\[WARN\] superpowers:codex/);
-    assert.match(output, /no SKILL\.md files were found/);
-  });
-});
-
-test('setupProject surfaces manual action required for claude', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-claude-'));
-  const fakeNpmDir = installFakeNpm(projectDir);
-  const fakeWhichDir = installFakeWhich(projectDir, null);
-
-  withTempPath(fakeWhichDir, () => withTempPath(fakeNpmDir, () => {
-    const output = setupProject({
-      projectDir,
-      agents: ['claude'],
-    });
-
-    assert.match(output, /Manual action required: Claude Code SuperPowers cannot be installed automatically from Praxis/);
-    assert.match(output, /\/plugin install superpowers@claude-plugins-official/);
-  }));
-});
-
-test('initProject repairs incomplete skill directories instead of skipping them', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-repair-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-
-  fs.mkdirSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, '.praxis', 'skills', 'java-security'), { recursive: true });
-
-  withTempPath(fakeBinDir, () => {
-    const output = initProject({
-      projectDir,
-      stackName: 'java-spring',
-      agents: ['codex'],
-    });
-
-    assert.match(output, /repaired from framework defaults/);
-    assert.match(output, /repaired from java-spring/);
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'git-workflow', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'java-security', 'SKILL.md')));
-  });
-});
-
-test('statusProject summarizes initialized project state', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-status-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-
-  withTempPath(fakeBinDir, () => {
-    initProject({
-      projectDir,
-      stackName: 'java-spring',
-      agents: ['codex', 'claude'],
-    });
-
-    fs.mkdirSync(path.join(projectDir, 'openspec', 'changes', 'add-login-audit'), { recursive: true });
-
-    const output = statusProject({
-      projectDir,
-      agents: ['codex', 'claude'],
-    });
-
-    assert.match(output, /initialized: yes/);
-    assert.match(output, /skills index: present/);
-    assert.match(output, /selected stack: java-spring/);
-    assert.match(output, /configured agents: codex, claude/);
-    assert.match(output, /active changes: add-login-audit/);
-    assert.match(output, /Dependencies:/);
-  });
-});
-
-test('syncProject preserves user content and refreshes opencode projection', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-sync-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-
-  withTempPath(fakeBinDir, () => {
-    initProject({
-      projectDir,
-      stackName: 'java-spring',
-      agents: ['codex'],
-    });
-
-    const agentsPath = path.join(projectDir, 'AGENTS.md');
-    fs.writeFileSync(agentsPath, `# User Notes\n\nKeep this section.\n\n${fs.readFileSync(agentsPath, 'utf8')}`);
-    fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode'), { recursive: true });
-    fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode', 'SKILL.md'), '# Custom OpenCode Skill\n');
-
-    const output = syncProject({
-      projectDir,
-      agents: ['opencode', 'codex'],
-    });
-
-    const nextAgents = fs.readFileSync(agentsPath, 'utf8');
-    assert.match(output, /OpenCode adapter synced to \.opencode\//);
-    assert.match(output, /Codex adapter synced via AGENTS\.md/);
-    assert.match(nextAgents, /^<!-- PRAXIS_DEVOS_START -->/);
-    assert.match(nextAgents, /Keep this section\./);
-    assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
-    assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'skills', 'custom-opencode', 'SKILL.md')));
-    assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'stack.md')));
-    assert.ok(!fs.existsSync(path.join(projectDir, '.opencode', 'stack-rules.md')));
-
-    const opencodeReadme = fs.readFileSync(path.join(projectDir, '.opencode', 'README.md'), 'utf8');
-    assert.match(opencodeReadme, /no longer mirrors canonical skills, stack, or rules files by default/);
-    assert.match(opencodeReadme, /supplemental skills/);
-
-    const paths = collectSkillsPaths(projectDir);
-    assert.ok(paths.includes(path.join(projectDir, '.praxis', 'skills')));
-    assert.ok(paths.includes(path.join(projectDir, '.opencode', 'skills')));
-    assert.ok(paths.indexOf(path.join(projectDir, '.praxis', 'skills')) < paths.indexOf(path.join(projectDir, '.opencode', 'skills')));
-  });
-});
-
-test('migrateProject moves legacy opencode assets into canonical praxis state', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-migrate-'));
-
-  fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'legacy-skill'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'legacy-skill', 'SKILL.md'), '# Legacy Skill\n');
-  fs.writeFileSync(path.join(projectDir, '.opencode', 'stack.md'), '# Legacy Stack\n');
-  fs.writeFileSync(path.join(projectDir, '.opencode', 'stack-rules.md'), '# Legacy Rules\n');
-
-  const output = migrateProject({
+  const output = syncProject({
     projectDir,
-    agents: ['codex'],
+    agents: ['codex', 'claude', 'opencode'],
   });
 
-  const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
-  assert.match(output, /Migrated \.opencode\/skills\/legacy-skill\/ to \.praxis\/skills\//);
-  assert.equal(manifest.migratedFrom, '.opencode');
-  assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'skills', 'legacy-skill', 'SKILL.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'stack.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'rules.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+  const agentsMd = fs.readFileSync(agentsPath, 'utf8');
+  assert.match(output, /Synced adapters: codex, claude, opencode/);
+  assert.match(agentsMd, /PRAXIS_DEVOS_START/);
+  assert.match(agentsMd, /Keep this section\./);
+  assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
 });
 
-test('bootstrapProject updates opencode config and prints agent-specific guidance', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bootstrap-'));
+test('initProject bootstraps openspec workspace through a local runtime', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+
+  const output = initProject({
+    projectDir,
+    agents: ['codex', 'opencode'],
+  });
+
+  assert.match(output, /openspec init completed \(project-local\)/);
+  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+});
+
+test('statusProject reports initialized state for the selected agents', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  fs.writeFileSync(
+    path.join(projectDir, 'opencode.json'),
+    JSON.stringify({ plugin: ['superpowers@git+https://github.com/obra/superpowers.git'] }, null, 2),
+  );
+  ensureOpenSpecWorkspace(projectDir);
+
+  const output = statusProject({
+    projectDir,
+    agents: ['opencode'],
+  });
+
+  assert.match(output, /initialized: yes/);
+  assert.match(output, /openspec: \[OK\]/);
+  assert.match(output, /superpowers:opencode: \[OK\]/);
+});
+
+test('bootstrapOpenSpec prefers the local runtime when available', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+
+  const output = bootstrapOpenSpec({ projectDir });
+
+  assert.match(output, /OpenSpec already available \(project-local\)/);
+  assert.match(output, /npx praxis-devos openspec list --specs/);
+});
+
+test('bootstrapProject updates OpenCode plugins and prints runtime guidance', () => {
+  const projectDir = makeTempProject();
 
   const output = bootstrapProject({
     projectDir,
     agents: ['opencode', 'codex', 'claude'],
   });
 
-  const config = readJsonFile(path.join(projectDir, 'opencode.json'));
-  assert.ok(Array.isArray(config.plugin));
-  assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
-  assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
+  const config = readJson(path.join(projectDir, 'opencode.json'));
   assert.match(output, /== opencode ==/);
   assert.match(output, /== codex ==/);
-  assert.match(output, /ln -s ~\/\.codex\/superpowers\/skills ~\/\.agents\/skills\/superpowers/);
   assert.match(output, /== claude ==/);
-  assert.match(output, /\/plugin install superpowers@claude-plugins-official/);
+  assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+  assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
 });
 
-test('bootstrapProject prints PowerShell Codex guidance on Windows', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bootstrap-win-'));
+test('setupProject initializes the current structure for OpenCode without networked side effects', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
 
-  withPlatform('win32', () => {
-    const output = bootstrapProject({
+  const output = setupProject({
+    projectDir,
+    agents: ['opencode'],
+  });
+
+  assert.match(output, /== openspec ==/);
+  assert.match(output, /== opencode ==/);
+  assert.match(output, /Configured OpenCode plugins in/);
+  assert.match(output, /\[OK\] superpowers:opencode/);
+  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
+});
+
+test('setupProject installs Claude SuperPowers with user scope when Claude CLI is available', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-home-'));
+  const fakeClaudeBin = installFakeClaude(fakeHome);
+  installFakeOpenSpec(projectDir);
+
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeClaudeBin, () => {
+    const output = setupProject({
       projectDir,
-      agents: ['codex'],
+      agents: ['claude'],
     });
 
-    assert.match(output, /PowerShell/);
-    assert.match(output, /New-Item -ItemType Junction/);
-    assert.doesNotMatch(output, /ln -s ~\/\.codex\/superpowers\/skills/);
+    assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
+    assert.match(output, /\[OK\] superpowers:claude/);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
+  }));
+});
+
+test('createChangeScaffold remains available as an internal scaffold helper', () => {
+  const projectDir = makeTempProject();
+  ensureOpenSpecWorkspace(projectDir);
+
+  const output = createChangeScaffold({
+    projectDir,
+    title: 'Add Two Factor Auth',
+    summary: 'Harden account access.',
   });
+
+  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth');
+  assert.match(output, /Created OpenSpec full change scaffold: add-two-factor-auth/);
+  assert.match(output, /type: auto -> full/);
+  assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
+  assert.ok(fs.existsSync(path.join(changeDir, 'tasks.md')));
+  assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
 });
 
-test('bootstrapOpenSpec reports project-local runtime when available', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-bootstrap-'));
-  installFakeProjectLocalOpenSpec(projectDir);
+test('runOpenSpecCommand delegates to the resolved OpenSpec runtime', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir, 'WRAPPED');
 
-  const output = bootstrapOpenSpec({ projectDir });
-  assert.match(output, /OpenSpec already available \(project-local\)/);
-  assert.match(output, /npx praxis-devos openspec list --specs/);
-  assert.match(output, /praxis-devos openspec list --specs/);
-});
-
-test('bootstrapOpenSpec reports Windows project-local cmd runtime when available', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win local-'));
-
-  withPlatform('win32', () => {
-    const scriptPath = installFakeWindowsOpenSpec(projectDir, 'local');
-    const output = bootstrapOpenSpec({ projectDir });
-
-    assert.match(output, /OpenSpec already available \(project-local\)/);
-    assert.match(output, new RegExp(scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const output = runOpenSpecCommand({
+    projectDir,
+    args: ['list', '--specs'],
   });
+
+  assert.equal(output, 'WRAPPED:list --specs');
 });
 
-test('runOpenSpecCommand prefers project-local runtime over PATH', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-run-'));
-  const fakeBinDir = installFakeOpenSpec(projectDir);
-  installFakeProjectLocalOpenSpec(projectDir, 'LOCAL');
+test('doctorProject reports current dependency status for OpenCode', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  fs.writeFileSync(
+    path.join(projectDir, 'opencode.json'),
+    JSON.stringify({ plugin: ['praxis-devos@git+https://github.com/chhuax/praxis-devos.git'] }, null, 2),
+  );
 
-  withTempPath(fakeBinDir, () => {
-    const output = runOpenSpecCommand({
+  const output = doctorProject({
+    projectDir,
+    agents: ['opencode'],
+  });
+
+  assert.match(output, /Dependency doctor:/);
+  assert.match(output, /\[OK\] openspec/);
+  assert.match(output, /\[MISSING\] superpowers:opencode/);
+  assert.match(output, /npx praxis-devos setup --agents opencode/);
+});
+
+test('doctorProject reports missing Claude plugin when settings do not contain it', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-missing-'));
+  const fakeClaudeBin = installFakeClaude(fakeHome);
+
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeClaudeBin, () => {
+    const output = doctorProject({
       projectDir,
-      args: ['list', '--specs'],
+      agents: ['claude'],
     });
 
-    assert.equal(output, 'LOCAL:list --specs');
-  });
+    assert.match(output, /\[MISSING\] superpowers:claude/);
+    assert.match(output, /claude plugin install superpowers@claude-plugins-official --scope user/);
+  }));
 });
 
-test('runOpenSpecCommand uses cmd wrapper for Windows project-local openspec.cmd', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win run-'));
+test('analyzeSessionTranscript distinguishes valid and incomplete evidence', () => {
+  const validFixture = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'valid-session.md'),
+    'utf8',
+  );
+  const invalidFixture = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'missing-hooks-session.md'),
+    'utf8',
+  );
 
-  withPlatform('win32', () => {
-    const scriptPath = installFakeWindowsOpenSpec(projectDir, 'local');
-    const cmdShell = installFakeCmdShell(projectDir);
+  const valid = analyzeSessionTranscript(validFixture);
+  const invalid = analyzeSessionTranscript(invalidFixture);
 
-    withEnv('ComSpec', cmdShell, () => {
-      const output = runOpenSpecCommand({
-        projectDir,
-        args: ['list', '--specs'],
-      });
-
-      assert.match(output, new RegExp(`"${scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" list --specs`));
-    });
-  });
+  assert.equal(valid.status, 'pass');
+  assert.equal(valid.findings.length, 0);
+  assert.equal(invalid.status, 'needs-attention');
+  assert.ok(invalid.findings.length > 0);
 });
 
-test('runOpenSpecCommand uses resolved PATH batch runtime on Windows', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win path-'));
+test('validateSessionTranscript returns reports and enforces strict mode', () => {
+  const validFile = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'valid-session.md');
+  const invalidFile = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'missing-hooks-session.md');
 
-  withPlatform('win32', () => {
-    const globalCmdPath = installFakeWindowsOpenSpec(projectDir, 'global');
-    const whereBin = installFakeWhere(projectDir, globalCmdPath);
-    const cmdShell = installFakeCmdShell(projectDir);
+  const report = validateSessionTranscript({ filePath: validFile });
 
-    withTempPath(whereBin, () => withEnv('ComSpec', cmdShell, () => {
-      const output = runOpenSpecCommand({
-        projectDir,
-        args: ['validate', 'add-auth', '--strict'],
-      });
-
-      assert.match(output, new RegExp(`"${globalCmdPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" validate add-auth --strict`));
-    }));
-  });
-});
-
-test('collectSkillsPaths still supports legacy opencode-only projects', () => {
-  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-legacy-skills-'));
-  fs.mkdirSync(path.join(projectDir, '.opencode', 'skills', 'legacy-only'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, '.opencode', 'skills', 'legacy-only', 'SKILL.md'), '# Legacy Only\n');
-
-  const paths = collectSkillsPaths(projectDir);
-  assert.ok(paths.includes(path.join(projectDir, '.opencode', 'skills')));
-});
-
-test('analyzeSessionTranscript recognizes SuperPowers event-hook evidence', () => {
-  const fixturePath = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'valid-session.md');
-  const result = analyzeSessionTranscript(fs.readFileSync(fixturePath, 'utf8'));
-
-  assert.equal(result.status, 'pass');
-  assert.equal(result.findings.length, 0);
-  assert.deepEqual(
-    result.triggered.map((hook) => hook.id),
-    [
-      'proposal-flow',
-      'proposal-ambiguity',
-      'implementation-branch-gate',
-      'multi-step-work',
-      'bug-debugging',
-      'parallel-work',
-      'completion-gate',
-    ],
+  assert.match(report, /status: pass/);
+  assert.match(report, /findings: none/);
+  assert.throws(
+    () => validateSessionTranscript({ filePath: invalidFile, strict: true }),
+    /status: needs-attention/,
   );
 });
 
-test('validateSessionTranscript reports missing event-hook evidence', () => {
-  const fixturePath = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'missing-hooks-session.md');
-  const report = validateSessionTranscript({ filePath: fixturePath });
+test('runCli routes help, openspec, validate-session, and migrate', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir, 'CLI');
+  ensureOpenSpecWorkspace(projectDir);
 
-  assert.match(report, /status: needs-attention/);
-  assert.match(report, /Missing Proposal Intake evidence after proposal flow signal/);
-  assert.match(report, /Missing git-workflow \/ branch check evidence after approved proposal implementation signal/);
-  assert.match(report, /Missing systematic-debugging evidence after bug \/ failure debugging signal/);
-  assert.match(report, /Missing verification-before-completion evidence after completion gate signal/);
-});
+  const help = runCli([]);
+  const openspec = runCli([
+    'openspec',
+    '--project-dir',
+    projectDir,
+    'list',
+    '--specs',
+  ]);
+  const validation = runCli([
+    'validate-session',
+    '--file',
+    path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'valid-session.md'),
+  ]);
+  const migration = runCli([
+    'migrate',
+    '--project-dir',
+    projectDir,
+    '--agent',
+    'codex',
+  ]);
 
-test('runCli validate-session --strict fails when transcript evidence is incomplete', () => {
-  const fixturePath = path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'missing-hooks-session.md');
-
+  assert.match(help, /praxis-devos <command> \[options\]/);
+  assert.equal(openspec, 'CLI:list --specs');
+  assert.match(validation, /status: pass/);
+  assert.match(migration, /Migration completed/);
+  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
   assert.throws(
-    () => runCli(['validate-session', '--file', fixturePath, '--strict']),
-    /Missing Proposal Intake evidence after proposal flow signal/,
+    () => runCli(['change', '--project-dir', projectDir, '--title', 'removed']),
+    /Unknown command: change/,
   );
-});
-
-test('runCli use-stack requires a stack name', () => {
   assert.throws(
-    () => runCli(['use-stack']),
-    /Stack name is required/,
-  );
-});
-
-test('runCli rejects removed --openspec flag with migration guidance', () => {
-  assert.throws(
-    () => runCli(['bootstrap', '--openspec']),
-    /`--openspec` has been removed/,
+    () => runCli(['proposal', '--project-dir', projectDir, '--title', 'removed']),
+    /Unknown command: proposal/,
   );
 });

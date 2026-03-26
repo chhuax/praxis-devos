@@ -18,13 +18,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - name: Show tool versions
         run: |
@@ -37,8 +38,10 @@ jobs:
       - name: CLI smoke checks
         run: |
           node bin/praxis-devos.js help
-          node bin/praxis-devos.js list-stacks
-          node bin/praxis-devos.js status
+          node bin/praxis-devos.js status --agent opencode
+          node bin/praxis-devos.js doctor --agent opencode
+          node bin/praxis-devos.js bootstrap --agent claude
+          node bin/praxis-devos.js validate-session --file test/fixtures/transcripts/valid-session.md
 
       - name: Pack dry run
         run: npm pack --dry-run --json

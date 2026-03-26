@@ -1,4 +1,4 @@
-User: /change add order search filters
+User: /opsx:propose add order search filters
 
 Assistant: 我先进入 proposal flow。
 

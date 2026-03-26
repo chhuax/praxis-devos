@@ -10,12 +10,9 @@
 import {
   bootstrapProject,
   bootstrapOpenSpec,
-  buildSystemPrompt,
-  collectSkillsPaths,
   createChangeScaffold,
   doctorProject,
   initProject,
-  listStacksDetailed,
   migrateProject,
   runOpenSpecCommand,
   statusProject,
@@ -44,35 +41,12 @@ const executeChangeTool = async ({ directory, args }) => {
 };
 
 const PraxisDevOSPlugin = async ({ directory }) => ({
-  config: async (config) => {
-    config.skills = config.skills || {};
-    config.skills.paths = config.skills.paths || [];
-
-    const skillsPaths = collectSkillsPaths(directory);
-    for (const skillsPath of skillsPaths) {
-      if (!config.skills.paths.includes(skillsPath)) {
-        config.skills.paths.push(skillsPath);
-      }
-    }
-  },
-
-  'experimental.chat.system.transform': async (_input, output) => {
-    const prompt = buildSystemPrompt(directory);
-    if (prompt) {
-      (output.system ||= []).push(prompt);
-    }
-  },
-
   tool: {
     'praxis-init': {
-      description: 'Initialize the current project with canonical .praxis assets and sync agent adapters.',
+      description: 'Initialize the current project with OpenSpec layout and sync agent adapters.',
       parameters: {
         type: 'object',
         properties: {
-          stack: {
-            type: 'string',
-            description: 'Tech stack to install (e.g., "java-spring", "starter").',
-          },
           agents: {
             type: 'array',
             items: { type: 'string' },
@@ -84,7 +58,6 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
         try {
           const result = initProject({
             projectDir: directory,
-            stackName: args.stack || null,
             agents: args.agents || SUPPORTED_AGENTS,
           });
           return {
@@ -99,7 +72,7 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
     },
 
     'praxis-sync': {
-      description: 'Refresh agent adapters from canonical .praxis assets.',
+      description: 'Refresh agent adapters and managed blocks.',
       parameters: {
         type: 'object',
         properties: {
@@ -128,7 +101,7 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
     },
 
     'praxis-migrate': {
-      description: 'Migrate legacy .opencode project assets into canonical .praxis assets, then sync adapters.',
+      description: 'Migrate legacy .opencode project assets, then sync adapters.',
       parameters: {
         type: 'object',
         properties: {
@@ -151,29 +124,6 @@ const PraxisDevOSPlugin = async ({ directory }) => ({
         } catch (err) {
           return {
             content: [{ type: 'text', text: `praxis-migrate failed: ${err?.message || String(err)}` }],
-          };
-        }
-      },
-    },
-
-    'praxis-list-stacks': {
-      description: 'List all available technology stacks in praxis-devos.',
-      parameters: { type: 'object', properties: {} },
-      execute: async () => {
-        try {
-          const stacks = listStacksDetailed();
-          return {
-            content: [{
-              type: 'text',
-              text: `Available stacks:\n${stacks.map((stack) => `  ${stack.name} — ${stack.description}`).join('\n')}`,
-            }],
-          };
-        } catch (err) {
-          return {
-            content: [{
-              type: 'text',
-              text: `Failed to list stacks: ${err?.message || String(err)}`,
-            }],
           };
         }
       },
