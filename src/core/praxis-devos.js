@@ -519,6 +519,10 @@ const shiftOptionValue = (args, optionName) => {
   return value;
 };
 
+const throwUnknownOption = (commandName, token) => {
+  throw new Error(`Unknown option for ${commandName}: ${token}`);
+};
+
 const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fallbackContent = '') => {
   const existing = readFile(filePath);
   const managedBlock = `${startMarker}\n${blockContent.trim()}\n${endMarker}`;
@@ -2129,6 +2133,10 @@ export const parseCliArgs = (argv) => {
       throw new Error('`--openspec` has been removed. `bootstrap` always includes OpenSpec. Use `npx praxis-devos bootstrap --agent <name>` or `npx praxis-devos setup --agent <name>`.');
     }
 
+    if (token.startsWith('--')) {
+      throwUnknownOption(parsed.command, token);
+    }
+
     parsed.positional.push(token);
   }
 
@@ -2163,7 +2171,7 @@ const parseOpenSpecCliArgs = (argv) => {
   return parsed;
 };
 
-const parseChangeCliArgs = (argv) => {
+const parseChangeCliArgs = (commandName, argv) => {
   const args = [...argv];
   if (args[0] === 'create') {
     args.shift();
@@ -2220,6 +2228,10 @@ const parseChangeCliArgs = (argv) => {
     if (token === '--lite') {
       parsed.type = 'lite';
       continue;
+    }
+
+    if (token.startsWith('--')) {
+      throwUnknownOption(commandName, token);
     }
 
     titleParts.push(token);
@@ -2571,7 +2583,7 @@ export const runCli = (argv) => {
   }
 
   if (argv[0] === 'change' || argv[0] === 'proposal') {
-    const parsedChange = parseChangeCliArgs(argv.slice(1));
+    const parsedChange = parseChangeCliArgs(argv[0], argv.slice(1));
     return createChangeScaffold(parsedChange);
   }
 

@@ -471,6 +471,20 @@ test('runCli rejects missing values for change scaffold flags', () => {
   );
 });
 
+test('runCli rejects unknown long options for core commands', () => {
+  assert.throws(
+    () => runCli(['doctor', '--strcit']),
+    /Unknown option for doctor: --strcit/,
+  );
+});
+
+test('runCli rejects unknown long options for change scaffold commands', () => {
+  assert.throws(
+    () => runCli(['change', 'create', '--summry', 'tighten cli validation']),
+    /Unknown option for change: --summry/,
+  );
+});
+
 test('doctorProject rejects mixed agent lists with unsupported entries', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-invalid-agents-'));
 
