@@ -882,6 +882,47 @@ test('initProject seeds an ECC hooks adapter placeholder before runtime binding 
   });
 });
 
+test('initProject closes the ECC loop immediately when the runtime is already available on PATH', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-ecc-bound-'));
+  const fakeOpenSpecDir = installFakeOpenSpec(projectDir);
+  const fakeEccDir = installFakeEcc(projectDir);
+
+  withTempPath(fakeOpenSpecDir, () => withTempPath(fakeEccDir, () => {
+    const output = initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
+    const commandsAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const hooksAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'manifest.json'));
+    const status = statusProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /Applying built-in Praxis runtime base/);
+    assert.match(output, /ECC runtime binding detected \(path\)/);
+    assert.doesNotMatch(output, /Bind ECC with `npx praxis-devos bind --ecc-runtime/);
+    assert.equal(manifest.dependencies.ecc.binding.state, 'bound');
+    assert.equal(manifest.dependencies.ecc.binding.source, 'path');
+    assert.equal(foundationManifest.binding.state, 'bound');
+    assert.equal(foundationManifest.binding.source, 'path');
+    assert.equal(commandsAdapterManifest.status, 'ready');
+    assert.equal(commandsAdapterManifest.binding.source, 'path');
+    assert.equal(commandsAdapterManifest.shim?.command, path.join(fakeEccDir, 'ecc'));
+    assert.equal(hooksAdapterManifest.status, 'ready');
+    assert.equal(hooksAdapterManifest.binding.source, 'path');
+    assert.equal(hooksAdapterManifest.descriptor?.command, path.join(fakeEccDir, 'ecc'));
+    assert.ok(fs.existsSync(eccCommandsAdapterShimPath(projectDir)));
+    assert.ok(fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
+    assert.match(status, /ecc binding state: bound/);
+    assert.match(status, /ecc-commands: \[OK\] ECC commands shim is ready/);
+    assert.match(status, /ecc-hooks: \[OK\] ECC hooks descriptor is ready/);
+  }));
+});
+
 test('initProject can skip the default foundation internally', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-no-foundation-'));
   const fakeBinDir = installFakeOpenSpec(projectDir);
@@ -1027,6 +1068,51 @@ test('setupProject applies the default foundation to an initialized project that
     assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.ok(fs.existsSync(path.join(projectDir, '.praxis', 'foundation', 'manifest.json')));
   })));
+});
+
+test('setupProject refreshes ECC foundation binding and adapters for an already initialized project', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-setup-refresh-ecc-binding-'));
+  const fakeOpenSpecDir = installFakeOpenSpec(projectDir);
+  const fakeGitDir = installFakeGit(projectDir);
+  const fakeNpmDir = installFakeNpm(projectDir);
+  const fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-home-refresh-binding-'));
+  const fakeEccDir = installFakeEcc(projectDir);
+
+  withTempPath(fakeOpenSpecDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+  });
+
+  withTempPath(fakeEccDir, () => withTempPath(fakeNpmDir, () => withTempPath(fakeGitDir, () => withEnv('HOME', fakeHomeDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    const manifest = readJsonFile(path.join(projectDir, '.praxis', 'manifest.json'));
+    const foundationManifest = readJsonFile(path.join(projectDir, '.praxis', 'foundation', 'manifest.json'));
+    const foundationReadme = fs.readFileSync(path.join(projectDir, '.praxis', 'foundation', 'README.md'), 'utf8');
+    const commandsAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-commands', 'manifest.json'));
+    const hooksAdapterManifest = readJsonFile(path.join(projectDir, '.praxis', 'adapters', 'ecc-hooks', 'manifest.json'));
+
+    assert.match(output, /Project already initialized; refreshing selected agents and managed adapters\./);
+    assert.match(output, /\.praxis\/foundation\/ binding synced \(path\)/);
+    assert.match(output, /\[OK\] ecc-runtime — ECC runtime CLI is available on PATH/);
+    assert.equal(manifest.dependencies.ecc.binding.state, 'bound');
+    assert.equal(manifest.dependencies.ecc.binding.source, 'path');
+    assert.equal(foundationManifest.binding.state, 'bound');
+    assert.equal(foundationManifest.binding.source, 'path');
+    assert.match(foundationReadme, /ECC binding state: `bound`/);
+    assert.match(foundationReadme, /ECC binding source: `path`/);
+    assert.equal(commandsAdapterManifest.status, 'ready');
+    assert.equal(commandsAdapterManifest.binding.source, 'path');
+    assert.equal(hooksAdapterManifest.status, 'ready');
+    assert.equal(hooksAdapterManifest.binding.source, 'path');
+    assert.ok(fs.existsSync(eccCommandsAdapterShimPath(projectDir)));
+    assert.ok(fs.existsSync(eccHooksAdapterDescriptorPath(projectDir)));
+  }))));
 });
 
 test('setupProject installs OpenSpec locally when runtime is missing', () => {

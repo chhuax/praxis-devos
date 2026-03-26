@@ -1644,13 +1644,26 @@ const syncAgent = ({ projectDir, agent, log }) => {
   throw new Error(`Unsupported agent: ${agent}`);
 };
 
-export const syncProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
+export const syncProject = ({
+  projectDir,
+  agents = SUPPORTED_AGENTS,
+  refreshFoundationBinding = true,
+}) => {
   const logs = [];
   const log = (msg) => logs.push(msg);
 
   const selectedAgents = uniqueAgents(agents);
   ensureFrameworkRulesMirror({ projectDir });
   const manifest = ensurePraxisManifest({ projectDir, agents: selectedAgents });
+  if (refreshFoundationBinding && manifest.selectedFoundation) {
+    const eccBinding = syncFoundationBindingState({
+      projectDir,
+      foundationName: manifest.selectedFoundation || null,
+    });
+    log(eccBinding?.required
+      ? `✓ .praxis/foundation/ binding synced (${eccBinding.source})`
+      : '✓ .praxis/foundation/ synced');
+  }
   ensureProjectSkillsIndex({ projectDir, log });
   ensureCompiledRulesArtifact({ projectDir, log });
   syncEccCommandsAdapter({
@@ -1755,7 +1768,11 @@ export const useStackProject = ({ projectDir, stackName, agents = SUPPORTED_AGEN
   applyStackAssets({ projectDir, stackName: resolvedStack, log });
   ensurePraxisManifest({ projectDir, stackName: resolvedStack, agents: uniqueAgents(agents) });
 
-  const syncLogs = syncProject({ projectDir, agents });
+  const syncLogs = syncProject({
+    projectDir,
+    agents,
+    refreshFoundationBinding: false,
+  });
   if (syncLogs) {
     logs.push(syncLogs);
   }
