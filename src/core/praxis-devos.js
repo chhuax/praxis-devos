@@ -36,6 +36,22 @@ const SUPERPOWERS_DOCS = {
 
 const OPENSPEC_INSTALL_DOC = 'https://github.com/Fission-AI/OpenSpec';
 
+const buildOpenSpecExecOptions = (opts = {}) => {
+  const env = {
+    ...process.env,
+    ...opts.env,
+  };
+
+  if (env.OPENSPEC_TELEMETRY == null && env.DO_NOT_TRACK == null) {
+    env.OPENSPEC_TELEMETRY = '0';
+  }
+
+  return {
+    ...opts,
+    env,
+  };
+};
+
 const AGENTS_MANAGED_START = '<!-- PRAXIS_DEVOS_START -->';
 const AGENTS_MANAGED_END = '<!-- PRAXIS_DEVOS_END -->';
 
@@ -651,9 +667,13 @@ const ensureOpenSpecLayout = ({ projectDir, log }) => {
     );
   }
 
-  const initResult = runFile(runtime.command, ['init', projectDir, '--tools', 'none', '--force'], {
-    cwd: projectDir,
-  });
+  const initResult = runFile(
+    runtime.command,
+    ['init', projectDir, '--tools', 'none', '--force'],
+    buildOpenSpecExecOptions({
+      cwd: projectDir,
+    }),
+  );
   if (initResult.ok) {
     log(`✓ openspec init completed (${runtime.source})`);
     return;
@@ -1589,10 +1609,14 @@ export const runOpenSpecCommand = ({ projectDir, args }) => {
     );
   }
 
-  const result = runFile(runtime.command, args, {
-    cwd: projectDir,
-    timeout: 300_000,
-  });
+  const result = runFile(
+    runtime.command,
+    args,
+    buildOpenSpecExecOptions({
+      cwd: projectDir,
+      timeout: 300_000,
+    }),
+  );
 
   if (!result.ok) {
     throw new Error(result.stderr || 'OpenSpec command failed');

@@ -109,6 +109,29 @@ echo "${label}:$*"
   return scriptPath;
 };
 
+const installFakeProjectLocalOpenSpecTelemetryProbe = (projectDir) => {
+  const binDir = path.join(projectDir, 'node_modules', '.bin');
+  const scriptPath = path.join(binDir, 'openspec');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+cmd="$1"
+target="\${2:-}"
+if [ "$cmd" = "init" ]; then
+  mkdir -p "$target/openspec/changes" "$target/openspec/archive" "$target/openspec/specs"
+  printf '%s' "\${OPENSPEC_TELEMETRY:-unset}" > "$target/openspec/.telemetry"
+  exit 0
+fi
+printf 'TELEMETRY:%s\\nARGS:%s\\n' "\${OPENSPEC_TELEMETRY:-unset}" "$*"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
+  return scriptPath;
+};
+
 const installFakeWindowsOpenSpec = (projectDir, location = 'local') => {
   const baseDir = location === 'local'
     ? path.join(projectDir, 'node_modules', '.bin')
@@ -116,6 +139,24 @@ const installFakeWindowsOpenSpec = (projectDir, location = 'local') => {
   const scriptPath = path.join(baseDir, 'openspec.cmd');
   fs.mkdirSync(baseDir, { recursive: true });
   fs.writeFileSync(scriptPath, '@echo off\r\n');
+  return scriptPath;
+};
+
+const installFakeWindowsOpenSpecTelemetryProbe = (projectDir, location = 'local') => {
+  const baseDir = location === 'local'
+    ? path.join(projectDir, 'node_modules', '.bin')
+    : path.join(projectDir, 'fake-win-bin');
+  const scriptPath = path.join(baseDir, 'openspec.cmd');
+  fs.mkdirSync(baseDir, { recursive: true });
+  fs.writeFileSync(
+    scriptPath,
+    `#!/bin/sh
+set -eu
+printf 'TELEMETRY:%s\\nARGS:%s\\n' "\${OPENSPEC_TELEMETRY:-unset}" "$*"
+`,
+    { mode: 0o755 },
+  );
+  fs.chmodSync(scriptPath, 0o755);
   return scriptPath;
 };
 
@@ -500,6 +541,22 @@ test('initProject installs OpenSpec when runtime is missing', () => {
     assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec')));
     assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes')));
   }));
+});
+
+test('initProject disables OpenSpec telemetry for child runtime invocations by default', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-init-telemetry-'));
+  installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
+
+  initProject({
+    projectDir,
+    agents: ['codex'],
+    applyDefaultFoundation: false,
+  });
+
+  assert.equal(
+    fs.readFileSync(path.join(projectDir, 'openspec', '.telemetry'), 'utf8'),
+    '0',
+  );
 });
 
 test('initProject applies the built-in runtime base by default', () => {
@@ -968,6 +1025,19 @@ test('runOpenSpecCommand prefers project-local runtime over PATH', () => {
   });
 });
 
+test('runOpenSpecCommand disables OpenSpec telemetry by default', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-run-telemetry-'));
+  installFakeProjectLocalOpenSpecTelemetryProbe(projectDir);
+
+  const output = runOpenSpecCommand({
+    projectDir,
+    args: ['list', '--specs'],
+  });
+
+  assert.match(output, /TELEMETRY:0/);
+  assert.match(output, /ARGS:list --specs/);
+});
+
 test('runOpenSpecCommand uses cmd wrapper for Windows project-local openspec.cmd', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win run-'));
 
@@ -982,6 +1052,25 @@ test('runOpenSpecCommand uses cmd wrapper for Windows project-local openspec.cmd
       });
 
       assert.match(output, new RegExp(`"${scriptPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" list --specs`));
+    });
+  });
+});
+
+test('runOpenSpecCommand disables telemetry for Windows batch runtimes by default', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis devos openspec win telemetry-'));
+
+  withPlatform('win32', () => {
+    installFakeWindowsOpenSpecTelemetryProbe(projectDir, 'local');
+    const cmdShell = installFakeCmdRunner(projectDir);
+
+    withEnv('ComSpec', cmdShell, () => {
+      const output = runOpenSpecCommand({
+        projectDir,
+        args: ['list', '--specs'],
+      });
+
+      assert.match(output, /TELEMETRY:0/);
+      assert.match(output, /ARGS:list --specs/);
     });
   });
 });
