@@ -38,9 +38,8 @@ const OPENSPEC_INSTALL_DOC = 'https://github.com/Fission-AI/OpenSpec';
 
 const normalizeEnvFlag = (value) => String(value || '').trim().toLowerCase();
 const isEnvFlagUnset = (value) => value == null || String(value).trim() === '';
-
-const isTelemetryOptOut = (value) => ['1', 'true', 'yes', 'on'].includes(normalizeEnvFlag(value));
-const isTelemetryDisabled = (value) => ['0', 'false', 'no', 'off'].includes(normalizeEnvFlag(value));
+const isEnvFlagEnabled = (value) => ['1', 'true', 'yes', 'on'].includes(normalizeEnvFlag(value));
+const isEnvFlagDisabled = (value) => ['0', 'false', 'no', 'off'].includes(normalizeEnvFlag(value));
 
 const buildOpenSpecExecOptions = (opts = {}) => {
   const env = {
@@ -54,10 +53,14 @@ const buildOpenSpecExecOptions = (opts = {}) => {
   if (openspecTelemetryUnset && doNotTrackUnset) {
     env.OPENSPEC_TELEMETRY = '0';
     env.DO_NOT_TRACK = '1';
-  } else if (openspecTelemetryUnset && isTelemetryOptOut(env.DO_NOT_TRACK)) {
+  } else if (openspecTelemetryUnset && isEnvFlagEnabled(env.DO_NOT_TRACK)) {
     env.OPENSPEC_TELEMETRY = '0';
-  } else if (doNotTrackUnset && isTelemetryDisabled(env.OPENSPEC_TELEMETRY)) {
+  } else if (doNotTrackUnset && isEnvFlagDisabled(env.OPENSPEC_TELEMETRY)) {
     env.DO_NOT_TRACK = '1';
+  } else if (openspecTelemetryUnset && isEnvFlagDisabled(env.DO_NOT_TRACK)) {
+    env.OPENSPEC_TELEMETRY = '1';
+  } else if (doNotTrackUnset && isEnvFlagEnabled(env.OPENSPEC_TELEMETRY)) {
+    env.DO_NOT_TRACK = '0';
   }
 
   return {
