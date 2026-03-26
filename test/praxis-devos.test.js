@@ -337,9 +337,14 @@ test('createChangeScaffold creates a full change by default', () => {
   const specContent = fs.readFileSync(specPath, 'utf8');
 
   assert.match(output, /type: auto -> full/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'proposal.md')));
+  const proposalPath = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'proposal.md');
+  const proposalContent = fs.readFileSync(proposalPath, 'utf8');
+
+  assert.ok(fs.existsSync(proposalPath));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth', 'tasks.md')));
   assert.ok(fs.existsSync(specPath));
+  assert.match(proposalContent, /影响代码：`auth` 对应实现、适配与验证路径/);
+  assert.doesNotMatch(proposalContent, /待补充/);
   assert.match(specContent, /MUST 支持/);
   assert.match(specContent, /SHALL/);
   assert.doesNotMatch(specContent, /TODO:/);

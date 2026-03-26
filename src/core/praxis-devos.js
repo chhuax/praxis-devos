@@ -1458,7 +1458,7 @@ const renderProposalContent = ({ title, summary, changeId, capability, type }) =
     '',
     '## 影响范围',
     `- 影响规范：${capability}`,
-    '- 影响代码：待补充',
+    `- 影响代码：\`${capability}\` 对应实现、适配与验证路径`,
     '',
     '## 备注',
     `- change-id: \`${changeId}\``,
