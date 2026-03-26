@@ -1347,11 +1347,7 @@ const renderFoundationSection = (projectDir) => {
   const foundationManifest = readJson(paths.praxisFoundationManifestPath);
 
   const lines = [
-<<<<<<< HEAD
     '## Praxis Runtime Base',
-=======
-    '## Runtime Baseline',
->>>>>>> feat/ecc-docs
     '',
   ];
 
@@ -2460,17 +2456,10 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
-<<<<<<< HEAD
   setup          Bootstrap dependencies, initialize framework files, apply the built-in Praxis runtime base, and optionally apply a stack
   init           Initialize the framework skeleton and apply the built-in Praxis runtime base in the current project
-  use-stack      Apply a technology stack to an initialized project
-  use-foundation Advanced: re-apply internal runtime-base assets
-=======
-  setup          Recommended first command: install dependencies, initialize project files, sync agents, and optionally apply a stack
-  init           Advanced: initialize project files and the built-in runtime baseline directly
   use-stack      Apply a technology stack after setup or init
-  use-foundation Advanced: apply or re-apply a built-in runtime baseline profile
->>>>>>> feat/ecc-docs
+  use-foundation Advanced: re-apply internal runtime-base assets
   sync           Refresh agent adapters from canonical .praxis assets
   migrate        Move legacy .opencode project assets into .praxis
   change         Create an OpenSpec change scaffold for governance-oriented work
@@ -2481,23 +2470,13 @@ Commands:
   openspec       Run governance-oriented OpenSpec commands through the Praxis wrapper
   validate-session  Validate a transcript against Praxis evidence hooks
   list-stacks    List available technology stacks
-<<<<<<< HEAD
   list-foundations Advanced: list internal runtime-base presets
-=======
-  list-foundations List available built-in runtime baseline bundles
->>>>>>> feat/ecc-docs
   help           Show this help
 
 Options:
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
-<<<<<<< HEAD
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
-=======
-  --foundation <name>    Advanced override for the built-in runtime baseline on setup/init, or pass it positionally to use-foundation
-  --agent <name>         Target one agent
-  --agents a,b,c         Target multiple agents
->>>>>>> feat/ecc-docs
   --project-dir <path>   Project directory (defaults to cwd)
   --file <path>          Transcript file for \`validate-session\`
   --title <text>         Change title for \`change\` / \`proposal\`
