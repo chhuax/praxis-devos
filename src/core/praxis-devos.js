@@ -531,6 +531,38 @@ const throwUnexpectedPositionalArgs = (commandName, positional) => {
   throw new Error(`Unexpected positional argument${positional.length > 1 ? 's' : ''} for ${commandName}: ${positional.join(' ')}`);
 };
 
+const CORE_COMMAND_OPTION_ALLOWLIST = {
+  help: new Set(),
+  'list-stacks': new Set(),
+  'list-foundations': new Set(),
+  setup: new Set(['--stack', '--foundation', '--agent', '--agents', '--project-dir', '--strict']),
+  init: new Set(['--stack', '--foundation', '--agent', '--agents', '--project-dir']),
+  'use-stack': new Set(['--stack', '--project-dir']),
+  'use-foundation': new Set(['--foundation', '--project-dir']),
+  sync: new Set(['--agent', '--agents', '--project-dir']),
+  migrate: new Set(['--project-dir']),
+  status: new Set(['--agent', '--agents', '--project-dir']),
+  doctor: new Set(['--agent', '--agents', '--project-dir', '--strict']),
+  bootstrap: new Set(['--agent', '--agents', '--project-dir']),
+  'validate-session': new Set(['--file', '--strict']),
+};
+
+const validateCliOptionsForCommand = (commandName, usedOptions) => {
+  const allowedOptions = CORE_COMMAND_OPTION_ALLOWLIST[commandName];
+  if (!allowedOptions) {
+    return;
+  }
+
+  const unsupportedOptions = [...usedOptions].filter((option) => !allowedOptions.has(option));
+  if (unsupportedOptions.length === 0) {
+    return;
+  }
+
+  throw new Error(
+    `Unsupported option${unsupportedOptions.length > 1 ? 's' : ''} for ${commandName}: ${unsupportedOptions.join(', ')}`,
+  );
+};
+
 const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fallbackContent = '') => {
   const existing = readFile(filePath);
   const managedBlock = `${startMarker}\n${blockContent.trim()}\n${endMarker}`;
@@ -2098,41 +2130,49 @@ export const parseCliArgs = (argv) => {
     strict: false,
     withOpenSpec: false,
   };
+  const usedOptions = new Set();
 
   while (args.length > 0) {
     const token = args.shift();
 
     if (token === '--stack') {
+      usedOptions.add(token);
       parsed.stack = shiftOptionValue(args, '--stack');
       continue;
     }
 
     if (token === '--foundation') {
+      usedOptions.add(token);
       parsed.foundation = shiftOptionValue(args, '--foundation');
       continue;
     }
 
     if (token === '--agent') {
+      usedOptions.add(token);
       parsed.agents.push(shiftOptionValue(args, '--agent'));
       continue;
     }
 
     if (token === '--agents') {
+      usedOptions.add(token);
       parsed.agents.push(...shiftOptionValue(args, '--agents').split(','));
       continue;
     }
 
     if (token === '--project-dir') {
+      usedOptions.add(token);
       parsed.projectDir = path.resolve(shiftOptionValue(args, '--project-dir'));
       continue;
     }
 
     if (token === '--file') {
+      usedOptions.add(token);
       parsed.file = path.resolve(shiftOptionValue(args, '--file'));
       continue;
     }
 
     if (token === '--strict') {
+      usedOptions.add(token);
       parsed.strict = true;
       continue;
     }
@@ -2157,6 +2197,8 @@ export const parseCliArgs = (argv) => {
   if (usedPositionalFoundation) {
     parsed.foundation = parsed.positional[0];
   }
+
+  validateCliOptionsForCommand(parsed.command, usedOptions);
 
   if (parsed.command === 'use-stack') {
     const allowedPositionals = usedPositionalStack ? 1 : 0;
@@ -2594,6 +2636,7 @@ Commands:
 
 Options:
   --stack <name>         Select a technology stack for setup/init, or pass it positionally to use-stack
+  --foundation <name>    Select a runtime base for setup/init, or pass it positionally to use-foundation
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
@@ -2603,7 +2646,7 @@ Options:
   --change-id <id>       Explicit change-id for \`change\`
   --type <mode>          Scaffold type: auto, full, or lite
   --summary <text>       One-line summary for proposal scaffolding
-  --strict               Fail doctor if required dependencies are missing
+  --strict               Fail doctor on missing dependencies or validate-session on missing evidence
 
 Supported agents:
   ${SUPPORTED_AGENTS.join(', ')}

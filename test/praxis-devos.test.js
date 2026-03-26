@@ -362,7 +362,7 @@ test('renderHelp exposes change and proposal commands', () => {
   assert.match(help, /use-stack\s+Apply a technology stack after setup or init/);
   assert.match(help, /list-foundations\s+Advanced: list internal runtime-base presets/);
   assert.match(help, /validate-session\s+Validate a transcript against Praxis evidence hooks/);
-  assert.doesNotMatch(help, /--foundation <name>/);
+  assert.match(help, /--foundation <name>/);
   assert.doesNotMatch(help, /--openspec/);
 });
 
@@ -489,6 +489,34 @@ test('runCli rejects unknown short options for core commands', () => {
   assert.throws(
     () => runCli(['doctor', '-s']),
     /Unknown option for doctor: -s/,
+  );
+});
+
+test('runCli rejects known but unsupported options for doctor', () => {
+  assert.throws(
+    () => runCli(['doctor', '--stack', 'java-spring']),
+    /Unsupported option for doctor: --stack/,
+  );
+});
+
+test('runCli rejects known but unsupported options for status', () => {
+  assert.throws(
+    () => runCli(['status', '--file', 'session.md']),
+    /Unsupported option for status: --file/,
+  );
+});
+
+test('runCli rejects known but unsupported options for validate-session', () => {
+  assert.throws(
+    () => runCli(['validate-session', '--project-dir', '.']),
+    /Unsupported option for validate-session: --project-dir/,
+  );
+});
+
+test('runCli rejects known but unsupported options for init', () => {
+  assert.throws(
+    () => runCli(['init', '--strict']),
+    /Unsupported option for init: --strict/,
   );
 });
 
