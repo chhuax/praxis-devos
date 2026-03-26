@@ -506,6 +506,24 @@ test('runCli rejects unknown short options for change scaffold commands', () => 
   );
 });
 
+test('runCli rejects positional args when change scaffold already received --title', () => {
+  const projectDir = makeTempProject();
+
+  assert.throws(
+    () => runCli(['change', 'create', '--project-dir', projectDir, '--title', 'Tighten CLI validation', 'extra']),
+    /Unexpected positional argument for change: extra/,
+  );
+});
+
+test('runCli rejects positional args when proposal alias already received --title', () => {
+  const projectDir = makeTempProject();
+
+  assert.throws(
+    () => runCli(['proposal', 'create', '--project-dir', projectDir, '--title', 'Tighten CLI validation', 'extra']),
+    /Unexpected positional argument for proposal: extra/,
+  );
+});
+
 test('doctorProject rejects mixed agent lists with unsupported entries', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-invalid-agents-'));
 

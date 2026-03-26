@@ -2216,6 +2216,7 @@ const parseChangeCliArgs = (commandName, argv) => {
     type: 'auto',
   };
   const titleParts = [];
+  let titleProvided = false;
 
   while (args.length > 0) {
     const token = args.shift();
@@ -2227,6 +2228,7 @@ const parseChangeCliArgs = (commandName, argv) => {
 
     if (token === '--title') {
       parsed.title = shiftOptionValue(args, '--title');
+      titleProvided = true;
       continue;
     }
 
@@ -2269,6 +2271,10 @@ const parseChangeCliArgs = (commandName, argv) => {
 
   if (!parsed.title && titleParts.length > 0) {
     parsed.title = titleParts.join(' ');
+  }
+
+  if (titleProvided && titleParts.length > 0) {
+    throwUnexpectedPositionalArgs(commandName, titleParts);
   }
 
   return parsed;
