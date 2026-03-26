@@ -450,6 +450,27 @@ test('runCli rejects unsupported agent names instead of ignoring them', () => {
   );
 });
 
+test('runCli rejects missing values for agent flags before consuming the next option', () => {
+  assert.throws(
+    () => runCli(['doctor', '--agent', '--strict']),
+    /Missing value for --agent/,
+  );
+});
+
+test('runCli rejects missing values for openspec project-dir flag', () => {
+  assert.throws(
+    () => runCli(['openspec', '--project-dir']),
+    /Missing value for --project-dir/,
+  );
+});
+
+test('runCli rejects missing values for change scaffold flags', () => {
+  assert.throws(
+    () => runCli(['change', 'create', '--summary']),
+    /Missing value for --summary/,
+  );
+});
+
 test('doctorProject rejects mixed agent lists with unsupported entries', () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-invalid-agents-'));
 

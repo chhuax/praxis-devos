@@ -510,6 +510,15 @@ const uniqueAgents = (agents = []) => {
   return deduped;
 };
 
+const shiftOptionValue = (args, optionName) => {
+  const value = args.shift();
+  if (!value || value.startsWith('--')) {
+    throw new Error(`Missing value for ${optionName}`);
+  }
+
+  return value;
+};
+
 const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fallbackContent = '') => {
   const existing = readFile(filePath);
   const managedBlock = `${startMarker}\n${blockContent.trim()}\n${endMarker}`;
@@ -2082,34 +2091,32 @@ export const parseCliArgs = (argv) => {
     const token = args.shift();
 
     if (token === '--stack') {
-      parsed.stack = args.shift() || null;
+      parsed.stack = shiftOptionValue(args, '--stack');
       continue;
     }
 
     if (token === '--foundation') {
-      parsed.foundation = args.shift() || null;
+      parsed.foundation = shiftOptionValue(args, '--foundation');
       continue;
     }
 
     if (token === '--agent') {
-      const agent = args.shift();
-      if (agent) parsed.agents.push(agent);
+      parsed.agents.push(shiftOptionValue(args, '--agent'));
       continue;
     }
 
     if (token === '--agents') {
-      const value = args.shift();
-      if (value) parsed.agents.push(...value.split(','));
+      parsed.agents.push(...shiftOptionValue(args, '--agents').split(','));
       continue;
     }
 
     if (token === '--project-dir') {
-      parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
+      parsed.projectDir = path.resolve(shiftOptionValue(args, '--project-dir'));
       continue;
     }
 
     if (token === '--file') {
-      parsed.file = path.resolve(args.shift() || parsed.projectDir);
+      parsed.file = path.resolve(shiftOptionValue(args, '--file'));
       continue;
     }
 
@@ -2146,7 +2153,7 @@ const parseOpenSpecCliArgs = (argv) => {
   while (args.length > 0) {
     const token = args.shift();
     if (token === '--project-dir') {
-      parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
+      parsed.projectDir = path.resolve(shiftOptionValue(args, '--project-dir'));
       continue;
     }
 
@@ -2176,32 +2183,32 @@ const parseChangeCliArgs = (argv) => {
     const token = args.shift();
 
     if (token === '--project-dir') {
-      parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
+      parsed.projectDir = path.resolve(shiftOptionValue(args, '--project-dir'));
       continue;
     }
 
     if (token === '--title') {
-      parsed.title = args.shift() || '';
+      parsed.title = shiftOptionValue(args, '--title');
       continue;
     }
 
     if (token === '--summary') {
-      parsed.summary = args.shift() || '';
+      parsed.summary = shiftOptionValue(args, '--summary');
       continue;
     }
 
     if (token === '--capability') {
-      parsed.capability = args.shift() || null;
+      parsed.capability = shiftOptionValue(args, '--capability');
       continue;
     }
 
     if (token === '--change-id') {
-      parsed.changeId = args.shift() || null;
+      parsed.changeId = shiftOptionValue(args, '--change-id');
       continue;
     }
 
     if (token === '--type') {
-      parsed.type = args.shift() || 'auto';
+      parsed.type = shiftOptionValue(args, '--type');
       continue;
     }
 
