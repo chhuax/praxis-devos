@@ -770,6 +770,8 @@ test('initProject applies the built-in runtime base by default', () => {
 
     assert.match(output, /Applying built-in Praxis runtime base/);
     assert.match(output, /ECC runtime binding not detected yet/);
+    assert.match(output, /Bind ECC with `npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime`/);
+    assert.match(output, /Verify with `npx praxis-devos status`/);
     assert.equal(manifest.selectedFoundation, 'ecc-foundation');
     assert.equal(manifest.foundationProfile, 'internal-base');
     assert.deepEqual(manifest.foundationOverlays, ['ecc-runtime-base', 'internal-extension-points']);
@@ -1084,7 +1086,8 @@ test('statusProject summarizes initialized project state', () => {
     assert.match(output, /runtime profile: internal-base/);
     assert.match(output, /ecc binding state: unbound/);
     assert.match(output, /ecc binding source: missing/);
-    assert.match(output, /ecc remediation: npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime/);
+    assert.match(output, /ecc remediation: Bind ECC with `npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime`/);
+    assert.match(output, /ecc verify: Verify with `npx praxis-devos status`/);
     assert.match(output, /overlay directories: ecc-runtime-base, internal-extension-points/);
     assert.match(output, /configured agents: codex, claude/);
     assert.match(output, /active changes: add-login-audit/);
@@ -1117,6 +1120,36 @@ test('statusProject reports bound ECC runtime when ecc is available on PATH', ()
     assert.match(output, /ecc binding source: path/);
     assert.match(output, /ecc-runtime: \[OK\] ECC runtime CLI is available on PATH/);
   }));
+});
+
+test('statusProject surfaces stale project-level ECC bindings with a concrete remediation target', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-status-ecc-stale-'));
+  const fakeOpenSpecDir = installFakeOpenSpec(projectDir);
+  const stalePath = path.join(projectDir, 'missing-ecc-runtime');
+
+  withTempPath(fakeOpenSpecDir, () => {
+    initProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    fs.writeFileSync(
+      path.join(projectDir, '.praxis', 'ecc-binding.json'),
+      `${JSON.stringify({ path: stalePath }, null, 2)}\n`,
+    );
+
+    const output = statusProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /ecc binding state: unbound/);
+    assert.match(output, /ecc binding source: project-binding/);
+    assert.match(output, /ecc current binding: \.praxis\/ecc-binding\.json -> /);
+    assert.match(output, new RegExp(stalePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(output, /ecc remediation: Re-bind ECC with `npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime`/);
+    assert.match(output, /ecc verify: Verify with `npx praxis-devos status`/);
+  });
 });
 
 test('runCli bind stores project-level ECC binding and refreshes manifest state', () => {
@@ -1179,6 +1212,29 @@ test('doctorProject strict fails when ECC runtime is missing for an ECC-bound pr
       () => doctorProject({ projectDir, agents: ['opencode'], strict: true }),
       /Bind ECC with `npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime`/,
     );
+  });
+});
+
+test('doctorProject recommends bind before setup when ECC runtime is the remaining issue', () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-ecc-remediate-'));
+  const fakeBinDir = installFakeOpenSpec(projectDir);
+
+  withTempPath(fakeBinDir, () => {
+    initProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+    bootstrapProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const output = doctorProject({ projectDir, agents: ['opencode'] });
+
+    assert.match(output, /Recommended next step:/);
+    assert.match(output, /- Bind ECC with `npx praxis-devos bind --ecc-runtime \/path\/to\/ecc-runtime`/);
+    assert.match(output, /- Verify with `npx praxis-devos doctor --strict`/);
+    assert.doesNotMatch(output, /- npx praxis-devos setup --agents opencode/);
   });
 });
 

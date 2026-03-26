@@ -818,6 +818,29 @@ const resolveEccBinding = ({ projectDir, foundationName = null }) => {
   };
 };
 
+const buildEccRemediationPlan = (eccBinding) => {
+  if (!eccBinding?.required || eccBinding.status === 'ok') {
+    return null;
+  }
+
+  const envName = eccBinding.source.startsWith('env:')
+    ? eccBinding.source.slice(4)
+    : null;
+  const bindingTarget = eccBinding.source === 'project-binding' && eccBinding.path
+    ? `.praxis/${ECC_BINDING_CONFIG} -> ${eccBinding.path}`
+    : (envName && eccBinding.path ? `${envName} -> ${eccBinding.path}` : null);
+
+  return {
+    action: envName
+      ? `Fix \`${envName}\` or bind ECC with \`${ECC_BIND_COMMAND}\``
+      : `${eccBinding.source === 'project-binding' ? 'Re-bind' : 'Bind'} ECC with \`${ECC_BIND_COMMAND}\``,
+    bindingTarget,
+    verifyStatus: 'Verify with `npx praxis-devos status`',
+    verifyDoctor: 'Verify with `npx praxis-devos doctor --strict`',
+    alternative: 'Alternative: PRAXIS_ECC_RUNTIME=/path/to/ecc-runtime, ECC_RUNTIME_DIR=/path/to/ecc-runtime, ECC_HOME=/path/to/ecc-runtime, or expose `ecc` on PATH',
+  };
+};
+
 const buildProjectDependencies = ({ projectDir, selectedFoundation, existingDependencies = {} }) => {
   const detectedAt = new Date().toISOString();
   const eccBinding = resolveEccBinding({
@@ -1738,12 +1761,21 @@ export const useFoundationProject = ({ projectDir, foundationName, agents = SUPP
   });
 
   if (definition.runtimeBase === 'ecc') {
+    const remediation = buildEccRemediationPlan(eccBinding);
     if (eccBinding.status === 'ok') {
       log(`✓ ECC runtime binding detected (${eccBinding.source})`);
     } else if (eccBinding.status === 'warning') {
       log(`! ECC runtime binding warning: ${eccBinding.detail}`);
     } else {
       log(`⊘ ECC runtime binding not detected yet; run \`${ECC_BIND_COMMAND}\`, bind PRAXIS_ECC_RUNTIME, ECC_RUNTIME_DIR, ECC_HOME, or put \`ecc\` on PATH`);
+    }
+
+    if (remediation) {
+      if (remediation.bindingTarget) {
+        log(`- Current ECC binding target: ${remediation.bindingTarget}`);
+      }
+      log(`- ${remediation.action}`);
+      log(`- ${remediation.verifyStatus}`);
     }
   }
 
@@ -1848,7 +1880,12 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   lines.push(`- adapters: ${adapterStatuses.map((adapter) => `${adapter.name}=${adapter.ok ? 'ready' : 'missing'}`).join(', ')}`);
   lines.push(`- active changes: ${activeChanges.length > 0 ? activeChanges.join(', ') : 'none'}`);
   if (eccBinding.required && eccBinding.status !== 'ok') {
-    lines.push(`- ecc remediation: ${ECC_BIND_COMMAND}`);
+    const remediation = buildEccRemediationPlan(eccBinding);
+    if (remediation?.bindingTarget) {
+      lines.push(`- ecc current binding: ${remediation.bindingTarget}`);
+    }
+    lines.push(`- ecc remediation: ${remediation?.action || `Bind ECC with \`${ECC_BIND_COMMAND}\``}`);
+    lines.push(`- ecc verify: ${remediation?.verifyStatus || 'Verify with `npx praxis-devos status`'}`);
   }
   lines.push('');
   lines.push('Dependencies:');
@@ -2439,11 +2476,23 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
 
   lines.push('');
   lines.push('Recommended next step:');
-  lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  const eccRemediation = buildEccRemediationPlan(eccBinding);
+  if (eccRemediation) {
+    lines.push(`- ${eccRemediation.action}`);
+    if (eccRemediation.bindingTarget) {
+      lines.push(`- Current ECC binding target: ${eccRemediation.bindingTarget}`);
+    }
+    lines.push(`- ${eccRemediation.verifyDoctor}`);
+    lines.push(`- ${eccRemediation.alternative}`);
+  }
 
-  if (eccBinding.required && eccBinding.status !== 'ok') {
-    lines.push(`- Bind ECC with \`${ECC_BIND_COMMAND}\``);
-    lines.push('- Alternative: PRAXIS_ECC_RUNTIME=/path/to/ecc-runtime, ECC_RUNTIME_DIR=/path/to/ecc-runtime, ECC_HOME=/path/to/ecc-runtime, or expose `ecc` on PATH');
+  const setupRequired = results.some((result) => result.name !== 'ecc-runtime' && result.status !== 'ok');
+  if (setupRequired) {
+    lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  }
+
+  if (!eccRemediation && !setupRequired) {
+    lines.push('- No repair action required.');
   }
 
   lines.push('');
