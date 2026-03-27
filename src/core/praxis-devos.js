@@ -1502,13 +1502,10 @@ const SESSION_EVENT_RULES = [
         ],
       },
       {
-        id: 'openspec',
-        label: 'openspec',
+        id: 'native-openspec-proposal',
+        label: 'native OpenSpec proposal execution',
         patterns: [
-          /openspec\/AGENTS\.md/i,
-          /praxis-devos openspec/i,
-          /\bopenspec\b/i,
-          /spec delta/i,
+          /openspec new change\b/i,
         ],
       },
     ],

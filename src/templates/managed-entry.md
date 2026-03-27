@@ -21,4 +21,5 @@
 - 需要隔离工作区时，显式加载 `superpowers:using-git-worktrees`；否则按项目默认分支门禁执行
 - 出现 bug、失败测试、异常、回归时，必须显式加载 `superpowers:systematic-debugging`，先做根因排查，再修改代码
 - 准备完成、提 PR、合并前，必须显式加载 `superpowers:verification-before-completion` 并记录实际验证结果
-- 涉及 OpenSpec 操作时，统一通过 `npx praxis-devos openspec ...`
+- 提案/探索阶段必须走原生 OpenSpec proposal 流程：先用 `/opsx:propose`、`/opsx:explore` 进入，再执行 `openspec new change ...` 等原生命令创建/推进 proposal
+- `npx praxis-devos openspec ...` 仅用于直接 CLI 调用（例如 `validate`、`list`），不能替代原生 proposal 流程

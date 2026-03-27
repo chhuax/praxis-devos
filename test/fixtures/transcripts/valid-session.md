@@ -9,6 +9,7 @@ Assistant: 我先进入 proposal flow。
 - open questions: 过滤字段是否允许组合使用，存在边界分歧
 
 Assistant: 我会读取 openspec/AGENTS.md，并显式加载 openspec skill。
+Assistant: 我会按原生 OpenSpec proposal 流程执行 `openspec new change "add-order-search-filters"`，然后继续生成 proposal artifacts。
 Assistant: 这个提案存在方案比较，我先进入 brainstorming，收敛范围并记录边界收敛结论。
 Assistant: 已创建 proposal.md、spec delta、tasks.md。
 
