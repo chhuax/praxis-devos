@@ -76,7 +76,6 @@ npx praxis-devos doctor --strict
 | `status` | Show current project/runtime state |
 | `doctor` | Check OpenSpec and SuperPowers dependencies |
 | `bootstrap` | Print repair/install guidance without full setup |
-| `openspec` | Pass through to the resolved OpenSpec runtime |
 | `validate-session` | Validate a transcript against Praxis hook evidence |
 
 ## Runtime Behavior
@@ -104,12 +103,15 @@ Managed entry blocks tell agents to:
 
 - use `/opsx:propose` or `/opsx:explore` for proposal/exploration flow
 - perform Proposal Intake before implementation
-- load `superpowers:brainstorming` when proposal scope is still unclear
-- load `superpowers:writing-plans` before multi-step implementation
-- load `superpowers:subagent-driven-development` when parallel execution is appropriate
-- load `superpowers:systematic-debugging` before fixing a bug or failed test
-- load `superpowers:verification-before-completion` before claiming work is done
-- use `npx praxis-devos openspec ...` for OpenSpec operations
+- treat OpenSpec as the only visible workflow once an OpenSpec stage is active
+- use SuperPowers only as stage-local execution method, without a second workflow announcement
+- keep brainstorming/planning/debugging/verification outputs inside the current `openspec/changes/<change>/...` artifacts
+
+Praxis does not currently fork or override the upstream SuperPowers plugin. The coordination contract is enforced through:
+
+- managed entry blocks in `AGENTS.md` / `CLAUDE.md`
+- projected OpenSpec skills (`opsx-*`) that define OpenSpec as the outer workflow
+- transcript/session validation rules that flag duplicate workflow announcements or `docs/superpowers/...` outputs inside OpenSpec flow
 
 ## Enterprise Extension Packs
 

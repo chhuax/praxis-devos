@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-03-27
+
+### Changed
+- tightened managed entry routing so only clearly small, low-risk work can skip OpenSpec proposal flow
+- clarified that `superpowers:brainstorming` is a proposal-prep aid, not a replacement for native OpenSpec proposal execution
+- clarified that `superpowers:writing-plans` must attach to an approved OpenSpec change instead of creating a parallel planning document flow
+
+### Fixed
+- `validate-session` now rejects transcripts that enter `writing-plans` before Proposal Intake and native OpenSpec proposal execution evidence
+- added regression coverage for the planning-before-proposal failure path
+
 ## [0.4.1] - 2026-03-27
 
 ### Fixed
