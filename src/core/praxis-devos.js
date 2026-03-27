@@ -190,8 +190,8 @@ const runFile = (cmd, args, opts = {}) => {
 };
 
 const codexSuperpowersPaths = () => ({
-  skillsPath: path.join(resolveUserHomeDir(), '.agents', 'skills', 'superpowers'),
-  skillsParent: path.join(resolveUserHomeDir(), '.agents', 'skills'),
+  skillsPath: path.join(resolveUserHomeDir(), '.codex', 'skills', 'superpowers'),
+  skillsParent: path.join(resolveUserHomeDir(), '.codex', 'skills'),
   clonePath: path.join(resolveUserHomeDir(), '.codex', 'superpowers'),
   cloneParent: path.join(resolveUserHomeDir(), '.codex'),
 });
@@ -482,6 +482,15 @@ const renderManagedBlock = () => {
   return renderManagedEntryTemplate();
 };
 
+const renderClaudeManagedBlock = () => {
+  return [
+    '@AGENTS.md',
+    '',
+    '> Claude Code 通过 `CLAUDE.md` 读取项目指令；共享项目规则统一维护在 `AGENTS.md`。',
+    '> 如需 Claude 专属补充，请只在此文件追加少量差异内容，不要复制 `AGENTS.md` 全文。',
+  ].join('\n');
+};
+
 const syncCodexAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
   const status = upsertManagedBlock(
@@ -501,7 +510,7 @@ const syncClaudeAdapter = ({ projectDir, log }) => {
     paths.rootClaudeMd,
     CLAUDE_MANAGED_START,
     CLAUDE_MANAGED_END,
-    renderManagedBlock(),
+    renderClaudeManagedBlock(),
     CLAUDE_MD_TEMPLATE,
   );
 
@@ -954,7 +963,7 @@ const detectCodexSuperpowers = () => {
 
     return {
       status: 'warning',
-      detail: `Found clone at ${clonePath}, but ~/.agents/skills/superpowers is missing`,
+      detail: `Found clone at ${clonePath}, but ~/.codex/skills/superpowers is missing`,
     };
   }
 
@@ -1166,9 +1175,9 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
         '- Clone the repo:',
         '  git clone https://github.com/obra/superpowers.git "$HOME/.codex/superpowers"',
         '- Create the skills directory:',
-        '  New-Item -ItemType Directory -Force "$HOME/.agents/skills" | Out-Null',
+        '  New-Item -ItemType Directory -Force "$HOME/.codex/skills" | Out-Null',
         '- Link the skills directory (junction avoids Windows symlink privilege issues):',
-        '  New-Item -ItemType Junction -Path "$HOME/.agents/skills/superpowers" -Target "$HOME/.codex/superpowers/skills"',
+        '  New-Item -ItemType Junction -Path "$HOME/.codex/skills/superpowers" -Target "$HOME/.codex/superpowers/skills"',
         '- Restart Codex',
         '- Optional: enable multi-agent in Codex config if you want subagent skills',
       ].join('\n');
@@ -1180,8 +1189,8 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
       '- Clone the repo:',
       '  git clone https://github.com/obra/superpowers.git ~/.codex/superpowers',
       '- Create the skills symlink:',
-      '  mkdir -p ~/.agents/skills',
-      '  ln -s ~/.codex/superpowers/skills ~/.agents/skills/superpowers',
+      '  mkdir -p ~/.codex/skills',
+      '  ln -s ~/.codex/superpowers/skills ~/.codex/skills/superpowers',
       '- Restart Codex',
       '- Optional: enable multi-agent in Codex config if you want subagent skills',
     ].join('\n');
@@ -1261,7 +1270,6 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
   }
 
   for (const agent of selectedAgents) {
-    if (agent === 'opencode') continue;
     const projections = detectForAgent(agent);
     const expected = expectedSkillNames();
     const found = projections.map((p) => p.name);

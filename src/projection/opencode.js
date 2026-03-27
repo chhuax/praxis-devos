@@ -1,14 +1,61 @@
-/**
- * OpenCode projection — placeholder.
- * OpenCode skill discovery is currently handled via plugin system prompt injection,
- * so native file projection is not yet required.
- */
+import fs from 'fs';
+import path from 'path';
+import { buildMarker, injectMarker, isProjection } from './markers.js';
+import { resolveUserHomeDir } from '../support/home.js';
 
-export const projectSkills = ({ log }) => {
-  log('⊘ OpenCode: skill projection handled via plugin, no native file projection needed');
-  return [];
+const openCodeSkillsDir = () => path.join(resolveUserHomeDir(), '.claude', 'skills');
+
+const ensureDir = (dirPath) => {
+  fs.mkdirSync(dirPath, { recursive: true });
 };
 
-export const detectProjections = () => [];
+/**
+ * Project OpenSpec skills to ~/.claude/skills/ as shared skill directories with SKILL.md.
+ * This mirrors the user-home shared skill drop used by OpenCode integrations.
+ */
+export const projectSkills = ({ skillSources, version, log }) => {
+  ensureDir(openCodeSkillsDir());
+  const results = [];
 
-export const cleanStaleProjections = () => {};
+  for (const { name, sourcePath } of skillSources) {
+    const targetDir = path.join(openCodeSkillsDir(), name);
+    const targetPath = path.join(targetDir, 'SKILL.md');
+    ensureDir(targetDir);
+
+    const content = fs.readFileSync(sourcePath, 'utf8');
+    const marker = buildMarker({ source: path.relative(process.cwd(), sourcePath), version });
+    const projected = injectMarker(content, marker);
+
+    fs.writeFileSync(targetPath, projected, 'utf8');
+    results.push({ name, targetPath, status: 'projected' });
+    log(`✓ OpenCode: projected ${name} → ${targetPath}`);
+  }
+
+  return results;
+};
+
+export const detectProjections = () => {
+  if (!fs.existsSync(openCodeSkillsDir())) {
+    return [];
+  }
+
+  const dirs = fs.readdirSync(openCodeSkillsDir(), { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name.startsWith('opsx-'));
+
+  return dirs
+    .map((d) => {
+      const skillMd = path.join(openCodeSkillsDir(), d.name, 'SKILL.md');
+      return { name: d.name, path: skillMd, isProjection: isProjection(skillMd) };
+    })
+    .filter((entry) => entry.isProjection);
+};
+
+export const cleanStaleProjections = ({ validNames, log }) => {
+  const existing = detectProjections();
+  for (const entry of existing) {
+    if (!validNames.includes(entry.name)) {
+      fs.rmSync(path.dirname(entry.path), { recursive: true, force: true });
+      log(`✓ OpenCode: removed stale projection ${entry.name}`);
+    }
+  }
+};

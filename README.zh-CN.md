@@ -22,12 +22,14 @@
 
 ```text
 your-project/
-├── AGENTS.md          # Codex 托管入口区块
-├── CLAUDE.md          # Claude Code 托管入口区块
+├── AGENTS.md          # Codex / OpenCode 共享项目规则
+├── CLAUDE.md          # 通过 @AGENTS.md 引入共享规则的薄包装
 ├── openspec/          # OpenSpec 工作区
 ├── .opencode/         # 选中 OpenCode 时生成的最小兼容目录
 └── opencode.json      # OpenCode 插件配置
 ```
+
+`AGENTS.md` 是跨 agent 的共享项目规则文件；`CLAUDE.md` 保持很薄，只通过 `@AGENTS.md` 引入共享规则，避免再复制一份。
 
 ## 快速开始
 
@@ -85,21 +87,22 @@ npx praxis-devos doctor --strict
 - 确保 OpenSpec 可用；缺失时自动安装项目本地版本
 - 为所选 agent 自动安装或配置 SuperPowers
 - 创建或刷新 `openspec/`
-- 将托管区块写入 `AGENTS.md` 和 `CLAUDE.md`
+- 将共享托管规则写入 `AGENTS.md`
+- 在 `CLAUDE.md` 中写入引用 `@AGENTS.md` 的薄包装
 - 为 OpenCode 创建最小 `.opencode/README.md` 兼容目录
 - 在 setup 结束后执行依赖检查
 
 各 agent 当前行为：
 
-- OpenCode：向 `opencode.json` 写入插件声明
-- Codex：将 SuperPowers clone 到 `~/.codex/superpowers`，并把 skills 链接到 `~/.agents/skills/superpowers`
+- OpenCode：向 `opencode.json` 写入插件声明，并把共享 OpenSpec skills 投放到 `~/.claude/skills`
+- Codex：将 SuperPowers clone 到 `~/.codex/superpowers`，并把 skills 链接到 `~/.codex/skills/superpowers`
 - Claude Code：执行 `claude plugin install superpowers@claude-plugins-official --scope user`
 
 ## OpenSpec 与 SuperPowers 的结合方式
 
 Praxis 不替代 OpenSpec 或 SuperPowers，而是把两者编排到一起。
 
-托管入口区块会要求 agent：
+托管项目规则会要求 agent：
 
 - 用 `/opsx:propose` 或 `/opsx:explore` 进入提案/探索流程
 - 在进入实现前先完成 Proposal Intake
@@ -109,7 +112,7 @@ Praxis 不替代 OpenSpec 或 SuperPowers，而是把两者编排到一起。
 
 Praxis 目前不会 fork 或覆盖上游 SuperPowers 插件。当前的协调方式由三层构成：
 
-- `AGENTS.md` / `CLAUDE.md` 中的托管入口规则
+- `AGENTS.md` 中的共享托管规则，以及负责引入它的薄 `CLAUDE.md`
 - 投影后的 OpenSpec `opsx-*` skills，它们定义 OpenSpec 是外层主流程
 - transcript/session validator，它会拦截 OpenSpec flow 中重复的流程公告或写入 `docs/superpowers/...` 的输出
 
@@ -148,7 +151,7 @@ assets/            # 内置 OpenSpec skill 资产
 bin/               # 发布后的 CLI 入口
 src/core/          # setup/doctor/sync 等主逻辑
 src/projection/    # 各 agent 的 projection 逻辑
-src/templates/     # 托管入口区块模板
+src/templates/     # AGENTS.md 共享规则模板
 test/              # 单测与安装 smoke 脚本
 ```
 

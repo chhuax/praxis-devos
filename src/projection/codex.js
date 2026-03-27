@@ -3,14 +3,14 @@ import path from 'path';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
 import { resolveUserHomeDir } from '../support/home.js';
 
-const codexSkillsDir = () => path.join(resolveUserHomeDir(), '.agents', 'skills');
+const codexSkillsDir = () => path.join(resolveUserHomeDir(), '.codex', 'skills');
 
 const ensureDir = (dirPath) => {
   fs.mkdirSync(dirPath, { recursive: true });
 };
 
 /**
- * Project OpenSpec skills to ~/.agents/skills/ as directories with SKILL.md.
+ * Project OpenSpec skills to ~/.codex/skills/ as directories with SKILL.md.
  * Codex discovers these as native skills.
  */
 export const projectSkills = ({ skillSources, version, log }) => {

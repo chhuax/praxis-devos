@@ -22,12 +22,14 @@ After `setup`, a user project typically contains:
 
 ```text
 your-project/
-├── AGENTS.md          # Managed Codex entry block
-├── CLAUDE.md          # Managed Claude Code entry block
+├── AGENTS.md          # Shared project rules for Codex/OpenCode
+├── CLAUDE.md          # Thin Claude wrapper that imports @AGENTS.md
 ├── openspec/          # OpenSpec workspace
 ├── .opencode/         # OpenCode compatibility marker when selected
 └── opencode.json      # OpenCode plugin config when selected
 ```
+
+`AGENTS.md` is the shared project instruction file. `CLAUDE.md` stays thin and imports `@AGENTS.md` so Claude Code reads the shared rules without duplicating them.
 
 ## Quick Start
 
@@ -85,21 +87,22 @@ npx praxis-devos doctor --strict
 - ensure OpenSpec is available, installing it locally when needed
 - install or configure SuperPowers for the selected agents when the runtime supports automation
 - create or refresh `openspec/`
-- write managed entry blocks into `AGENTS.md` and `CLAUDE.md`
+- write the shared managed rules block into `AGENTS.md`
+- write a thin Claude wrapper into `CLAUDE.md` that imports `@AGENTS.md`
 - create the minimal `.opencode/README.md` compatibility marker for OpenCode
 - run dependency checks after setup
 
 Agent-specific runtime behavior:
 
-- OpenCode: writes plugin declarations into `opencode.json`
-- Codex: clones SuperPowers into `~/.codex/superpowers` and links skills into `~/.agents/skills/superpowers`
+- OpenCode: writes plugin declarations into `opencode.json` and projects shared OpenSpec skills under `~/.claude/skills`
+- Codex: clones SuperPowers into `~/.codex/superpowers` and links skills into `~/.codex/skills/superpowers`
 - Claude Code: runs `claude plugin install superpowers@claude-plugins-official --scope user`
 
 ## OpenSpec + SuperPowers Contract
 
 Praxis does not replace OpenSpec or SuperPowers. It binds them together.
 
-Managed entry blocks tell agents to:
+The managed project rules tell agents to:
 
 - use `/opsx:propose` or `/opsx:explore` for proposal/exploration flow
 - perform Proposal Intake before implementation
@@ -109,7 +112,7 @@ Managed entry blocks tell agents to:
 
 Praxis does not currently fork or override the upstream SuperPowers plugin. The coordination contract is enforced through:
 
-- managed entry blocks in `AGENTS.md` / `CLAUDE.md`
+- the shared managed rules in `AGENTS.md` plus the thin `CLAUDE.md` wrapper
 - projected OpenSpec skills (`opsx-*`) that define OpenSpec as the outer workflow
 - transcript/session validation rules that flag duplicate workflow announcements or `docs/superpowers/...` outputs inside OpenSpec flow
 
