@@ -163,7 +163,9 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(output, /Synced adapters: codex, claude, opencode/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
+  assert.match(agentsMd, /中大型变更、跨模块改动、接口或兼容性调整、架构\/流程重构/);
   assert.match(agentsMd, /提案\/探索阶段必须走原生 OpenSpec proposal 流程/);
+  assert.match(agentsMd, /一旦已经触发 `writing-plans`，必须回到 proposal flow/);
   assert.match(agentsMd, /`npx praxis-devos openspec \.\.\.` 仅用于直接 CLI 调用/);
   assert.doesNotMatch(agentsMd, /涉及 OpenSpec 操作时，统一通过 `npx praxis-devos openspec \.\.\.`/);
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
@@ -412,6 +414,22 @@ test('validateSessionTranscript rejects proposal flow without native OpenSpec pr
 
   assert.match(report, /status: needs-attention/);
   assert.match(report, /Missing native OpenSpec proposal execution evidence after proposal flow signal/);
+});
+
+test('validateSessionTranscript rejects writing-plans before required proposal flow evidence', () => {
+  const invalidFile = path.join(
+    PRAXIS_ROOT,
+    'test',
+    'fixtures',
+    'transcripts',
+    'writing-plans-before-proposal-session.md',
+  );
+
+  const report = validateSessionTranscript({ filePath: invalidFile });
+
+  assert.match(report, /status: needs-attention/);
+  assert.match(report, /Missing Proposal Intake evidence after planning before proposal signal/);
+  assert.match(report, /Missing native OpenSpec proposal execution evidence after planning before proposal signal/);
 });
 
 test('runCli routes help, openspec, validate-session, and migrate', () => {

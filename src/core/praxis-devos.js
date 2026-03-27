@@ -1473,6 +1473,29 @@ const normalizeTranscriptText = (input) => input
 
 const matchAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
 
+const PROPOSAL_INTAKE_PATTERNS = [
+  /Proposal Intake/i,
+  /change target/i,
+  /intended behavior/i,
+  /scope\/risk/i,
+  /open questions/i,
+  /变更对象/,
+  /预期变化/,
+  /范围.*风险/,
+  /开放问题/,
+];
+
+const NATIVE_OPENSPEC_PROPOSAL_PATTERNS = [
+  /openspec new change\b/i,
+];
+
+const WRITING_PLANS_PATTERNS = [
+  /writing-plans/i,
+  /实施计划/,
+  /执行计划/,
+  /分步计划/,
+];
+
 const SESSION_EVENT_RULES = [
   {
     id: 'proposal-flow',
@@ -1489,24 +1512,12 @@ const SESSION_EVENT_RULES = [
       {
         id: 'proposal-intake',
         label: 'Proposal Intake',
-        patterns: [
-          /Proposal Intake/i,
-          /change target/i,
-          /intended behavior/i,
-          /scope\/risk/i,
-          /open questions/i,
-          /变更对象/,
-          /预期变化/,
-          /范围.*风险/,
-          /开放问题/,
-        ],
+        patterns: PROPOSAL_INTAKE_PATTERNS,
       },
       {
         id: 'native-openspec-proposal',
         label: 'native OpenSpec proposal execution',
-        patterns: [
-          /openspec new change\b/i,
-        ],
+        patterns: NATIVE_OPENSPEC_PROPOSAL_PATTERNS,
       },
     ],
   },
@@ -1534,6 +1545,23 @@ const SESSION_EVENT_RULES = [
           /方案探索/,
           /边界收敛/,
         ],
+      },
+    ],
+  },
+  {
+    id: 'planning-before-proposal',
+    label: 'planning before proposal',
+    signal: WRITING_PLANS_PATTERNS,
+    requirements: [
+      {
+        id: 'proposal-intake',
+        label: 'Proposal Intake',
+        patterns: PROPOSAL_INTAKE_PATTERNS,
+      },
+      {
+        id: 'native-openspec-proposal',
+        label: 'native OpenSpec proposal execution',
+        patterns: NATIVE_OPENSPEC_PROPOSAL_PATTERNS,
       },
     ],
   },
@@ -1579,10 +1607,7 @@ const SESSION_EVENT_RULES = [
         id: 'writing-plans',
         label: 'writing-plans',
         patterns: [
-          /writing-plans/i,
-          /实施计划/,
-          /执行计划/,
-          /分步计划/,
+          ...WRITING_PLANS_PATTERNS,
           /step 1/i,
           /1\.\s.+\n2\.\s/s,
         ],
