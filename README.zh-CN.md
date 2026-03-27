@@ -76,7 +76,6 @@ npx praxis-devos doctor --strict
 | `status` | 查看当前项目与运行时状态 |
 | `doctor` | 检查 OpenSpec 与 SuperPowers 依赖 |
 | `bootstrap` | 打印修复/安装指导，不执行完整 setup |
-| `openspec` | 透传到实际解析到的 OpenSpec runtime |
 | `validate-session` | 按 Praxis hook 证据校验会话记录 |
 
 ## 运行时行为
@@ -104,12 +103,15 @@ Praxis 不替代 OpenSpec 或 SuperPowers，而是把两者编排到一起。
 
 - 用 `/opsx:propose` 或 `/opsx:explore` 进入提案/探索流程
 - 在进入实现前先完成 Proposal Intake
-- 范围不清或方案分歧时加载 `superpowers:brainstorming`
-- 多步骤实现前加载 `superpowers:writing-plans`
-- 适合并行执行时加载 `superpowers:subagent-driven-development`
-- bug / failed test / regression 时先加载 `superpowers:systematic-debugging`
-- 宣称完成前必须加载 `superpowers:verification-before-completion`
-- OpenSpec 操作统一走 `npx praxis-devos openspec ...`
+- 一旦进入 OpenSpec 阶段，始终以 OpenSpec 作为唯一对外可见的主流程
+- 仅把 SuperPowers 当作阶段内的方法论能力使用，不再额外宣告第二层流程
+- brainstorming / planning / debugging / verification 的结论与产物必须收敛到当前 `openspec/changes/<change>/...`
+
+Praxis 目前不会 fork 或覆盖上游 SuperPowers 插件。当前的协调方式由三层构成：
+
+- `AGENTS.md` / `CLAUDE.md` 中的托管入口规则
+- 投影后的 OpenSpec `opsx-*` skills，它们定义 OpenSpec 是外层主流程
+- transcript/session validator，它会拦截 OpenSpec flow 中重复的流程公告或写入 `docs/superpowers/...` 的输出
 
 ## 企业级扩展包
 

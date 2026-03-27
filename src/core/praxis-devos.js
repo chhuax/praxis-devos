@@ -823,7 +823,7 @@ export const createChangeScaffold = ({
     '',
     'Next steps:',
     '- refine proposal.md and spec delta before validation',
-    `- run: npx praxis-devos openspec validate ${nextChangeId} --strict --no-interactive`,
+    `- run: openspec validate ${nextChangeId} --strict --no-interactive`,
     '- request approval before implementation',
     '- after approval, create the implementation branch and start coding',
   ];
@@ -833,26 +833,6 @@ export const createChangeScaffold = ({
   }
 
   return lines.join('\n');
-};
-
-export const runOpenSpecCommand = ({ projectDir, args }) => {
-  const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status !== 'ok' || !runtime.command) {
-    throw new Error(
-      `OpenSpec is required for this command. ${runtime.detail}`,
-    );
-  }
-
-  const result = runFile(runtime.command, args, {
-    cwd: projectDir,
-    timeout: 300_000,
-  });
-
-  if (!result.ok) {
-    throw new Error(result.stderr || 'OpenSpec command failed');
-  }
-
-  return result.stdout || 'OpenSpec command completed with no output.';
 };
 
 const readProjectJson = (filePath) => {
@@ -1240,10 +1220,8 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
       '== openspec ==',
       `OpenSpec already available (${runtime.source})`,
       `- ${runtime.detail}`,
-      '- Use the unified wrapper command from the same installation context:',
-      '  npx praxis-devos openspec list --specs',
-      '- If `praxis-devos` is installed on PATH, you can also run:',
-      '  praxis-devos openspec list --specs',
+      '- Use the OpenSpec CLI directly from the same installation context:',
+      `  ${runtime.command} list --specs`,
     ].join('\n');
   }
 
@@ -1252,12 +1230,12 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
     'OpenSpec is a hard dependency of Praxis DevOS.',
     'Preferred install (project-local):',
     `- npm install -D ${OPENSPEC_PACKAGE}`,
-    'Then use the unified wrapper command:',
-    '  npx praxis-devos openspec list --specs',
-    '- If `praxis-devos` is installed on PATH, you can also run:',
-    '  praxis-devos openspec list --specs',
+    'Then run OpenSpec directly:',
+    '  ./node_modules/.bin/openspec list --specs',
     'Fallback install (global):',
     `- npm install -g ${OPENSPEC_PACKAGE}`,
+    '- Then run:',
+    '  openspec list --specs',
     `Reference: ${OPENSPEC_INSTALL_DOC}`,
   ].join('\n');
 };
@@ -1378,26 +1356,6 @@ export const parseCliArgs = (argv) => {
   return parsed;
 };
 
-const parseOpenSpecCliArgs = (argv) => {
-  const args = [...argv];
-  const parsed = {
-    projectDir: process.cwd(),
-    args: [],
-  };
-
-  while (args.length > 0) {
-    const token = args.shift();
-    if (token === '--project-dir') {
-      parsed.projectDir = path.resolve(args.shift() || parsed.projectDir);
-      continue;
-    }
-
-    parsed.args.push(token);
-  }
-
-  return parsed;
-};
-
 const parseChangeCliArgs = (argv) => {
   const args = [...argv];
   if (args[0] === 'create') {
@@ -1494,6 +1452,24 @@ const WRITING_PLANS_PATTERNS = [
   /实施计划/,
   /执行计划/,
   /分步计划/,
+];
+
+const OPENSPEC_VISIBLE_FLOW_PATTERNS = [
+  /\/opsx:(?:propose|explore|apply|archive)\b/i,
+  /proposal flow/i,
+  /implementation flow/i,
+  /archive flow/i,
+  /当前进入 opsx-/i,
+];
+
+const SUPERPOWERS_VISIBLE_ANNOUNCEMENT_PATTERNS = [
+  /Using (?:brainstorming|writing-plans|systematic-debugging|verification-before-completion|subagent-driven-development)/i,
+  /显式加载 `?superpowers:/i,
+  /进入\s+subagent-driven-development/i,
+];
+
+const SUPERPOWERS_DOC_OUTPUT_PATTERNS = [
+  /docs\/superpowers\/(?:specs|plans)\//i,
 ];
 
 const SESSION_EVENT_RULES = [
@@ -1728,6 +1704,14 @@ export const analyzeSessionTranscript = (transcriptText) => {
     });
   }
 
+  if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, SUPERPOWERS_VISIBLE_ANNOUNCEMENT_PATTERNS)) {
+    findings.push('Avoid separate SuperPowers workflow announcements inside OpenSpec flow');
+  }
+
+  if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, SUPERPOWERS_DOC_OUTPUT_PATTERNS)) {
+    findings.push('Keep OpenSpec-stage outputs in the current change artifacts, not docs/superpowers');
+  }
+
   return {
     status: findings.length === 0 ? 'pass' : 'needs-attention',
     triggered,
@@ -1791,7 +1775,6 @@ Commands:
   status         Show current project initialization and dependency state
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
-  openspec       Run OpenSpec through the Praxis wrapper
   validate-session  Validate a transcript against Praxis evidence hooks
   help           Show this help
 
@@ -1807,14 +1790,6 @@ Supported agents:
 `;
 
 export const runCli = (argv) => {
-  if (argv[0] === 'openspec') {
-    const parsedOpenSpec = parseOpenSpecCliArgs(argv.slice(1));
-    return runOpenSpecCommand({
-      projectDir: parsedOpenSpec.projectDir,
-      args: parsedOpenSpec.args,
-    });
-  }
-
   const parsed = parseCliArgs(argv);
   const agents = parsed.agents.length > 0 ? parsed.agents : SUPPORTED_AGENTS;
 

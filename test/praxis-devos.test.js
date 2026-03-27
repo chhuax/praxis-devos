@@ -18,7 +18,6 @@ import {
   projectNativeSkills,
   renderHelp,
   runCli,
-  runOpenSpecCommand,
   setupProject,
   statusProject,
   syncProject,
@@ -117,6 +116,7 @@ test('renderHelp reflects the current CLI surface', () => {
 
   assert.match(help, /setup/);
   assert.match(help, /validate-session/);
+  assert.doesNotMatch(help, /^\s*openspec\s+/m);
   assert.doesNotMatch(help, /change\s+Create an OpenSpec change scaffold/);
   assert.doesNotMatch(help, /proposal\s+Compatibility alias/);
   assert.doesNotMatch(help, /list-stacks/);
@@ -165,9 +165,16 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /Keep this section\./);
   assert.match(agentsMd, /中大型变更、跨模块改动、接口或兼容性调整、架构\/流程重构/);
   assert.match(agentsMd, /提案\/探索阶段必须走原生 OpenSpec proposal 流程/);
-  assert.match(agentsMd, /一旦已经触发 `writing-plans`，必须回到 proposal flow/);
-  assert.match(agentsMd, /`npx praxis-devos openspec \.\.\.` 仅用于直接 CLI 调用/);
-  assert.doesNotMatch(agentsMd, /涉及 OpenSpec 操作时，统一通过 `npx praxis-devos openspec \.\.\.`/);
+  assert.match(agentsMd, /进入 OpenSpec flow 后，OpenSpec skill 是唯一主流程/);
+  assert.match(agentsMd, /superpowers 仅作为当前 OpenSpec 阶段的辅助能力使用/);
+  assert.match(agentsMd, /在 OpenSpec 上下文中，避免再次向用户宣告 `Using \[skill\]` 或 `superpowers:/);
+  assert.match(agentsMd, /先在当前 OpenSpec 阶段内完成范围澄清与方案比较/);
+  assert.match(agentsMd, /执行 `openspec new change \.\.\.` 等原生命令创建\/推进 proposal/);
+  assert.doesNotMatch(agentsMd, /praxis-devos openspec/);
+  assert.doesNotMatch(agentsMd, /显式加载 `superpowers:brainstorming`/);
+  assert.doesNotMatch(agentsMd, /显式加载 `superpowers:writing-plans`/);
+  assert.doesNotMatch(agentsMd, /`brainstorming` 方法/);
+  assert.doesNotMatch(agentsMd, /brainstorming \/ writing-plans \/ debugging \/ verification/);
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
 });
@@ -248,7 +255,9 @@ test('bootstrapOpenSpec prefers the local runtime when available', () => {
   const output = bootstrapOpenSpec({ projectDir });
 
   assert.match(output, /OpenSpec already available \(project-local\)/);
-  assert.match(output, /npx praxis-devos openspec list --specs/);
+  assert.match(output, /OpenSpec CLI directly from the same installation context/);
+  assert.match(output, /node_modules\/\.bin\/openspec list --specs/);
+  assert.doesNotMatch(output, /praxis-devos openspec/);
 });
 
 test('bootstrapProject updates OpenCode plugins and prints runtime guidance', () => {
@@ -319,18 +328,6 @@ test('createChangeScaffold remains available as an internal scaffold helper', ()
   assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
   assert.ok(fs.existsSync(path.join(changeDir, 'tasks.md')));
   assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
-});
-
-test('runOpenSpecCommand delegates to the resolved OpenSpec runtime', () => {
-  const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir, 'WRAPPED');
-
-  const output = runOpenSpecCommand({
-    projectDir,
-    args: ['list', '--specs'],
-  });
-
-  assert.equal(output, 'WRAPPED:list --specs');
 });
 
 test('doctorProject reports current dependency status for OpenCode', () => {
@@ -432,19 +429,42 @@ test('validateSessionTranscript rejects writing-plans before required proposal f
   assert.match(report, /Missing native OpenSpec proposal execution evidence after planning before proposal signal/);
 });
 
-test('runCli routes help, openspec, validate-session, and migrate', () => {
+test('validateSessionTranscript rejects duplicate SuperPowers workflow announcements inside OpenSpec flow', () => {
+  const invalidFile = path.join(
+    PRAXIS_ROOT,
+    'test',
+    'fixtures',
+    'transcripts',
+    'duplicate-superpowers-announcement-session.md',
+  );
+
+  const report = validateSessionTranscript({ filePath: invalidFile });
+
+  assert.match(report, /status: needs-attention/);
+  assert.match(report, /Avoid separate SuperPowers workflow announcements inside OpenSpec flow/);
+});
+
+test('validateSessionTranscript rejects writing OpenSpec outputs into docs\\/superpowers paths', () => {
+  const invalidFile = path.join(
+    PRAXIS_ROOT,
+    'test',
+    'fixtures',
+    'transcripts',
+    'openspec-with-superpowers-doc-output-session.md',
+  );
+
+  const report = validateSessionTranscript({ filePath: invalidFile });
+
+  assert.match(report, /status: needs-attention/);
+  assert.match(report, /Keep OpenSpec-stage outputs in the current change artifacts, not docs\/superpowers/);
+});
+
+test('runCli routes help, validate-session, and migrate but rejects openspec wrapper usage', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir, 'CLI');
   ensureOpenSpecWorkspace(projectDir);
 
   const help = runCli([]);
-  const openspec = runCli([
-    'openspec',
-    '--project-dir',
-    projectDir,
-    'list',
-    '--specs',
-  ]);
   const validation = runCli([
     'validate-session',
     '--file',
@@ -459,10 +479,13 @@ test('runCli routes help, openspec, validate-session, and migrate', () => {
   ]);
 
   assert.match(help, /praxis-devos <command> \[options\]/);
-  assert.equal(openspec, 'CLI:list --specs');
   assert.match(validation, /status: pass/);
   assert.match(migration, /Migration completed/);
   assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+  assert.throws(
+    () => runCli(['openspec', '--project-dir', projectDir, 'list', '--specs']),
+    /Unknown command: openspec/,
+  );
   assert.throws(
     () => runCli(['change', '--project-dir', projectDir, '--title', 'removed']),
     /Unknown command: change/,
