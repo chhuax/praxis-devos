@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-03-27
+
+### Changed
+- redefined the OpenSpec/SuperPowers contract so OpenSpec remains the only visible workflow and SuperPowers runs as embedded stage-local sub-skills
+- translated the bundled `opsx-explore`, `opsx-propose`, `opsx-apply`, and `opsx-archive` skills into Chinese and documented how they internally invoke `brainstorming`, `writing-plans`, `systematic-debugging`, `subagent-driven-development`, and `verification-before-completion`
+- tightened managed entry guidance so it stays at the governance layer instead of routing agent-visible `superpowers:*` workflows
+
+### Fixed
+- `validate-session` now rejects duplicate OpenSpec stage recaps in addition to duplicate SuperPowers workflow announcements and `docs/superpowers/...` outputs
+- embedded SuperPowers sub-skill usage now explicitly inherits OpenSpec stage context, current change ownership, artifact paths, and output constraints
+
+### Removed
+- removed the `praxis-devos openspec` wrapper command and all related AI-facing/documented guidance in favor of calling the OpenSpec CLI directly
+
 ## [0.4.2] - 2026-03-27
 
 ### Changed
