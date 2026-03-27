@@ -145,7 +145,7 @@ const findSkillMarkdown = (rootDir) => {
 };
 
 const assertProjectedCodexSkills = (fakeHome) => {
-  const skillsRoot = path.join(fakeHome, '.agents', 'skills');
+  const skillsRoot = path.join(fakeHome, '.codex', 'skills');
   for (const name of PROJECTED_OPENSPEC_SKILLS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
@@ -160,6 +160,16 @@ const assertProjectedClaudeSkills = (fakeHome) => {
     assert.ok(
       fs.existsSync(path.join(commandsRoot, `${name}.md`)),
       `Expected Claude projected command at ${path.join(commandsRoot, `${name}.md`)}`,
+    );
+  }
+};
+
+const assertProjectedOpenCodeSkills = (fakeHome) => {
+  const skillsRoot = path.join(fakeHome, '.claude', 'skills');
+  for (const name of PROJECTED_OPENSPEC_SKILLS) {
+    assert.ok(
+      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
+      `Expected OpenCode shared skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
     );
   }
 };
@@ -270,7 +280,7 @@ const runSmoke = ({ packageFile, scenario }) => {
   assert.match(secondSetupResult.stdout, /Project already initialized; refreshing selected agents and managed adapters\./);
 
   if (scenario === 'codex') {
-    const codexSkillsPath = path.join(fakeHome, '.agents', 'skills', 'superpowers');
+    const codexSkillsPath = path.join(fakeHome, '.codex', 'skills', 'superpowers');
     assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')), `Expected AGENTS.md in ${projectDir}`);
     assert.ok(fs.existsSync(codexSkillsPath), `Expected Codex skills path at ${codexSkillsPath}`);
     assert.ok(findSkillMarkdown(codexSkillsPath), `Expected Codex SuperPowers content under ${codexSkillsPath}`);
@@ -293,6 +303,7 @@ const runSmoke = ({ packageFile, scenario }) => {
     assert.ok(Array.isArray(config.plugin));
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
     assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
+    assertProjectedOpenCodeSkills(fakeHome);
 
     const doctor = runCommand(npxCmd, ['praxis-devos', 'doctor', '--strict', '--agent', 'opencode'], {
       cwd: projectDir,

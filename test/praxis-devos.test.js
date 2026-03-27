@@ -152,6 +152,7 @@ test('parseCliArgs parses current flags and rejects removed --openspec', () => {
 test('syncProject refreshes adapters and preserves user-owned content', () => {
   const projectDir = makeTempProject();
   const agentsPath = path.join(projectDir, 'AGENTS.md');
+  const claudePath = path.join(projectDir, 'CLAUDE.md');
   fs.writeFileSync(agentsPath, '# Project Notes\n\nKeep this section.\n', 'utf8');
 
   const output = syncProject({
@@ -160,6 +161,7 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   });
 
   const agentsMd = fs.readFileSync(agentsPath, 'utf8');
+  const claudeMd = fs.readFileSync(claudePath, 'utf8');
   assert.match(output, /Synced adapters: codex, claude, opencode/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
@@ -175,7 +177,10 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.doesNotMatch(agentsMd, /显式加载 `superpowers:writing-plans`/);
   assert.doesNotMatch(agentsMd, /`brainstorming` 方法/);
   assert.doesNotMatch(agentsMd, /brainstorming \/ writing-plans \/ debugging \/ verification/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')));
+  assert.match(claudeMd, /PRAXIS_DEVOS_START/);
+  assert.match(claudeMd, /^<!-- PRAXIS_DEVOS_START -->\n@AGENTS\.md/m);
+  assert.match(claudeMd, /Claude Code 通过 `CLAUDE\.md` 读取项目指令/);
+  assert.doesNotMatch(claudeMd, /中大型变更、跨模块改动、接口或兼容性调整、架构\/流程重构/);
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
 });
 
@@ -222,26 +227,38 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(explore, /必须传递当前主流程类型、当前阶段目标、当前 artifacts 位置和当前输出约束/);
 });
 
-test('projectNativeSkills writes Codex skills under the resolved user home with valid frontmatter', () => {
+test('projectNativeSkills writes agent-native skills under the resolved user home with valid frontmatter', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-projection-home-'));
   const logs = [];
 
   withEnv('HOME', fakeHome, () => {
     projectNativeSkills({
       projectDir: makeTempProject(),
-      agents: ['codex'],
+      agents: ['codex', 'claude', 'opencode'],
       log: (msg) => logs.push(msg),
     });
 
     const projectedCodexSkill = fs.readFileSync(
-      path.join(fakeHome, '.agents', 'skills', 'opsx-propose', 'SKILL.md'),
+      path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
+      'utf8',
+    );
+    const projectedClaudeCommand = fs.readFileSync(
+      path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md'),
+      'utf8',
+    );
+    const projectedOpenCodeSkill = fs.readFileSync(
+      path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
 
     assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedClaudeCommand, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedOpenCodeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
   });
 
   assert.match(logs.join('\n'), /Codex: projected opsx-propose/);
+  assert.match(logs.join('\n'), /Claude: projected opsx-propose/);
+  assert.match(logs.join('\n'), /OpenCode: projected opsx-propose/);
 });
 
 test('initProject bootstraps openspec workspace through a local runtime', () => {
