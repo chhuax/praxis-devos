@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-03-27
+
+### Changed
+- aligned the project entry-file model so `AGENTS.md` is the shared project rules file and `CLAUDE.md` stays a thin `@AGENTS.md` wrapper for Claude Code
+- refreshed the English and Chinese README wording around shared rules, agent entry files, and native projection surfaces
+- renamed the agent-surface reference note under `docs/` to an English filename
+
+### Fixed
+- aligned Codex native skill projection and SuperPowers detection with `~/.codex/skills` instead of the previous `~/.agents/skills` path
+- added OpenCode native projection for bundled `opsx-*` skills under the shared user-home skills surface and included it in dependency doctor coverage
+- updated smoke and unit coverage to validate the revised Codex, Claude, and OpenCode projection model
+
 ## [0.4.3] - 2026-03-27
 
 ### Changed
