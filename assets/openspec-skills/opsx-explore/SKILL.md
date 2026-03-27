@@ -18,13 +18,14 @@ metadata:
 ## OpenSpec + Superpowers 协调
 
 - `opsx-explore` 是当前唯一对外可见的主流程
-- 即使你在内部采用 `brainstorming` 的方法，也不要再额外宣告 `Using brainstorming` 或 `superpowers:brainstorming`
+- 即使你在内部 invoke `brainstorming` internally，也不要再额外宣告 `Using brainstorming` 或 `superpowers:brainstorming`
 - 当讨论已经关联某个 change 时，所有结论和笔记都应写回当前 change artifacts，不要在 OpenSpec flow 中创建 `docs/superpowers/...` 输出
 - superpowers 的方法只影响“怎么思考”，不会改变当前仍然处于 `explore` 阶段这一事实
+- 当你在当前阶段内部 invoke 任意 Superpowers 子 skill 时，必须传递当前主流程类型、当前阶段目标、当前 artifacts 位置和当前输出约束；如果当前已经关联到 change，则还必须传递当前 change id，不得新建独立 workflow、独立文档根目录或改变 change 归属
 
 ## 阶段内方法映射
 
-- 当需求边界不清、存在 `open questions`、需要多方案比较时：在内部采用 `brainstorming` 的做法来澄清问题、比较方案、收敛边界
+- 当需求边界不清、存在 `open questions`、需要多方案比较时：invoke `brainstorming` internally 来澄清问题、比较方案、收敛边界
 - 当讨论逐渐成形并需要落档时：把结论写回当前 change 的 `proposal.md`、`design.md`、`tasks.md` 或相关 `spec.md`
 - 当用户只是想继续探索：保持 `explore`，不要强行推进到 proposal 或 implementation
 
@@ -101,6 +102,8 @@ openspec list --json
 - 是否存在 active changes
 - change 名称、schema、状态
 - 用户当前可能在处理什么
+
+如果你发现当前讨论的核心问题仍然是范围不清、方案分歧或关键约束不明确，直接在当前 `opsx-explore` 中 invoke `brainstorming` internally，然后继续 explore；不要把它升级成新的对外流程。
 
 ### 当还没有 change
 

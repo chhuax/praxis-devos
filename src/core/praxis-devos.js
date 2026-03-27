@@ -1472,6 +1472,16 @@ const SUPERPOWERS_DOC_OUTPUT_PATTERNS = [
   /docs\/superpowers\/(?:specs|plans)\//i,
 ];
 
+const OPENSPEC_DUPLICATE_RECAP_PATTERNS = [
+  /最后再总结一遍/,
+  /再次总结/,
+  /重复总结/,
+  /再做一次收尾总结/,
+  /最终总结/,
+  /close-out recap/i,
+  /summary again/i,
+];
+
 const SESSION_EVENT_RULES = [
   {
     id: 'proposal-flow',
@@ -1710,6 +1720,10 @@ export const analyzeSessionTranscript = (transcriptText) => {
 
   if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, SUPERPOWERS_DOC_OUTPUT_PATTERNS)) {
     findings.push('Keep OpenSpec-stage outputs in the current change artifacts, not docs/superpowers');
+  }
+
+  if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, OPENSPEC_DUPLICATE_RECAP_PATTERNS)) {
+    findings.push('Avoid duplicate stage summaries or close-out recaps inside OpenSpec flow');
   }
 
   return {

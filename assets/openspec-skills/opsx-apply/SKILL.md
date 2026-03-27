@@ -19,13 +19,14 @@ metadata:
 - 如果你在内部采用计划、调试、验证或并行执行的方法，不要再额外宣告 `Using writing-plans`、`Using systematic-debugging` 或 `superpowers:...`
 - 计划细化、任务状态、实现笔记等都必须留在当前 change artifacts 中，不要在 apply 阶段创建 `docs/superpowers/...` 输出
 - 辅助方法只能帮助执行，不会改变当前仍然处于 `apply` 阶段这一事实
+- 当你在当前阶段内部 invoke 任意 Superpowers 子 skill 时，必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束；不得新建独立 workflow、独立文档根目录或改变 change 归属
 
 ## 阶段内方法映射
 
-- 当任务是多步骤、需要进一步拆细时：在内部采用 `writing-plans` 的方法，把实施计划收敛到当前 change 的任务与上下文中
-- 当出现 bug、failed test、回归、异常时：在内部采用 `systematic-debugging` 的方法，先复现、列假设、做验证，再动代码
-- 当存在多个可独立推进的子任务时：在内部采用 `subagent-driven-development` 的方法进行并行拆分，但所有产物与状态仍归属于当前 change
-- 当你准备宣称“完成”“修复”或“已通过”时：在内部采用 `verification-before-completion` 的方法，先拿到真实验证证据再对外表述
+- 当任务是多步骤、需要进一步拆细时：invoke `writing-plans` internally，把实施计划收敛到当前 change 的任务与上下文中
+- 当出现 bug、failed test、回归、异常时：invoke `systematic-debugging` internally，先复现、列假设、做验证，再动代码
+- 当存在多个可独立推进的子任务时：invoke `subagent-driven-development` internally 进行并行拆分，但所有产物与状态仍归属于当前 change
+- 当你准备宣称“完成”“修复”或“已通过”时：invoke `verification-before-completion` internally，先拿到真实验证证据再对外表述
 
 **步骤**
 
@@ -79,6 +80,8 @@ metadata:
    - 剩余任务概览
    - CLI 给出的动态 instruction
 
+   如果当前工作明显是多步骤实现，先在 `opsx-apply` 内 invoke `writing-plans` internally 来整理实施计划，再继续执行任务；不要把它升级成第二层可见流程。
+
 6. **逐个实现任务，直到完成或被阻塞**
 
    对每个 pending task：
@@ -91,8 +94,10 @@ metadata:
    **以下情况应暂停：**
    - 任务含义不清 → 先向用户确认
    - 实现过程中暴露出设计问题 → 建议更新 artifacts
-   - 遇到错误或 blocker → 明确报告并等待指示
+   - 遇到错误、failed test、回归或 blocker → 先 invoke `systematic-debugging` internally，完成复现与假设验证后再决定下一步
    - 用户打断
+
+   如果待办里存在多个可独立推进的子任务，可以在当前 `opsx-apply` 内 invoke `subagent-driven-development` internally 做并行拆分，但不要把并行执行本身对外表述成新的主流程。
 
 7. **完成或暂停时，回报状态**
 
@@ -101,6 +106,8 @@ metadata:
    - 总体进度，例如：`N/M tasks complete`
    - 如果全部完成：建议 archive
    - 如果暂停：说明原因并等待用户指示
+
+   在任何“完成”“修复”“已通过”的对外表述之前，先在当前 `opsx-apply` 内 invoke `verification-before-completion` internally，拿到真实验证证据后再回报状态。
 
 **实现过程中输出示例**
 

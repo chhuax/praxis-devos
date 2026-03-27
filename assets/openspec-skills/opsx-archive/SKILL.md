@@ -19,10 +19,11 @@ metadata:
 - 如果你在归档前内部采用验证方法，不要再额外宣告 `Using verification-before-completion`
 - 归档时的说明、校验结果、同步结论都必须附着在当前 change/archive flow 中，不要在 archive 阶段创建 `docs/superpowers/...` 输出
 - 辅助验证方法只能帮助确认是否可归档，不会形成第二套“完成流程”
+- 当你在当前阶段内部 invoke 任意 Superpowers 子 skill 时，必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束；不得新建独立 workflow、独立文档根目录或改变 change 归属
 
 ## 阶段内方法映射
 
-- 当你准备归档时：在内部采用 `verification-before-completion` 的方法，先确认 artifacts、tasks、校验结果是否足以支撑归档
+- 当你准备归档时：invoke `verification-before-completion` internally，先确认 artifacts、tasks、校验结果是否足以支撑归档
 - 当发现 delta specs 还没同步时：先给出同步评估，再由用户决定是先 sync 还是直接 archive
 
 **步骤**
@@ -52,6 +53,8 @@ metadata:
    - 使用 **AskUserQuestion tool** 询问用户是否仍要继续
    - 若用户确认，则继续
 
+   在汇报“可以归档”之前，先在当前 `opsx-archive` 内 invoke `verification-before-completion` internally，确认这些 artifacts 的完成情况足以支撑归档判断。
+
 3. **检查 task 完成情况**
 
    读取任务文件（通常是 `tasks.md`），检查是否仍有未完成任务。
@@ -64,6 +67,8 @@ metadata:
    - 展示 warning，并告诉用户数量
    - 使用 **AskUserQuestion tool** 确认是否仍要继续
    - 若用户确认，则继续
+
+   这一检查同样属于归档前验证的一部分，应纳入当前 `opsx-archive` 内部的 `verification-before-completion` 执行中。
 
    **如果没有任务文件：** 跳过这一检查。
 

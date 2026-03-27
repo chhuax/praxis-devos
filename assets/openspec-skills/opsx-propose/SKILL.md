@@ -21,13 +21,14 @@ metadata:
 ## OpenSpec + Superpowers 协调
 
 - `opsx-propose` 是当前唯一对外可见的主流程
-- 如果你在内部采用 `brainstorming` 的方法来处理模糊需求或方案分歧，不要再额外宣告 `Using brainstorming` 或 `superpowers:brainstorming`
+- 如果你在内部 invoke `brainstorming` 来处理模糊需求或方案分歧，不要再额外宣告 `Using brainstorming` 或 `superpowers:brainstorming`
 - proposal、design、tasks 等输出都必须留在 `openspec/changes/<name>/...` 下，不要创建 `docs/superpowers/...` 提案侧文档
 - 辅助方法只能帮助你澄清和组织 proposal，不能替代原生 OpenSpec proposal 步骤
+- 当你在当前阶段内部 invoke 任意 Superpowers 子 skill 时，必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束；不得新建独立 workflow、独立文档根目录或改变 change 归属
 
 ## 阶段内方法映射
 
-- 当用户的问题还很模糊，或 `open questions` 仍然很多时：在内部采用 `brainstorming` 的方法收敛边界、比较方案、明确约束
+- 当用户的问题还很模糊，或 `open questions` 仍然很多时：invoke `brainstorming` internally 来收敛边界、比较方案、明确约束
 - 当范围已经足够清楚时：回到原生 OpenSpec proposal 流程，逐个生成当前 change 所需 artifacts
 - 所有设计结论、任务拆分、范围变更都必须写回当前 change，而不是另起一套文档路径
 
@@ -43,6 +44,8 @@ metadata:
    > “What change do you want to work on? Describe what you want to build or fix.”
 
    再根据用户描述推导一个 kebab-case 名称，例如 `"add user authentication"` → `add-user-auth`。
+
+   如果用户给出的目标、约束、边界或方案仍然存在关键歧义，先在当前 `opsx-propose` 中 invoke `brainstorming` internally，完成范围澄清、关键问题收敛和方案比较后再继续。不要把它作为第二层对外流程宣告。
 
    **重要：** 在没有理解用户要做什么之前，不要继续推进。
 
@@ -93,6 +96,7 @@ metadata:
 
    c. **如果某个 artifact 需要额外用户输入**
       - 使用 **AskUserQuestion tool** 追问
+      - 如果问题属于范围分歧、方案分歧或关键上下文歧义，先在当前 propose 阶段 invoke `brainstorming` internally，再把收敛结果写回当前 change artifacts
       - 然后继续生成
 
 5. **展示最终状态**

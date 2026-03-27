@@ -190,6 +190,38 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
   assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
 });
 
+test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance without promoting a second visible workflow', () => {
+  const propose = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-propose', 'SKILL.md'),
+    'utf8',
+  );
+  const apply = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-apply', 'SKILL.md'),
+    'utf8',
+  );
+  const archive = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-archive', 'SKILL.md'),
+    'utf8',
+  );
+  const explore = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-explore', 'SKILL.md'),
+    'utf8',
+  );
+
+  assert.match(propose, /invoke `brainstorming` internally/);
+  assert.match(propose, /不要再额外宣告 `Using brainstorming`/);
+  assert.match(propose, /必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(apply, /invoke `writing-plans` internally/);
+  assert.match(apply, /invoke `systematic-debugging` internally/);
+  assert.match(apply, /invoke `subagent-driven-development` internally/);
+  assert.match(apply, /invoke `verification-before-completion` internally/);
+  assert.match(apply, /必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(archive, /invoke `verification-before-completion` internally/);
+  assert.match(archive, /必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(explore, /invoke `brainstorming` internally/);
+  assert.match(explore, /必须传递当前主流程类型、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+});
+
 test('projectNativeSkills writes Codex skills under the resolved user home with valid frontmatter', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-projection-home-'));
   const logs = [];
@@ -457,6 +489,21 @@ test('validateSessionTranscript rejects writing OpenSpec outputs into docs\\/sup
 
   assert.match(report, /status: needs-attention/);
   assert.match(report, /Keep OpenSpec-stage outputs in the current change artifacts, not docs\/superpowers/);
+});
+
+test('validateSessionTranscript rejects duplicate stage summaries or close-out recaps inside OpenSpec flow', () => {
+  const invalidFile = path.join(
+    PRAXIS_ROOT,
+    'test',
+    'fixtures',
+    'transcripts',
+    'duplicate-openspec-recap-session.md',
+  );
+
+  const report = validateSessionTranscript({ filePath: invalidFile });
+
+  assert.match(report, /status: needs-attention/);
+  assert.match(report, /Avoid duplicate stage summaries or close-out recaps inside OpenSpec flow/);
 });
 
 test('runCli routes help, validate-session, and migrate but rejects openspec wrapper usage', () => {
