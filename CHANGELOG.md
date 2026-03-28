@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-03-28
+
+### Added
+- introduced a separate monitoring module for optional OpenSpec capability instrumentation, including user-level evidence storage and projected-skill monitoring overlays
+- added `validate-change` and instrumentation command coverage for embedded capability evidence and projected skill monitoring state
+
+### Changed
+- restored the bundled `opsx-explore`, `opsx-propose`, `opsx-apply`, and `opsx-archive` skills to English-first OpenSpec bodies while isolating Praxis-specific coordination in explicit overlay sections
+- aligned bundled OpenSpec skill frontmatter names with their shipped `opsx-*` command and folder names
+- simplified the managed AI entry contract into a shorter English-only routing and gate model while preserving proposal, execution, and completion hard gates
+
+### Fixed
+- prevented native skill projection from overwriting user-authored same-name skills unless they already carry a Praxis projection marker
+- moved embedded capability evidence out of project directories and into a user-level Praxis state directory so target repositories stay clean
+
 ## [0.4.4] - 2026-03-27
 
 ### Changed

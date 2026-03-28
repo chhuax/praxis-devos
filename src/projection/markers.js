@@ -40,6 +40,14 @@ export const isProjection = (filePath) => {
   return parseMarker(content) !== null;
 };
 
+export const canWriteProjection = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    return true;
+  }
+
+  return isProjection(filePath);
+};
+
 export const projectionVersion = (filePath) => {
   if (!fs.existsSync(filePath)) {
     return null;

@@ -1,5 +1,5 @@
 ---
-name: openspec-apply-change
+name: opsx-apply
 description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
 license: MIT
 compatibility: Requires openspec CLI.
@@ -9,121 +9,133 @@ metadata:
   generatedBy: "1.2.0"
 ---
 
-按照 OpenSpec change 中的任务执行实现。
+Implement tasks from an OpenSpec change.
 
-**输入**：可以指定 change 名称；如果未指定，则从上下文推断。若上下文含糊或有多个候选，必须提示用户选择。
+**Input**: Optionally specify a change name. If omitted, check whether it can be inferred from conversation context. If vague or ambiguous, you MUST prompt for available changes.
 
-## OpenSpec + Superpowers 协调
+## PRAXIS_DEVOS_OVERLAY
 
-- `opsx-apply` 是当前唯一对外可见的主流程
-- 如果你在内部采用计划、调试、验证或并行执行的方法，不要再额外宣告 `Using writing-plans`、`Using systematic-debugging` 或 `superpowers:...`
-- 计划细化、任务状态、实现笔记等都必须留在当前 change artifacts 中，不要在 apply 阶段创建 `docs/superpowers/...` 输出
-- 辅助方法只能帮助执行，不会改变当前仍然处于 `apply` 阶段这一事实
-- 当你在当前阶段内部 invoke 任意 Superpowers 子 skill 时，必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束；不得新建独立 workflow、独立文档根目录或改变 change 归属
+Framework-specific coordination for embedded Superpowers usage:
 
-## 阶段内方法映射
+- `opsx-apply` remains the only visible flow for this stage.
+- If you use planning, debugging, verification, or parallel execution methods internally, do not announce `Using writing-plans`, `Using systematic-debugging`, or `superpowers:...`.
+- Plan refinement, task status, and implementation notes must stay in the current change artifacts. Do not create `docs/superpowers/...`.
+- Internal methods can help execution, but they do not change the fact that you are still in `apply`.
+- When invoking any internal Superpowers capability, pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints.
 
-- 当任务是多步骤、需要进一步拆细时：invoke `writing-plans` internally，把实施计划收敛到当前 change 的任务与上下文中
-- 当出现 bug、failed test、回归、异常时：invoke `systematic-debugging` internally，先复现、列假设、做验证，再动代码
-- 当存在多个可独立推进的子任务时：invoke `subagent-driven-development` internally 进行并行拆分，但所有产物与状态仍归属于当前 change
-- 当你准备宣称“完成”“修复”或“已通过”时：invoke `verification-before-completion` internally，先拿到真实验证证据再对外表述
+Embedded capability contract:
 
-**步骤**
+- `mode: embedded`
+- `owner_flow: opsx-apply`
+- `visibility: internal`
+- `artifact_targets: openspec/changes/<change>/...`
+- `evidence_target: user-level Praxis state directory`
 
-1. **选择 change**
+Internal capabilities must not:
 
-   如果用户显式提供名称，就直接使用；否则：
-   - 从对话上下文推断用户提到的是哪个 change
-   - 如果只有一个 active change，可自动选中
-   - 如果存在歧义，运行 `openspec list --json` 查看候选 change，并使用 **AskUserQuestion tool** 让用户选择
+- announce a second workflow
+- create `docs/superpowers/...`
+- output a second final recap
 
-   当说明 change 有助于用户理解时，可以在单一 OpenSpec 叙事里说明，例如：
-   `当前进入 opsx-apply，change: <name>`
+Stage hooks:
 
-2. **查看状态，理解当前 schema**
+- If the work is clearly multi-step and needs finer breakdown, invoke `writing-plans` internally to organize the implementation plan inside the current change context.
+- If you hit a bug, failed test, regression, exception, or blocker, invoke `systematic-debugging` internally before deciding on a fix.
+- If multiple subtasks can advance independently, invoke `subagent-driven-development` internally for parallel execution while keeping all outputs under the same change.
+- Before saying work is complete, fixed, or passing, invoke `verification-before-completion` internally and use real verification evidence in the status update.
+
+---
+
+**Steps**
+
+1. **Select the change**
+
+   If a name is provided, use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` and use the **AskUserQuestion tool** to let the user select
+
+   When it helps the user understand the context, keep it inside the single OpenSpec narrative, for example:
+   `Currently in opsx-apply, change: <name>`
+
+2. **Check status to understand the schema**
    ```bash
    openspec status --change "<name>" --json
    ```
-   解析 JSON，了解：
-   - `schemaName`：当前 workflow 所使用的 schema
-   - 哪个 artifact 存放任务列表（spec-driven 通常是 `tasks`，其他 schema 以状态输出为准）
+   Parse the JSON to understand:
+   - `schemaName`: the workflow being used
+   - which artifact contains the tasks
 
-3. **读取 apply instructions**
+3. **Get apply instructions**
 
    ```bash
    openspec instructions apply --change "<name>" --json
    ```
 
-   返回内容通常包括：
-   - `contextFiles`：当前实现应读取的上下文文件路径
-   - 当前进度（总数、已完成、剩余）
-   - 任务列表与状态
-   - 动态 instruction
+   This returns:
+   - `contextFiles`: the file paths to read before implementing
+   - progress counts
+   - task list and status
+   - a dynamic instruction
 
-   **处理不同状态：**
-   - 如果 `state: "blocked"`：说明 artifacts 不完整，显示提示，并建议使用 `openspec-continue-change`
-   - 如果 `state: "all_done"`：说明任务已全部完成，提示用户考虑 archive
-   - 其他状态：继续进入实现
+   **Handle states:**
+   - If `state: "blocked"`: show the message and suggest `openspec-continue-change`
+   - If `state: "all_done"`: show that all tasks are complete and suggest archive
+   - Otherwise: proceed to implementation
 
-4. **读取上下文文件**
+4. **Read context files**
 
-   按 `apply instructions` 返回的 `contextFiles` 读取上下文。
-   不同 schema 下文件会不同：
-   - **spec-driven**：通常包括 `proposal`、`specs`、`design`、`tasks`
-   - 其他 schema：以 CLI 返回的 `contextFiles` 为准
+   Read the files listed in `contextFiles`.
+   The exact files depend on the schema:
+   - **spec-driven** usually includes `proposal`, `specs`, `design`, and `tasks`
+   - other schemas should follow the CLI output
 
-5. **展示当前进度**
+5. **Show current progress**
 
-   告诉用户：
-   - 当前 schema
-   - 进度，例如：`N/M tasks complete`
-   - 剩余任务概览
-   - CLI 给出的动态 instruction
+   Display:
+   - The current schema
+   - Progress, for example `N/M tasks complete`
+   - A brief overview of remaining tasks
+   - The dynamic instruction from the CLI
 
-   如果当前工作明显是多步骤实现，先在 `opsx-apply` 内 invoke `writing-plans` internally 来整理实施计划，再继续执行任务；不要把它升级成第二层可见流程。
+6. **Implement tasks until done or blocked**
 
-6. **逐个实现任务，直到完成或被阻塞**
+   For each pending task:
+   - Show which task is being worked on
+   - Make the required code changes
+   - Keep changes minimal and focused
+   - Mark the task complete in the tasks file by changing `- [ ]` to `- [x]`
+   - Continue to the next task
 
-   对每个 pending task：
-   - 说明正在处理哪个 task
-   - 做必要的代码修改
-   - 保持改动聚焦、最小化
-   - 完成后把 tasks 文件中的复选框从 `- [ ]` 改成 `- [x]`
-   - 然后继续下一个 task
+   **Pause if:**
+   - The task is unclear and needs clarification
+   - Implementation reveals a design issue and artifacts should be updated
+   - An error or blocker is encountered
+   - The user interrupts
 
-   **以下情况应暂停：**
-   - 任务含义不清 → 先向用户确认
-   - 实现过程中暴露出设计问题 → 建议更新 artifacts
-   - 遇到错误、failed test、回归或 blocker → 先 invoke `systematic-debugging` internally，完成复现与假设验证后再决定下一步
-   - 用户打断
+7. **On completion or pause, show status**
 
-   如果待办里存在多个可独立推进的子任务，可以在当前 `opsx-apply` 内 invoke `subagent-driven-development` internally 做并行拆分，但不要把并行执行本身对外表述成新的主流程。
+   Display:
+   - Tasks completed this session
+   - Overall progress, for example `N/M tasks complete`
+   - If all tasks are done, suggest archive
+   - If paused, explain why and wait for guidance
 
-7. **完成或暂停时，回报状态**
-
-   展示：
-   - 本次会话完成了哪些任务
-   - 总体进度，例如：`N/M tasks complete`
-   - 如果全部完成：建议 archive
-   - 如果暂停：说明原因并等待用户指示
-
-   在任何“完成”“修复”“已通过”的对外表述之前，先在当前 `opsx-apply` 内 invoke `verification-before-completion` internally，拿到真实验证证据后再回报状态。
-
-**实现过程中输出示例**
+**Output During Implementation**
 
 ```text
-## 正在实现：<change-name>（schema: <schema-name>）
+## Implementing: <change-name> (schema: <schema-name>)
 
-当前任务 3/7：<task description>
-[...正在实现...]
+Working on task 3/7: <task description>
+[...implementation happening...]
 ✓ Task complete
 
-当前任务 4/7：<task description>
-[...正在实现...]
+Working on task 4/7: <task description>
+[...implementation happening...]
 ✓ Task complete
 ```
 
-**完成时输出示例**
+**Output On Completion**
 
 ```text
 ## Implementation Complete
@@ -140,7 +152,7 @@ metadata:
 All tasks complete! Ready to archive this change.
 ```
 
-**暂停时输出示例**
+**Output On Pause**
 
 ```text
 ## Implementation Paused
@@ -162,19 +174,19 @@ What would you like to do?
 
 **Guardrails**
 
-- 除非完成或被阻塞，否则持续推进任务
-- 开始实现前，始终先读 `contextFiles`
-- 任务含糊时先问，不要猜
-- 如果实现暴露出 artifacts 问题，暂停并建议更新
-- 每个任务的代码改动都应保持小而聚焦
-- 完成一个任务后立即更新任务复选框
-- 遇到错误、阻塞或不明确需求时暂停，不要硬猜
-- 以 CLI 返回的 `contextFiles` 为准，不要自己假定固定文件名
-- 对用户只保留一层主流程进度，不要再额外输出第二套方法论流程
+- Keep going through tasks until done or blocked
+- Always read `contextFiles` before starting
+- If a task is ambiguous, pause and ask before implementing
+- If implementation reveals artifact issues, pause and suggest updates
+- Keep code changes minimal and scoped to each task
+- Update the task checkbox immediately after completing each task
+- Pause on errors, blockers, or unclear requirements. Do not guess
+- Use `contextFiles` from CLI output rather than assuming fixed filenames
+- Keep only one visible flow for the user rather than exposing a second methodology layer
 
 **Fluid Workflow Integration**
 
-该 skill 支持“围绕 change 做动作”的模型：
+This skill supports an actions-on-a-change model:
 
-- **可在任意时点调用**：例如 artifacts 尚未全部齐备但已有任务、实现中途暂停后继续、与其他动作交错进行
-- **允许回写 artifacts**：如果实现暴露设计问题，可以建议更新 artifacts，而不是把流程理解为僵硬的单向阶段机
+- **Can be invoked anytime**: before all artifacts are done if tasks already exist, after partial implementation, or interleaved with other actions
+- **Allows artifact updates**: if implementation reveals design issues, suggest updating artifacts rather than treating the workflow as a rigid one-way phase machine

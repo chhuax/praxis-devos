@@ -4,6 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { injectMarker } from '../src/projection/markers.js';
+import {
+  getCapabilityEvidencePath,
+  readCapabilityEvidence,
+  recordCapabilitySelection,
+  updateCapabilityEvidenceStage,
+} from '../src/monitoring/state-store.js';
 
 import {
   PRAXIS_ROOT,
@@ -18,9 +24,11 @@ import {
   projectNativeSkills,
   renderHelp,
   runCli,
+  selectCapabilities,
   setupProject,
   statusProject,
   syncProject,
+  validateChangeEvidence,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
 
@@ -116,6 +124,11 @@ test('renderHelp reflects the current CLI surface', () => {
 
   assert.match(help, /setup/);
   assert.match(help, /validate-session/);
+  assert.match(help, /validate-change/);
+  assert.match(help, /instrumentation/);
+  assert.doesNotMatch(help, /record-selection/);
+  assert.doesNotMatch(help, /record-capability/);
+  assert.doesNotMatch(help, /Internal monitoring helper option/);
   assert.doesNotMatch(help, /^\s*openspec\s+/m);
   assert.doesNotMatch(help, /change\s+Create an OpenSpec change scaffold/);
   assert.doesNotMatch(help, /proposal\s+Compatibility alias/);
@@ -125,22 +138,27 @@ test('renderHelp reflects the current CLI surface', () => {
 
 test('parseCliArgs parses current flags and rejects removed --openspec', () => {
   const parsed = parseCliArgs([
-    'doctor',
+    'instrumentation',
+    'enable',
     '--agents',
     'codex,claude',
     '--agent',
     'opencode',
     '--project-dir',
     'tmp/project',
-    '--file',
-    'tmp/session.md',
+    '--change-id',
+    'add-auth',
+    '--stage',
+    'apply',
     '--strict',
   ]);
 
-  assert.equal(parsed.command, 'doctor');
+  assert.equal(parsed.command, 'instrumentation');
   assert.deepEqual(parsed.agents, ['codex', 'claude', 'opencode']);
   assert.equal(parsed.projectDir, path.resolve('tmp/project'));
-  assert.equal(parsed.file, path.resolve('tmp/session.md'));
+  assert.equal(parsed.changeId, 'add-auth');
+  assert.equal(parsed.stage, 'apply');
+  assert.deepEqual(parsed.positional, ['enable']);
   assert.equal(parsed.strict, true);
 
   assert.throws(
@@ -165,13 +183,17 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(output, /Synced adapters: codex, claude, opencode/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
-  assert.match(agentsMd, /中大型变更、跨模块改动、接口或兼容性调整、架构\/流程重构/);
-  assert.match(agentsMd, /提案\/探索阶段必须走原生 OpenSpec proposal 流程/);
-  assert.match(agentsMd, /进入 OpenSpec flow 后，OpenSpec skill 是唯一主流程/);
-  assert.match(agentsMd, /superpowers 仅作为当前 OpenSpec 阶段的辅助能力使用/);
-  assert.match(agentsMd, /在 OpenSpec 上下文中，避免再次向用户宣告 `Using \[skill\]` 或 `superpowers:/);
-  assert.match(agentsMd, /先在当前 OpenSpec 阶段内完成范围澄清与方案比较/);
-  assert.match(agentsMd, /执行 `openspec new change \.\.\.` 等原生命令创建\/推进 proposal/);
+  assert.match(agentsMd, /Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors/);
+  assert.match(agentsMd, /native OpenSpec proposal flow has been executed through `\/opsx:propose` or `\/opsx:explore` plus native OpenSpec commands/);
+  assert.match(agentsMd, /Inside OpenSpec, `opsx-explore`, `opsx-propose`, `opsx-apply`, and `opsx-archive` are the only visible workflow layer/);
+  assert.match(agentsMd, /Superpowers may run only as embedded capabilities inside the active OpenSpec stage/);
+  assert.match(agentsMd, /Do not re-announce `Using \[skill\]` or `superpowers:/);
+  assert.match(agentsMd, /finish clarification and option comparison inside the current OpenSpec stage before implementation/);
+  assert.match(agentsMd, /keep all parallel work, subtasks, outputs, and status under the current change/);
+  assert.match(agentsMd, /OpenSpec \+ Superpowers Contract/);
+  assert.match(agentsMd, /Stage Gates/);
+  assert.match(agentsMd, /Capability execution is judged by evidence/);
+  assert.doesNotMatch(agentsMd, /[\u4e00-\u9fff]/u);
   assert.doesNotMatch(agentsMd, /praxis-devos openspec/);
   assert.doesNotMatch(agentsMd, /显式加载 `superpowers:brainstorming`/);
   assert.doesNotMatch(agentsMd, /显式加载 `superpowers:writing-plans`/);
@@ -180,7 +202,7 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
   assert.match(claudeMd, /^<!-- PRAXIS_DEVOS_START -->\n@AGENTS\.md/m);
   assert.match(claudeMd, /Claude Code 通过 `CLAUDE\.md` 读取项目指令/);
-  assert.doesNotMatch(claudeMd, /中大型变更、跨模块改动、接口或兼容性调整、架构\/流程重构/);
+  assert.doesNotMatch(claudeMd, /Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors/);
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
 });
 
@@ -213,18 +235,37 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
     'utf8',
   );
 
+  assert.match(propose, /^---\nname: opsx-propose\n/m);
+  assert.match(apply, /^---\nname: opsx-apply\n/m);
+  assert.match(archive, /^---\nname: opsx-archive\n/m);
+  assert.match(explore, /^---\nname: opsx-explore\n/m);
+  assert.match(propose, /## PRAXIS_DEVOS_OVERLAY/);
+  assert.match(apply, /## PRAXIS_DEVOS_OVERLAY/);
+  assert.match(archive, /## PRAXIS_DEVOS_OVERLAY/);
+  assert.match(explore, /## PRAXIS_DEVOS_OVERLAY/);
   assert.match(propose, /invoke `brainstorming` internally/);
-  assert.match(propose, /不要再额外宣告 `Using brainstorming`/);
-  assert.match(propose, /必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(propose, /do not announce `Using brainstorming`/);
+  assert.match(propose, /Embedded capability contract:/);
+  assert.match(propose, /mode: embedded/);
+  assert.match(propose, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(apply, /invoke `writing-plans` internally/);
   assert.match(apply, /invoke `systematic-debugging` internally/);
   assert.match(apply, /invoke `subagent-driven-development` internally/);
   assert.match(apply, /invoke `verification-before-completion` internally/);
-  assert.match(apply, /必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(apply, /evidence_target: user-level Praxis state directory/);
+  assert.doesNotMatch(apply, /record-selection/);
+  assert.doesNotMatch(apply, /record-capability/);
+  assert.match(apply, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(archive, /invoke `verification-before-completion` internally/);
-  assert.match(archive, /必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(archive, /Embedded capability contract:/);
+  assert.match(archive, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(explore, /invoke `brainstorming` internally/);
-  assert.match(explore, /必须传递当前主流程类型、当前阶段目标、当前 artifacts 位置和当前输出约束/);
+  assert.match(explore, /mode: embedded/);
+  assert.match(explore, /pass the current flow type, current stage goal, current artifact locations, and current output constraints/);
+  assert.doesNotMatch(propose, /[\u4e00-\u9fff]/u);
+  assert.doesNotMatch(apply, /[\u4e00-\u9fff]/u);
+  assert.doesNotMatch(archive, /[\u4e00-\u9fff]/u);
+  assert.doesNotMatch(explore, /[\u4e00-\u9fff]/u);
 });
 
 test('projectNativeSkills writes agent-native skills under the resolved user home with valid frontmatter', () => {
@@ -259,6 +300,25 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
   assert.match(logs.join('\n'), /Codex: projected opsx-propose/);
   assert.match(logs.join('\n'), /Claude: projected opsx-propose/);
   assert.match(logs.join('\n'), /OpenCode: projected opsx-propose/);
+});
+
+test('projectNativeSkills does not overwrite user-authored same-name skills without Praxis projection markers', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-safe-projection-home-'));
+  const customSkillPath = path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'SKILL.md');
+  fs.mkdirSync(path.dirname(customSkillPath), { recursive: true });
+  fs.writeFileSync(customSkillPath, '# user custom apply\n', 'utf8');
+  const logs = [];
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir: makeTempProject(),
+      agents: ['codex'],
+      log: (msg) => logs.push(msg),
+    });
+  });
+
+  assert.equal(fs.readFileSync(customSkillPath, 'utf8'), '# user custom apply\n');
+  assert.match(logs.join('\n'), /skipped opsx-apply because .* is not a Praxis projection/);
 });
 
 test('initProject bootstraps openspec workspace through a local runtime', () => {
@@ -363,20 +423,215 @@ test('setupProject installs Claude SuperPowers with user scope when Claude CLI i
 
 test('createChangeScaffold remains available as an internal scaffold helper', () => {
   const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-evidence-home-'));
   ensureOpenSpecWorkspace(projectDir);
 
-  const output = createChangeScaffold({
+  const output = withEnv('HOME', fakeHome, () => createChangeScaffold({
     projectDir,
     title: 'Add Two Factor Auth',
     summary: 'Harden account access.',
-  });
+  }));
 
   const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth');
+  const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({
+    projectDir,
+    changeId: 'add-two-factor-auth',
+  }));
   assert.match(output, /Created OpenSpec full change scaffold: add-two-factor-auth/);
   assert.match(output, /type: auto -> full/);
   assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
   assert.ok(fs.existsSync(path.join(changeDir, 'tasks.md')));
   assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
+  assert.ok(fs.existsSync(evidencePath));
+  assert.match(evidencePath, new RegExp(`^${fakeHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+});
+
+test('selectCapabilities chooses stage-appropriate embedded capabilities from signals', () => {
+  const selection = selectCapabilities({
+    stage: 'apply',
+    signals: ['multi_step', 'behavior_change', 'completion_claim'],
+  });
+
+  assert.deepEqual(
+    selection.selected.map((entry) => entry.id),
+    ['writing-plans', 'test-driven-development', 'verification-before-completion'],
+  );
+  assert.ok(selection.skipped.some((entry) => entry.id === 'using-git-worktrees'));
+  assert.ok(selection.skipped.some((entry) => entry.id === 'finishing-a-development-branch'));
+});
+
+test('validateChangeEvidence reports missing capability evidence and passes once evidence is complete', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-validate-home-'));
+  const changeId = 'add-auth';
+  const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({ projectDir, changeId }));
+  fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+
+  const incompleteEvidence = {
+    version: 1,
+    changeId,
+    stages: {
+      apply: {
+        signals: ['multi_step', 'behavior_change', 'completion_claim'],
+        capabilities: {
+          'writing-plans': {
+            selected: true,
+            reasons: ['multi_step'],
+            evidence: {
+              task_count: 4,
+              files: ['src/core/praxis-devos.js'],
+            },
+          },
+          'test-driven-development': {
+            selected: true,
+            reasons: ['behavior_change'],
+            evidence: {
+              failing_test: 'selector should choose TDD',
+            },
+          },
+          'verification-before-completion': {
+            selected: true,
+            reasons: ['completion_claim'],
+            evidence: {
+              command: 'npm test',
+              exit_code: 0,
+              summary: 'tests pass',
+            },
+          },
+        },
+      },
+    },
+  };
+
+  fs.writeFileSync(
+    evidencePath,
+    `${JSON.stringify(incompleteEvidence, null, 2)}\n`,
+    'utf8',
+  );
+
+  const incomplete = withEnv('HOME', fakeHome, () => validateChangeEvidence({ projectDir, changeId, stage: 'apply' }));
+  assert.match(incomplete, /status: needs-attention/);
+  assert.match(incomplete, /Missing evidence field "verification_steps" for writing-plans/);
+  assert.match(incomplete, /Missing evidence field "passing_test" for test-driven-development/);
+
+  const completeEvidence = {
+    ...incompleteEvidence,
+    stages: {
+      apply: {
+        signals: ['multi_step', 'behavior_change', 'completion_claim'],
+        capabilities: {
+          'writing-plans': {
+            selected: true,
+            reasons: ['multi_step'],
+            evidence: {
+              task_count: 4,
+              files: ['src/core/praxis-devos.js'],
+              verification_steps: ['npm test -- --test-name-pattern capability'],
+            },
+          },
+          'test-driven-development': {
+            selected: true,
+            reasons: ['behavior_change'],
+            evidence: {
+              failing_test: 'selector should choose TDD',
+              passing_test: 'selector should choose TDD',
+            },
+          },
+          'verification-before-completion': {
+            selected: true,
+            reasons: ['completion_claim'],
+            evidence: {
+              command: 'npm test',
+              exit_code: 0,
+              summary: 'tests pass',
+            },
+          },
+        },
+      },
+    },
+  };
+
+  fs.writeFileSync(
+    evidencePath,
+    `${JSON.stringify(completeEvidence, null, 2)}\n`,
+    'utf8',
+  );
+
+  const complete = withEnv('HOME', fakeHome, () => validateChangeEvidence({ projectDir, changeId, stage: 'apply' }));
+  assert.match(complete, /status: pass/);
+  assert.match(complete, /findings: none/);
+});
+
+test('capability evidence runtime APIs persist selection and merge stage evidence in user state', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-runtime-home-'));
+  const changeId = 'add-auth';
+
+  withEnv('HOME', fakeHome, () => {
+    const selection = recordCapabilitySelection({
+      projectDir,
+      changeId,
+      stage: 'apply',
+      signals: ['multi_step', 'behavior_change'],
+    });
+
+    assert.deepEqual(
+      selection.selected.map((entry) => entry.id),
+      ['writing-plans', 'test-driven-development'],
+    );
+
+    updateCapabilityEvidenceStage({
+      projectDir,
+      changeId,
+      stage: 'apply',
+      capabilities: {
+        'writing-plans': {
+          evidence: {
+            task_count: 3,
+            files: ['src/core/praxis-devos.js'],
+            verification_steps: ['npm test'],
+          },
+        },
+      },
+    });
+
+    updateCapabilityEvidenceStage({
+      projectDir,
+      changeId,
+      stage: 'apply',
+      capabilities: {
+        'test-driven-development': {
+          evidence: {
+            failing_test: 'selection lacks TDD evidence',
+            passing_test: 'selection now has TDD evidence',
+          },
+        },
+      },
+    });
+
+    const persisted = readCapabilityEvidence({ projectDir, changeId }).value;
+    assert.deepEqual(persisted.stages.apply.signals, ['multi_step', 'behavior_change']);
+    assert.deepEqual(
+      Object.keys(persisted.stages.apply.capabilities).sort(),
+      ['test-driven-development', 'writing-plans'],
+    );
+    assert.equal(persisted.stages.apply.capabilities['writing-plans'].selected, true);
+    assert.deepEqual(
+      persisted.stages.apply.capabilities['writing-plans'].evidence.verification_steps,
+      ['npm test'],
+    );
+    assert.equal(
+      persisted.stages.apply.capabilities['test-driven-development'].evidence.passing_test,
+      'selection now has TDD evidence',
+    );
+  });
+
+  const report = withEnv('HOME', fakeHome, () => validateChangeEvidence({
+    projectDir,
+    changeId,
+    stage: 'apply',
+  }));
+  assert.match(report, /status: pass/);
 });
 
 test('doctorProject reports current dependency status for OpenCode', () => {
@@ -523,10 +778,37 @@ test('validateSessionTranscript rejects duplicate stage summaries or close-out r
   assert.match(report, /Avoid duplicate stage summaries or close-out recaps inside OpenSpec flow/);
 });
 
-test('runCli routes help, validate-session, and migrate but rejects openspec wrapper usage', () => {
+test('runCli routes help, validate-session, validate-change, and migrate but rejects openspec wrapper usage', () => {
   const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-cli-home-'));
   installFakeOpenSpec(projectDir, 'CLI');
   ensureOpenSpecWorkspace(projectDir);
+  const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({ projectDir, changeId: 'add-auth' }));
+  fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+  fs.writeFileSync(
+    evidencePath,
+    `${JSON.stringify({
+      version: 1,
+      changeId: 'add-auth',
+      stages: {
+        apply: {
+          signals: ['multi_step'],
+          capabilities: {
+            'writing-plans': {
+              selected: true,
+              reasons: ['multi_step'],
+              evidence: {
+                task_count: 2,
+                files: ['src/core/praxis-devos.js'],
+                verification_steps: ['npm test'],
+              },
+            },
+          },
+        },
+      },
+    }, null, 2)}\n`,
+    'utf8',
+  );
 
   const help = runCli([]);
   const validation = runCli([
@@ -534,6 +816,15 @@ test('runCli routes help, validate-session, and migrate but rejects openspec wra
     '--file',
     path.join(PRAXIS_ROOT, 'test', 'fixtures', 'transcripts', 'valid-session.md'),
   ]);
+  const changeValidation = withEnv('HOME', fakeHome, () => runCli([
+    'validate-change',
+    '--project-dir',
+    projectDir,
+    '--change-id',
+    'add-auth',
+    '--stage',
+    'apply',
+  ]));
   const migration = runCli([
     'migrate',
     '--project-dir',
@@ -544,6 +835,7 @@ test('runCli routes help, validate-session, and migrate but rejects openspec wra
 
   assert.match(help, /praxis-devos <command> \[options\]/);
   assert.match(validation, /status: pass/);
+  assert.match(changeValidation, /status: pass/);
   assert.match(migration, /Migration completed/);
   assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
   assert.throws(
@@ -558,4 +850,69 @@ test('runCli routes help, validate-session, and migrate but rejects openspec wra
     () => runCli(['proposal', '--project-dir', projectDir, '--title', 'removed']),
     /Unknown command: proposal/,
   );
+});
+
+test('runCli instrumentation enable and disable only affect projected OpenSpec skills', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-record-home-'));
+  const customSkillDir = path.join(fakeHome, '.codex', 'skills', 'custom-skill');
+  fs.mkdirSync(customSkillDir, { recursive: true });
+  fs.writeFileSync(path.join(customSkillDir, 'SKILL.md'), '# custom\n', 'utf8');
+
+  withEnv('HOME', fakeHome, () => {
+    const enableReport = runCli([
+      'instrumentation',
+      'enable',
+      '--project-dir',
+      projectDir,
+      '--agent',
+      'codex',
+    ]);
+
+    const projectedApply = path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'SKILL.md');
+    const projectedPropose = path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md');
+    const customSkill = path.join(customSkillDir, 'SKILL.md');
+
+    assert.match(enableReport, /Instrumentation enabled/);
+    assert.match(fs.readFileSync(projectedApply, 'utf8'), /PRAXIS_MONITORING/);
+    assert.match(fs.readFileSync(projectedPropose, 'utf8'), /PRAXIS_MONITORING/);
+    assert.equal(fs.readFileSync(customSkill, 'utf8'), '# custom\n');
+
+    const statusEnabled = runCli([
+      'instrumentation',
+      'status',
+      '--agent',
+      'codex',
+    ]);
+    assert.match(statusEnabled, /codex: enabled/);
+    assert.match(statusEnabled, /opsx-apply: instrumented/);
+    assert.match(statusEnabled, /opsx-propose: instrumented/);
+    assert.match(statusEnabled, /opsx-explore: instrumented/);
+    assert.match(statusEnabled, /opsx-archive: instrumented/);
+
+    const disableReport = runCli([
+      'instrumentation',
+      'disable',
+      '--project-dir',
+      projectDir,
+      '--agent',
+      'codex',
+    ]);
+
+    assert.match(disableReport, /Instrumentation disabled/);
+    assert.doesNotMatch(fs.readFileSync(projectedApply, 'utf8'), /PRAXIS_MONITORING/);
+    assert.doesNotMatch(fs.readFileSync(projectedPropose, 'utf8'), /PRAXIS_MONITORING/);
+
+    const statusDisabled = runCli([
+      'instrumentation',
+      'status',
+      '--agent',
+      'codex',
+    ]);
+    assert.match(statusDisabled, /codex: clean/);
+    assert.match(statusDisabled, /opsx-apply: clean/);
+    assert.match(statusDisabled, /opsx-propose: clean/);
+    assert.match(statusDisabled, /opsx-explore: clean/);
+    assert.match(statusDisabled, /opsx-archive: clean/);
+  });
 });

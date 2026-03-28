@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { buildMarker, injectMarker, isProjection } from './markers.js';
+import { buildMarker, canWriteProjection, injectMarker, isProjection } from './markers.js';
 import { resolveUserHomeDir } from '../support/home.js';
 
 const codexSkillsDir = () => path.join(resolveUserHomeDir(), '.codex', 'skills');
@@ -21,6 +21,11 @@ export const projectSkills = ({ skillSources, version, log }) => {
     const targetDir = path.join(codexSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
     ensureDir(targetDir);
+    if (!canWriteProjection(targetPath)) {
+      results.push({ name, targetPath, status: 'skipped' });
+      log(`⊘ Codex: skipped ${name} because ${targetPath} is not a Praxis projection`);
+      continue;
+    }
 
     const content = fs.readFileSync(sourcePath, 'utf8');
     const marker = buildMarker({ source: path.relative(process.cwd(), sourcePath), version });
