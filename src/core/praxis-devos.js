@@ -5,6 +5,18 @@ import { execFileSync, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { projectToAgent, detectForAgent, expectedSkillNames } from '../projection/index.js';
 import { resolveUserHomeDir } from '../support/home.js';
+import {
+  handleInstrumentationCommand,
+  handleRecordCapabilityCommand,
+  handleRecordSelectionCommand,
+  handleValidateChangeCommand,
+  initializeCapabilityEvidence,
+  recordCapabilityEvidence,
+  recordCapabilitySelection,
+  updateCapabilityEvidenceStage,
+  validateChangeEvidence,
+} from '../monitoring/index.js';
+import { selectCapabilities } from './capability-policy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -818,6 +830,7 @@ export const createChangeScaffold = ({
   }
 
   writeText(specPath, renderSpecDeltaContent({ title: trimmedTitle }));
+  initializeCapabilityEvidence({ projectDir, changeId: nextChangeId });
 
   const created = [
     path.relative(projectDir, proposalPath),
@@ -1317,9 +1330,16 @@ export const parseCliArgs = (argv) => {
   const parsed = {
     command: args.shift() || 'help',
     agents: [],
+    capability: null,
+    changeId: null,
+    evidenceJson: null,
     file: null,
     positional: [],
     projectDir: process.cwd(),
+    reasons: '',
+    selected: false,
+    signals: '',
+    stage: null,
     strict: false,
     withOpenSpec: false,
   };
@@ -1346,6 +1366,41 @@ export const parseCliArgs = (argv) => {
 
     if (token === '--file') {
       parsed.file = path.resolve(args.shift() || parsed.projectDir);
+      continue;
+    }
+
+    if (token === '--change-id') {
+      parsed.changeId = args.shift() || null;
+      continue;
+    }
+
+    if (token === '--capability') {
+      parsed.capability = args.shift() || null;
+      continue;
+    }
+
+    if (token === '--signals') {
+      parsed.signals = args.shift() || '';
+      continue;
+    }
+
+    if (token === '--reasons') {
+      parsed.reasons = args.shift() || '';
+      continue;
+    }
+
+    if (token === '--evidence-json') {
+      parsed.evidenceJson = args.shift() || null;
+      continue;
+    }
+
+    if (token === '--selected') {
+      parsed.selected = true;
+      continue;
+    }
+
+    if (token === '--stage') {
+      parsed.stage = args.shift() || null;
       continue;
     }
 
@@ -1787,6 +1842,15 @@ export const validateSessionTranscript = ({ filePath, strict = false }) => {
   return report;
 };
 
+export {
+  selectCapabilities,
+  validateChangeEvidence,
+  initializeCapabilityEvidence,
+  recordCapabilityEvidence,
+  recordCapabilitySelection,
+  updateCapabilityEvidenceStage,
+};
+
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
@@ -1794,10 +1858,12 @@ Commands:
   init           Initialize the framework skeleton in the current project
   sync           Refresh agent adapters and managed blocks
   migrate        Sync adapters (legacy .praxis migration is no longer needed)
+  instrumentation Enable, disable, or inspect projected monitoring overlays
   status         Show current project initialization and dependency state
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
   validate-session  Validate a transcript against Praxis evidence hooks
+  validate-change  Validate embedded capability evidence for an OpenSpec change
   help           Show this help
 
 Options:
@@ -1805,6 +1871,8 @@ Options:
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
   --file <path>          Transcript file for \`validate-session\`
+  --change-id <name>     OpenSpec change id for \`validate-change\`
+  --stage <name>         Capability stage to validate (\`explore\`, \`propose\`, \`apply\`, \`archive\`)
   --strict               Fail doctor if required dependencies are missing
 
 Supported agents:
@@ -1834,6 +1902,14 @@ export const runCli = (argv) => {
     });
   }
 
+  if (parsed.command === 'instrumentation') {
+    const action = parsed.positional[0] || 'status';
+    const logs = [];
+    const log = (msg) => logs.push(msg);
+    const lines = handleInstrumentationCommand({ action, agents, log });
+    return [...lines, ...logs].join('\n');
+  }
+
   if (parsed.command === 'bootstrap') {
     const outputs = [];
     outputs.push(bootstrapOpenSpec({
@@ -1859,6 +1935,37 @@ export const runCli = (argv) => {
     return validateSessionTranscript({
       filePath: parsed.file,
       strict: parsed.strict,
+    });
+  }
+
+  if (parsed.command === 'validate-change') {
+    return handleValidateChangeCommand({
+      projectDir: parsed.projectDir,
+      changeId: parsed.changeId,
+      stage: parsed.stage,
+      strict: parsed.strict,
+    });
+  }
+
+  if (parsed.command === 'record-selection') {
+    return handleRecordSelectionCommand({
+      projectDir: parsed.projectDir,
+      changeId: parsed.changeId,
+      stage: parsed.stage,
+      signals: parsed.signals,
+    });
+  }
+
+  if (parsed.command === 'record-capability') {
+    return handleRecordCapabilityCommand({
+      projectDir: parsed.projectDir,
+      changeId: parsed.changeId,
+      stage: parsed.stage,
+      capability: parsed.capability,
+      selected: parsed.selected,
+      reasons: parsed.reasons,
+      evidenceJson: parsed.evidenceJson,
+      signals: parsed.signals,
     });
   }
 

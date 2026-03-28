@@ -1,5 +1,5 @@
 ---
-name: openspec-archive-change
+name: opsx-archive
 description: Archive a completed change in the experimental workflow. Use when the user wants to finalize and archive a change after implementation is complete.
 license: MIT
 compatibility: Requires openspec CLI.
@@ -9,114 +9,129 @@ metadata:
   generatedBy: "1.2.0"
 ---
 
-归档一个已完成的 experimental workflow change。
+Archive a completed change in the experimental workflow.
 
-**输入**：可以指定 change 名称；如果未指定，则从上下文推断。若上下文模糊或有多个候选，必须提示用户选择。
+**Input**: Optionally specify a change name. If omitted, check whether it can be inferred from conversation context. If vague or ambiguous, you MUST prompt for available changes.
 
-## OpenSpec + Superpowers 协调
+## PRAXIS_DEVOS_OVERLAY
 
-- `opsx-archive` 是当前唯一对外可见的主流程
-- 如果你在归档前内部采用验证方法，不要再额外宣告 `Using verification-before-completion`
-- 归档时的说明、校验结果、同步结论都必须附着在当前 change/archive flow 中，不要在 archive 阶段创建 `docs/superpowers/...` 输出
-- 辅助验证方法只能帮助确认是否可归档，不会形成第二套“完成流程”
-- 当你在当前阶段内部 invoke 任意 Superpowers 子 skill 时，必须传递当前主流程类型、当前 change id、当前阶段目标、当前 artifacts 位置和当前输出约束；不得新建独立 workflow、独立文档根目录或改变 change 归属
+Framework-specific coordination for embedded Superpowers usage:
 
-## 阶段内方法映射
+- `opsx-archive` remains the only visible flow for this stage.
+- If you use verification methods internally before archiving, do not announce `Using verification-before-completion`.
+- Archive explanations, verification results, and sync conclusions must stay attached to the current change or archive flow. Do not create `docs/superpowers/...`.
+- Internal verification methods help determine whether archiving is safe, but they do not create a second completion flow.
+- When invoking any internal Superpowers capability, pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints.
 
-- 当你准备归档时：invoke `verification-before-completion` internally，先确认 artifacts、tasks、校验结果是否足以支撑归档
-- 当发现 delta specs 还没同步时：先给出同步评估，再由用户决定是先 sync 还是直接 archive
+Embedded capability contract:
 
-**步骤**
+- `mode: embedded`
+- `owner_flow: opsx-archive`
+- `visibility: internal`
+- `artifact_targets: openspec/changes/<change>/...`
+- `evidence_target: user-level Praxis state directory`
 
-1. **如果未指定 change 名称，提示用户选择**
+Internal capabilities must not:
 
-   运行 `openspec list --json` 获取当前 changes，并使用 **AskUserQuestion tool** 让用户选择。
+- announce a second workflow
+- create `docs/superpowers/...`
+- output a second final recap
 
-   只展示 active changes（不要展示已经 archived 的）。
-   如可获得，也一起展示每个 change 的 schema。
+Stage hooks:
 
-   **重要：** 不要猜测或默认选中某个 change；必须让用户明确选择。
+- Before saying a change is ready to archive, invoke `verification-before-completion` internally and confirm artifacts, tasks, and validation evidence are sufficient.
+- If delta specs still need syncing, provide the sync assessment first and let the user decide whether to sync before archive.
+- Task-completion checks are part of the same internal verification pass before archive.
 
-2. **检查 artifact 完成情况**
+---
 
-   运行：
+**Steps**
+
+1. **If no change name is provided, prompt for selection**
+
+   Run `openspec list --json` to get available changes. Use the **AskUserQuestion tool** to let the user select.
+
+   Show only active changes, not archived ones.
+   Include the schema for each change if available.
+
+   **IMPORTANT**: Do not guess or auto-select a change. Always let the user choose.
+
+2. **Check artifact completion status**
+
+   Run:
    ```bash
    openspec status --change "<name>" --json
    ```
 
-   解析 JSON，了解：
+   Parse the JSON to understand:
    - `schemaName`
-   - `artifacts` 及其状态（`done` 或其他）
+   - `artifacts` and their status
 
-   **如果存在未完成的 artifacts：**
-   - 展示 warning，并列出未完成项
-   - 使用 **AskUserQuestion tool** 询问用户是否仍要继续
-   - 若用户确认，则继续
+   **If any artifacts are not `done`:**
+   - Display a warning listing incomplete artifacts
+   - Use **AskUserQuestion tool** to confirm that the user wants to proceed
+   - Proceed if the user confirms
 
-   在汇报“可以归档”之前，先在当前 `opsx-archive` 内 invoke `verification-before-completion` internally，确认这些 artifacts 的完成情况足以支撑归档判断。
+3. **Check task completion status**
 
-3. **检查 task 完成情况**
+   Read the tasks file, typically `tasks.md`, and check for incomplete tasks.
 
-   读取任务文件（通常是 `tasks.md`），检查是否仍有未完成任务。
+   Count:
+   - `- [ ]` for incomplete
+   - `- [x]` for complete
 
-   统计：
-   - `- [ ]`：未完成
-   - `- [x]`：已完成
+   **If incomplete tasks are found:**
+   - Display a warning showing the count
+   - Use **AskUserQuestion tool** to confirm that the user wants to proceed
+   - Proceed if the user confirms
 
-   **如果存在未完成任务：**
-   - 展示 warning，并告诉用户数量
-   - 使用 **AskUserQuestion tool** 确认是否仍要继续
-   - 若用户确认，则继续
+   **If no tasks file exists:** proceed without a task warning.
 
-   这一检查同样属于归档前验证的一部分，应纳入当前 `opsx-archive` 内部的 `verification-before-completion` 执行中。
+4. **Assess delta spec sync state**
 
-   **如果没有任务文件：** 跳过这一检查。
+   Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, continue without a sync prompt.
 
-4. **评估 delta spec 同步状态**
+   **If delta specs exist:**
+   - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
+   - Determine what changes would be applied
+   - Show a combined summary before prompting
 
-   查看 `openspec/changes/<name>/specs/` 下是否存在 delta specs。若不存在，跳过同步提示。
+   **Prompt options:**
+   - If changes are needed: `Sync now (recommended)` or `Archive without syncing`
+   - If already synced: `Archive now`, `Sync anyway`, or `Cancel`
 
-   **如果存在 delta specs：**
-   - 将每个 delta spec 与对应的主 spec（`openspec/specs/<capability>/spec.md`）比较
-   - 识别会产生的变更类型：新增、修改、删除、重命名
-   - 在询问用户前，先给出一份合并后的影响摘要
+   If the user chooses sync, use Task tool with:
+   `Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>`
 
-   **提示选项：**
-   - 如果存在待同步变更：`Sync now (recommended)`、`Archive without syncing`
-   - 如果已经同步：`Archive now`、`Sync anyway`、`Cancel`
+   Proceed to archive regardless of whether the user syncs.
 
-   如果用户选择 sync，使用 Task tool（`subagent_type: "general-purpose"`），并提示：
-   `Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <summary>`
+5. **Perform the archive**
 
-   无论用户是否 sync，之后都继续 archive 流程。
-
-5. **执行 archive**
-
-   如果 archive 目录不存在，先创建：
+   Create the archive directory if it does not exist:
    ```bash
    mkdir -p openspec/changes/archive
    ```
 
-   使用当前日期生成 archive 名称：`YYYY-MM-DD-<change-name>`
+   Generate the target name using the current date: `YYYY-MM-DD-<change-name>`
 
-   **检查目标目录是否已存在：**
-   - 如果已存在：报错，并建议用户改名或处理已有 archive
-   - 如果不存在：将 change 目录移动到 archive
+   **Check whether the target already exists:**
+   - If yes: fail with an error and suggest renaming the existing archive or using a different date
+   - If no: move the change directory to archive
 
    ```bash
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **展示归档总结**
+6. **Display summary**
 
-   总结内容包括：
-   - change 名称
-   - 使用的 schema
-   - archive 位置
-   - specs 是否已同步（如果适用）
-   - 是否带着 warnings 继续（例如 artifacts/tasks 未全部完成）
+   Show:
+   - Change name
+   - Schema
+   - Archive location
+   - Whether specs were synced
+   - Any warnings that were acknowledged
 
-**成功输出示例**
+**Output On Success**
 
 ```text
 ## Archive Complete
@@ -124,17 +139,17 @@ metadata:
 **Change:** <change-name>
 **Schema:** <schema-name>
 **Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
-**Specs:** ✓ Synced to main specs（或 "No delta specs" / "Sync skipped"）
+**Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
 
 All artifacts complete. All tasks complete.
 ```
 
 **Guardrails**
 
-- 如果未指定 change，始终让用户选择
-- 完成度检查以 `openspec status --json` 的 artifact graph 为准
-- 不要因为 warning 直接阻止 archive；应提示并确认
-- 移动目录时要保留 `.openspec.yaml`（它会随目录一起移动）
-- 始终明确说明归档过程发生了什么
-- 如果用户要求 sync，使用 `openspec-sync-specs` 路线处理
-- 如果存在 delta specs，必须先做同步评估并给出摘要，再询问用户
+- Always prompt for change selection if no name is provided
+- Use the artifact graph from `openspec status --json` for completion checks
+- Do not block archive on warnings. Inform and confirm instead
+- Preserve `.openspec.yaml` when moving to archive
+- Show a clear summary of what happened
+- If sync is requested, use the `openspec-sync-specs` path
+- If delta specs exist, always run the sync assessment and show the combined summary before prompting
