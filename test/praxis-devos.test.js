@@ -239,7 +239,7 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
     });
 
     const projectedCodexSkill = fs.readFileSync(
-      path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
+      path.join(fakeHome, '.agents', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
     const projectedClaudeCommand = fs.readFileSync(

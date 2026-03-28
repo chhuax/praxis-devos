@@ -190,10 +190,10 @@ const runFile = (cmd, args, opts = {}) => {
 };
 
 const codexSuperpowersPaths = () => ({
-  skillsPath: path.join(resolveUserHomeDir(), '.codex', 'skills', 'superpowers'),
-  skillsParent: path.join(resolveUserHomeDir(), '.codex', 'skills'),
-  clonePath: path.join(resolveUserHomeDir(), '.codex', 'superpowers'),
-  cloneParent: path.join(resolveUserHomeDir(), '.codex'),
+  skillsPath: path.join(resolveUserHomeDir(), '.agents', 'skills', 'superpowers'),
+  skillsParent: path.join(resolveUserHomeDir(), '.agents', 'skills'),
+  clonePath: path.join(resolveUserHomeDir(), '.agents', 'superpowers'),
+  cloneParent: path.join(resolveUserHomeDir(), '.agents'),
 });
 
 const hasSkillMarkdownFiles = (rootDir) => {
@@ -963,7 +963,7 @@ const detectCodexSuperpowers = () => {
 
     return {
       status: 'warning',
-      detail: `Found clone at ${clonePath}, but ~/.codex/skills/superpowers is missing`,
+      detail: `Found clone at ${clonePath}, but ~/.agents/skills/superpowers is missing`,
     };
   }
 
@@ -1173,11 +1173,11 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
         'Follow the official Codex installation steps for Superpowers (PowerShell):',
         `- Reference: ${SUPERPOWERS_DOCS.codex}`,
         '- Clone the repo:',
-        '  git clone https://github.com/obra/superpowers.git "$HOME/.codex/superpowers"',
+        '  git clone https://github.com/obra/superpowers.git "$HOME/.agents/superpowers"',
         '- Create the skills directory:',
-        '  New-Item -ItemType Directory -Force "$HOME/.codex/skills" | Out-Null',
+        '  New-Item -ItemType Directory -Force "$HOME/.agents/skills" | Out-Null',
         '- Link the skills directory (junction avoids Windows symlink privilege issues):',
-        '  New-Item -ItemType Junction -Path "$HOME/.codex/skills/superpowers" -Target "$HOME/.codex/superpowers/skills"',
+        '  New-Item -ItemType Junction -Path "$HOME/.agents/skills/superpowers" -Target "$HOME/.agents/superpowers/skills"',
         '- Restart Codex',
         '- Optional: enable multi-agent in Codex config if you want subagent skills',
       ].join('\n');
@@ -1187,10 +1187,10 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
       'Follow the official Codex installation steps for Superpowers:',
       `- Reference: ${SUPERPOWERS_DOCS.codex}`,
       '- Clone the repo:',
-      '  git clone https://github.com/obra/superpowers.git ~/.codex/superpowers',
+      '  git clone https://github.com/obra/superpowers.git ~/.agents/superpowers',
       '- Create the skills symlink:',
-      '  mkdir -p ~/.codex/skills',
-      '  ln -s ~/.codex/superpowers/skills ~/.codex/skills/superpowers',
+      '  mkdir -p ~/.agents/skills',
+      '  ln -s ~/.agents/superpowers/skills ~/.agents/skills/superpowers',
       '- Restart Codex',
       '- Optional: enable multi-agent in Codex config if you want subagent skills',
     ].join('\n');
