@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-03-30
+
+### Fixed
+- OpenCode plugin configuration now writes to the global `~/.config/opencode/config.json` instead of the project-level `opencode.json`; detection and bootstrap logic updated accordingly
+
 ## [0.4.5] - 2026-03-28
 
 ### Added
