@@ -166,6 +166,8 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
   assert.match(agentsMd, /中大型变更、跨模块改动、接口或兼容性调整、架构\/流程重构/);
+  assert.match(agentsMd, /纯写作、改写、翻译、总结等直接产出型请求，默认直接执行/);
+  assert.match(agentsMd, /如果请求同时涉及代码、行为、接口、兼容性、架构或流程变化，则按工程任务处理/);
   assert.match(agentsMd, /提案\/探索阶段必须走原生 OpenSpec proposal 流程/);
   assert.match(agentsMd, /进入 OpenSpec flow 后，OpenSpec skill 是唯一主流程/);
   assert.match(agentsMd, /superpowers 仅作为当前 OpenSpec 阶段的辅助能力使用/);
@@ -339,8 +341,29 @@ test('setupProject initializes the current structure for OpenCode without networ
   assert.match(output, /Configured OpenCode plugins in/);
   assert.match(output, /\[OK\] superpowers:opencode/);
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
   assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
+  assert.match(
+    fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8'),
+    /PRAXIS_DEVOS_START/,
+  );
+});
+
+test('syncProject writes shared AGENTS rules for OpenCode-only projects', () => {
+  const projectDir = makeTempProject();
+
+  const output = syncProject({
+    projectDir,
+    agents: ['opencode'],
+  });
+
+  assert.match(output, /OpenCode adapter synced/);
+  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+  assert.match(
+    fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8'),
+    /PRAXIS_DEVOS_START/,
+  );
 });
 
 test('setupProject installs Claude SuperPowers with user scope when Claude CLI is available', () => {
@@ -445,6 +468,22 @@ test('validateSessionTranscript returns reports and enforces strict mode', () =>
     () => validateSessionTranscript({ filePath: invalidFile, strict: true }),
     /status: needs-attention/,
   );
+});
+
+test('validateSessionTranscript allows lightweight direct-output sessions without engineering workflow evidence', () => {
+  const validFile = path.join(
+    PRAXIS_ROOT,
+    'test',
+    'fixtures',
+    'transcripts',
+    'lightweight-direct-output-session.md',
+  );
+
+  const report = validateSessionTranscript({ filePath: validFile });
+
+  assert.match(report, /status: pass/);
+  assert.match(report, /triggered hooks: none/);
+  assert.match(report, /findings: none/);
 });
 
 test('validateSessionTranscript rejects proposal flow without native OpenSpec proposal execution evidence', () => {

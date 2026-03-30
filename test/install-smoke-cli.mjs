@@ -145,7 +145,7 @@ const findSkillMarkdown = (rootDir) => {
 };
 
 const assertProjectedCodexSkills = (fakeHome) => {
-  const skillsRoot = path.join(fakeHome, '.codex', 'skills');
+  const skillsRoot = path.join(fakeHome, '.agents', 'skills');
   for (const name of PROJECTED_OPENSPEC_SKILLS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
@@ -280,7 +280,7 @@ const runSmoke = ({ packageFile, scenario }) => {
   assert.match(secondSetupResult.stdout, /Project already initialized; refreshing selected agents and managed adapters\./);
 
   if (scenario === 'codex') {
-    const codexSkillsPath = path.join(fakeHome, '.codex', 'skills', 'superpowers');
+    const codexSkillsPath = path.join(fakeHome, '.agents', 'skills', 'superpowers');
     assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')), `Expected AGENTS.md in ${projectDir}`);
     assert.ok(fs.existsSync(codexSkillsPath), `Expected Codex skills path at ${codexSkillsPath}`);
     assert.ok(findSkillMarkdown(codexSkillsPath), `Expected Codex SuperPowers content under ${codexSkillsPath}`);
@@ -299,7 +299,10 @@ const runSmoke = ({ packageFile, scenario }) => {
   if (scenario === 'opencode') {
     const configPath = path.join(projectDir, 'opencode.json');
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const agentsPath = path.join(projectDir, 'AGENTS.md');
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+    assert.ok(fs.existsSync(agentsPath), `Expected AGENTS.md in ${projectDir}`);
+    assert.match(fs.readFileSync(agentsPath, 'utf8'), /PRAXIS_DEVOS_START/);
     assert.ok(Array.isArray(config.plugin));
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
     assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));

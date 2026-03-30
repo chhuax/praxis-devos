@@ -95,7 +95,7 @@ npx praxis-devos doctor --strict
 Agent-specific runtime behavior:
 
 - OpenCode: writes plugin declarations into `opencode.json` and projects shared OpenSpec skills under `~/.claude/skills`
-- Codex: clones SuperPowers into `~/.codex/superpowers` and links skills into `~/.codex/skills/superpowers`
+- Codex: projects shared OpenSpec skills under `~/.agents/skills` for native skill discovery
 - Claude Code: runs `claude plugin install superpowers@claude-plugins-official --scope user`
 
 ## OpenSpec + SuperPowers Contract
@@ -104,6 +104,7 @@ Praxis does not replace OpenSpec or SuperPowers. It binds them together.
 
 The managed project rules tell agents to:
 
+- handle pure writing, rewriting, translation, and summarization requests as direct-output work instead of escalating them into engineering workflows
 - use `/opsx:propose` or `/opsx:explore` for proposal/exploration flow
 - perform Proposal Intake before implementation
 - treat OpenSpec as the only visible workflow once an OpenSpec stage is active
@@ -115,6 +116,8 @@ Praxis does not currently fork or override the upstream SuperPowers plugin. The 
 - the shared managed rules in `AGENTS.md` plus the thin `CLAUDE.md` wrapper
 - projected OpenSpec skills (`opsx-*`) that define OpenSpec as the outer workflow
 - transcript/session validation rules that flag duplicate workflow announcements or `docs/superpowers/...` outputs inside OpenSpec flow
+
+That means Praxis can narrow the routing boundary it projects into a repo, but it does not rewrite upstream SuperPowers skills globally. The lightweight direct-output rule is therefore expressed in Praxis-managed guidance and examples, while engineering-change gates remain mandatory for code, behavior, interface, compatibility, and architecture/process changes.
 
 ## Enterprise Extension Packs
 

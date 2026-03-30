@@ -95,7 +95,7 @@ npx praxis-devos doctor --strict
 各 agent 当前行为：
 
 - OpenCode：向 `opencode.json` 写入插件声明，并把共享 OpenSpec skills 投放到 `~/.claude/skills`
-- Codex：将 SuperPowers clone 到 `~/.codex/superpowers`，并把 skills 链接到 `~/.codex/skills/superpowers`
+- Codex：将共享 OpenSpec skills 投放到 `~/.agents/skills`，供 Codex 原生发现
 - Claude Code：执行 `claude plugin install superpowers@claude-plugins-official --scope user`
 
 ## OpenSpec 与 SuperPowers 的结合方式
@@ -104,6 +104,7 @@ Praxis 不替代 OpenSpec 或 SuperPowers，而是把两者编排到一起。
 
 托管项目规则会要求 agent：
 
+- 对纯写作、改写、翻译、总结这类直接产出型请求默认直接执行，而不是升级成工程流程
 - 用 `/opsx:propose` 或 `/opsx:explore` 进入提案/探索流程
 - 在进入实现前先完成 Proposal Intake
 - 一旦进入 OpenSpec 阶段，始终以 OpenSpec 作为唯一对外可见的主流程
@@ -115,6 +116,8 @@ Praxis 目前不会 fork 或覆盖上游 SuperPowers 插件。当前的协调方
 - `AGENTS.md` 中的共享托管规则，以及负责引入它的薄 `CLAUDE.md`
 - 投影后的 OpenSpec `opsx-*` skills，它们定义 OpenSpec 是外层主流程
 - transcript/session validator，它会拦截 OpenSpec flow 中重复的流程公告或写入 `docs/superpowers/...` 的输出
+
+这也意味着 Praxis 只能收窄自己投影到仓库内的路由边界，不能全局重写上游 SuperPowers skill。本仓库定义的“轻任务直出”规则会体现在 Praxis 托管规则与示例里，而代码、行为、接口、兼容性、架构/流程变化仍然必须走工程门禁。
 
 ## 企业级扩展包
 

@@ -88,6 +88,20 @@
 
 前提是仓库级规则未要求必须先走 proposal flow。
 
+### 5.3 何时直接执行，不升级为工程流程
+
+满足以下条件时，保持 direct-output 路径，不强制进入 `OpenSpec`，也不强制套用工程化的 `brainstorming` / `writing-plans` 门禁：
+
+- 纯写作
+- 改写 / 润色
+- 翻译
+- 总结用户已提供内容
+
+边界条件：
+
+- 一旦请求同时涉及代码、行为、接口、兼容性、架构或流程变化，仍按工程任务处理
+- 如果用户明确要求 proposal / explore / implementation flow，则按对应 OpenSpec 阶段执行
+
 ## 6. OpenSpec 上下文中的 Superpowers 适配规则
 
 一旦进入 `OpenSpec`，以下规则生效。

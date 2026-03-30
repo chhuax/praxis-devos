@@ -551,6 +551,10 @@ export const syncProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
 
   const selectedAgents = uniqueAgents(agents);
 
+  if (selectedAgents.includes('opencode') && !selectedAgents.includes('codex')) {
+    syncCodexAdapter({ projectDir, log });
+  }
+
   for (const agent of selectedAgents) {
     syncAgent({ projectDir, agent, log });
   }
