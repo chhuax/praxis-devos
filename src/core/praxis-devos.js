@@ -506,24 +506,41 @@ const syncCodexAdapter = ({ projectDir, log }) => {
 
 const syncClaudeAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
-  const status = upsertManagedBlock(
+
+  const agentsStatus = upsertManagedBlock(
+    paths.rootAgentsMd,
+    AGENTS_MANAGED_START,
+    AGENTS_MANAGED_END,
+    renderManagedBlock(),
+    AGENTS_MD_TEMPLATE,
+  );
+  log(`✓ Claude Code adapter synced via AGENTS.md (${agentsStatus})`);
+
+  const claudeStatus = upsertManagedBlock(
     paths.rootClaudeMd,
     CLAUDE_MANAGED_START,
     CLAUDE_MANAGED_END,
     renderClaudeManagedBlock(),
     CLAUDE_MD_TEMPLATE,
   );
-
-  log(`✓ Claude Code adapter synced via CLAUDE.md (${status})`);
+  log(`✓ Claude Code adapter synced via CLAUDE.md (${claudeStatus})`);
 };
 
 const syncOpenCodeAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
 
   ensureDir(paths.legacyOpenCodeDir);
-
   writeText(path.join(paths.legacyOpenCodeDir, 'README.md'), `${OPENCODE_ADAPTER_README}\n`);
   log('✓ OpenCode adapter synced to .opencode/');
+
+  const status = upsertManagedBlock(
+    paths.rootAgentsMd,
+    AGENTS_MANAGED_START,
+    AGENTS_MANAGED_END,
+    renderManagedBlock(),
+    AGENTS_MD_TEMPLATE,
+  );
+  log(`✓ OpenCode adapter synced via AGENTS.md (${status})`);
 };
 
 const syncAgent = ({ projectDir, agent, log }) => {
