@@ -297,7 +297,7 @@ const runSmoke = ({ packageFile, scenario }) => {
   }
 
   if (scenario === 'opencode') {
-    const configPath = path.join(projectDir, 'opencode.json');
+    const configPath = path.join(fakeHome, '.config', 'opencode', 'config.json');
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
     assert.ok(Array.isArray(config.plugin));
