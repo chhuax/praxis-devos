@@ -341,20 +341,25 @@ test('initProject bootstraps openspec workspace through a local runtime', () => 
 test('statusProject reports initialized state for the selected agents', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-ok-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  fs.mkdirSync(globalConfigDir, { recursive: true });
   fs.writeFileSync(
-    path.join(projectDir, 'opencode.json'),
+    path.join(globalConfigDir, 'config.json'),
     JSON.stringify({ plugin: ['superpowers@git+https://github.com/obra/superpowers.git'] }, null, 2),
   );
   ensureOpenSpecWorkspace(projectDir);
 
-  const output = statusProject({
-    projectDir,
-    agents: ['opencode'],
-  });
+  withEnv('HOME', fakeHome, () => {
+    const output = statusProject({
+      projectDir,
+      agents: ['opencode'],
+    });
 
-  assert.match(output, /initialized: yes/);
-  assert.match(output, /openspec: \[OK\]/);
-  assert.match(output, /superpowers:opencode: \[OK\]/);
+    assert.match(output, /initialized: yes/);
+    assert.match(output, /openspec: \[OK\]/);
+    assert.match(output, /superpowers:opencode: \[OK\]/);
+  });
 });
 
 test('bootstrapOpenSpec prefers the local runtime when available', () => {
@@ -371,36 +376,44 @@ test('bootstrapOpenSpec prefers the local runtime when available', () => {
 
 test('bootstrapProject updates OpenCode plugins and prints runtime guidance', () => {
   const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-bootstrap-'));
 
-  const output = bootstrapProject({
-    projectDir,
-    agents: ['opencode', 'codex', 'claude'],
+  withEnv('HOME', fakeHome, () => {
+    const output = bootstrapProject({
+      projectDir,
+      agents: ['opencode', 'codex', 'claude'],
+    });
+
+    const globalConfigPath = path.join(fakeHome, '.config', 'opencode', 'config.json');
+    const config = readJson(globalConfigPath);
+    assert.match(output, /== opencode ==/);
+    assert.match(output, /== codex ==/);
+    assert.match(output, /== claude ==/);
+    assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+    assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
   });
-
-  const config = readJson(path.join(projectDir, 'opencode.json'));
-  assert.match(output, /== opencode ==/);
-  assert.match(output, /== codex ==/);
-  assert.match(output, /== claude ==/);
-  assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
-  assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
 });
 
 test('setupProject initializes the current structure for OpenCode without networked side effects', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-setup-'));
 
-  const output = setupProject({
-    projectDir,
-    agents: ['opencode'],
+  withEnv('HOME', fakeHome, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const globalConfigPath = path.join(fakeHome, '.config', 'opencode', 'config.json');
+    assert.match(output, /== openspec ==/);
+    assert.match(output, /== opencode ==/);
+    assert.match(output, /Configured OpenCode plugins in/);
+    assert.match(output, /\[OK\] superpowers:opencode/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
+    assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+    assert.ok(fs.existsSync(globalConfigPath));
   });
-
-  assert.match(output, /== openspec ==/);
-  assert.match(output, /== opencode ==/);
-  assert.match(output, /Configured OpenCode plugins in/);
-  assert.match(output, /\[OK\] superpowers:opencode/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
-  assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'opencode.json')));
 });
 
 test('setupProject installs Claude SuperPowers with user scope when Claude CLI is available', () => {
@@ -637,20 +650,19 @@ test('capability evidence runtime APIs persist selection and merge stage evidenc
 test('doctorProject reports current dependency status for OpenCode', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
-  fs.writeFileSync(
-    path.join(projectDir, 'opencode.json'),
-    JSON.stringify({ plugin: ['praxis-devos@git+https://github.com/chhuax/praxis-devos.git'] }, null, 2),
-  );
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-missing-'));
 
-  const output = doctorProject({
-    projectDir,
-    agents: ['opencode'],
+  withEnv('HOME', fakeHome, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.match(output, /Dependency doctor:/);
+    assert.match(output, /\[OK\] openspec/);
+    assert.match(output, /\[MISSING\] superpowers:opencode/);
+    assert.match(output, /npx praxis-devos setup --agents opencode/);
   });
-
-  assert.match(output, /Dependency doctor:/);
-  assert.match(output, /\[OK\] openspec/);
-  assert.match(output, /\[MISSING\] superpowers:opencode/);
-  assert.match(output, /npx praxis-devos setup --agents opencode/);
 });
 
 test('doctorProject reports missing Claude plugin when settings do not contain it', () => {

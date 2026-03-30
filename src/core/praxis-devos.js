@@ -438,6 +438,9 @@ const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const getPackageVersion = () => readJson(PACKAGE_JSON)?.version || '0.0.0';
 
+const globalOpencodeConfigPath = () =>
+  path.join(resolveUserHomeDir(), '.config', 'opencode', 'config.json');
+
 const projectPaths = (projectDir) => ({
   projectDir,
   opencodeConfigPath: path.join(projectDir, 'opencode.json'),
@@ -886,14 +889,14 @@ const writeProjectJson = (filePath, value) => {
   writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
 };
 
-const detectOpenCodeSuperpowers = (projectDir) => {
-  const paths = projectPaths(projectDir);
-  const config = readProjectJson(paths.opencodeConfigPath);
+const detectOpenCodeSuperpowers = () => {
+  const configPath = globalOpencodeConfigPath();
+  const config = readProjectJson(configPath);
 
   if (!config) {
     return {
       status: 'missing',
-      detail: `Missing ${path.basename(paths.opencodeConfigPath)}`,
+      detail: `Missing ${configPath}`,
     };
   }
 
@@ -904,8 +907,8 @@ const detectOpenCodeSuperpowers = (projectDir) => {
     ));
 
   return hasSuperpowers
-    ? { status: 'ok', detail: 'superpowers plugin declared in opencode.json' }
-    : { status: 'missing', detail: 'superpowers plugin not declared in opencode.json' };
+    ? { status: 'ok', detail: `superpowers plugin declared in ${configPath}` }
+    : { status: 'missing', detail: `superpowers plugin not declared in ${configPath}` };
 };
 
 const ensureOpenSpecRuntime = (projectDir) => {
@@ -942,9 +945,10 @@ const ensureOpenSpecRuntime = (projectDir) => {
   return logs.join('\n');
 };
 
-const ensureOpenCodeSuperpowers = (projectDir) => {
-  const paths = projectPaths(projectDir);
-  const config = readProjectJson(paths.opencodeConfigPath) || {};
+const ensureOpenCodeSuperpowers = () => {
+  const configPath = globalOpencodeConfigPath();
+  ensureDir(path.dirname(configPath));
+  const config = readProjectJson(configPath) || {};
   const next = {
     ...config,
     plugin: [...new Set([
@@ -954,8 +958,8 @@ const ensureOpenCodeSuperpowers = (projectDir) => {
     ])],
   };
 
-  writeProjectJson(paths.opencodeConfigPath, next);
-  return `Configured OpenCode plugins in ${paths.opencodeConfigPath}`;
+  writeProjectJson(configPath, next);
+  return `Configured OpenCode plugins in ${configPath}`;
 };
 
 const detectCodexSuperpowers = () => {
@@ -1124,7 +1128,7 @@ const ensureRuntimeDependencies = ({ projectDir, agents }) => {
   for (const agent of selectedAgents) {
     if (agent === 'opencode') {
       logs.push(`== ${agent} ==`);
-      logs.push(ensureOpenCodeSuperpowers(projectDir));
+      logs.push(ensureOpenCodeSuperpowers());
       continue;
     }
 
@@ -1146,7 +1150,7 @@ const ensureRuntimeDependencies = ({ projectDir, agents }) => {
 
 const detectSuperpowersForAgent = (projectDir, agent) => {
   if (agent === 'opencode') {
-    return detectOpenCodeSuperpowers(projectDir);
+    return detectOpenCodeSuperpowers();
   }
 
   if (agent === 'codex') {
@@ -1174,7 +1178,9 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
   const paths = projectPaths(projectDir);
 
   if (agent === 'opencode') {
-    const config = readProjectJson(paths.opencodeConfigPath) || {};
+    const configPath = globalOpencodeConfigPath();
+    ensureDir(path.dirname(configPath));
+    const config = readProjectJson(configPath) || {};
     const next = {
       ...config,
       plugin: [...new Set([
@@ -1184,9 +1190,9 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
       ])],
     };
 
-    writeProjectJson(paths.opencodeConfigPath, next);
+    writeProjectJson(configPath, next);
     return [
-      `Updated ${paths.opencodeConfigPath}`,
+      `Updated ${configPath}`,
       'Added OpenCode plugins:',
       `- ${PRAXIS_OPENCODE_PLUGIN}`,
       `- ${SUPERPOWERS_OPENCODE_PLUGIN}`,
