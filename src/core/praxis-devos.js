@@ -889,6 +889,101 @@ const writeProjectJson = (filePath, value) => {
   writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
 };
 
+const readJsonFileWithRaw = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    return {
+      ok: true,
+      exists: false,
+      raw: null,
+      value: null,
+    };
+  }
+
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return {
+      ok: true,
+      exists: true,
+      raw,
+      value: JSON.parse(raw),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      exists: true,
+      raw: readFile(filePath),
+      error,
+    };
+  }
+};
+
+const backupFile = (filePath) => {
+  const backupPath = `${filePath}.bak-${Date.now()}`;
+  ensureDir(path.dirname(backupPath));
+  fs.copyFileSync(filePath, backupPath);
+  return backupPath;
+};
+
+const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+
+const validateOpenCodeConfigShape = (configPath, config) => {
+  if (!isPlainObject(config)) {
+    throw new Error(`Cannot safely merge OpenCode config at ${configPath}: expected a JSON object at the top level.`);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(config, 'plugin') && !Array.isArray(config.plugin)) {
+    throw new Error(`Cannot safely merge OpenCode config at ${configPath}: expected "plugin" to be an array.`);
+  }
+};
+
+const mergeOpenCodePlugins = (config) => ({
+  ...config,
+  plugin: [...new Set([
+    ...(Array.isArray(config.plugin) ? config.plugin : []),
+    PRAXIS_OPENCODE_PLUGIN,
+    SUPERPOWERS_OPENCODE_PLUGIN,
+  ])],
+});
+
+const ensureOpenCodePluginsConfigured = () => {
+  const configPath = globalOpencodeConfigPath();
+  ensureDir(path.dirname(configPath));
+
+  const current = readJsonFileWithRaw(configPath);
+  if (!current.ok) {
+    const backupPath = backupFile(configPath);
+    throw new Error(`Cannot safely merge OpenCode config at ${configPath}. Backed up the original file to ${backupPath} and left the config unchanged.`);
+  }
+
+  const config = current.value ?? {};
+
+  try {
+    validateOpenCodeConfigShape(configPath, config);
+    const next = mergeOpenCodePlugins(config);
+    const nextText = `${JSON.stringify(next, null, 2)}\n`;
+
+    if (current.raw === nextText) {
+      return {
+        changed: false,
+        configPath,
+        backupPath: null,
+      };
+    }
+
+    const backupPath = current.exists ? backupFile(configPath) : null;
+    writeProjectJson(configPath, next);
+    return {
+      changed: true,
+      configPath,
+      backupPath,
+    };
+  } catch (error) {
+    const backupPath = current.exists ? backupFile(configPath) : null;
+    const backupNote = backupPath ? ` Backed up the original file to ${backupPath}.` : '';
+    throw new Error(`${error.message}${backupNote} Left the config unchanged.`);
+  }
+};
+
 const detectOpenCodeSuperpowers = () => {
   const configPath = globalOpencodeConfigPath();
   const config = readProjectJson(configPath);
@@ -946,20 +1041,18 @@ const ensureOpenSpecRuntime = (projectDir) => {
 };
 
 const ensureOpenCodeSuperpowers = () => {
-  const configPath = globalOpencodeConfigPath();
-  ensureDir(path.dirname(configPath));
-  const config = readProjectJson(configPath) || {};
-  const next = {
-    ...config,
-    plugin: [...new Set([
-      ...(Array.isArray(config.plugin) ? config.plugin : []),
-      PRAXIS_OPENCODE_PLUGIN,
-      SUPERPOWERS_OPENCODE_PLUGIN,
-    ])],
-  };
+  const result = ensureOpenCodePluginsConfigured();
+  const lines = [`Configured OpenCode plugins in ${result.configPath}`];
 
-  writeProjectJson(configPath, next);
-  return `Configured OpenCode plugins in ${configPath}`;
+  if (result.backupPath) {
+    lines.push(`Backed up existing OpenCode config to ${result.backupPath}`);
+  }
+
+  if (!result.changed) {
+    lines.push('OpenCode plugin config already contained the required plugins');
+  }
+
+  return lines.join('\n');
 };
 
 const detectCodexSuperpowers = () => {
@@ -1178,29 +1271,30 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
   const paths = projectPaths(projectDir);
 
   if (agent === 'opencode') {
-    const configPath = globalOpencodeConfigPath();
-    ensureDir(path.dirname(configPath));
-    const config = readProjectJson(configPath) || {};
-    const next = {
-      ...config,
-      plugin: [...new Set([
-        ...(Array.isArray(config.plugin) ? config.plugin : []),
-        PRAXIS_OPENCODE_PLUGIN,
-        SUPERPOWERS_OPENCODE_PLUGIN,
-      ])],
-    };
-
-    writeProjectJson(configPath, next);
-    return [
-      `Updated ${configPath}`,
+    const result = ensureOpenCodePluginsConfigured();
+    const lines = [
+      `Updated ${result.configPath}`,
       'Added OpenCode plugins:',
       `- ${PRAXIS_OPENCODE_PLUGIN}`,
       `- ${SUPERPOWERS_OPENCODE_PLUGIN}`,
+    ];
+
+    if (result.backupPath) {
+      lines.push(`Backed up existing OpenCode config to ${result.backupPath}`);
+    }
+
+    if (!result.changed) {
+      lines.push('OpenCode plugin config already contained the required plugins.');
+    }
+
+    lines.push(
       'Next steps:',
       '- Restart OpenCode',
       '- Start a new session and verify Superpowers skills are available',
       `Reference: ${SUPERPOWERS_DOCS.opencode}`,
-    ].join('\n');
+    );
+
+    return lines.join('\n');
   }
 
   if (agent === 'codex') {
