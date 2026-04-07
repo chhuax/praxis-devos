@@ -10,6 +10,7 @@ test('quoted windows npm shim installs a local openspec wrapper for setup smoke'
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-quoted-npm-'));
   const projectDir = path.join(tempRoot, 'project');
   const invocationLogPath = path.join(tempRoot, 'quoted-command-invocations.log');
+  const diagnosticLogPath = path.join(tempRoot, 'quoted-command-diagnostics.log');
   const shimPath = path.join(tempRoot, 'npm-shim.cjs');
   const openspecCmdPath = path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd');
   const openspecShimPath = path.join(projectDir, 'node_modules', '.bin', 'openspec-shim.cjs');
@@ -19,6 +20,7 @@ test('quoted windows npm shim installs a local openspec wrapper for setup smoke'
     shimPath,
     buildQuotedWindowsNpmShim({
       invocationLogPath,
+      diagnosticLogPath,
       openspecCmdPath,
       openspecShimPath,
     }),
@@ -30,6 +32,8 @@ test('quoted windows npm shim installs a local openspec wrapper for setup smoke'
 
   assert.equal(install.status, 0, install.stderr);
   assert.equal(fs.readFileSync(invocationLogPath, 'utf8').trim(), 'npm.cmd install -D @fission-ai/openspec');
+  assert.match(fs.readFileSync(diagnosticLogPath, 'utf8'), /"shimPath":/);
+  assert.match(fs.readFileSync(diagnosticLogPath, 'utf8'), new RegExp(shimPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.ok(fs.existsSync(openspecCmdPath));
   assert.ok(fs.existsSync(openspecShimPath));
 
