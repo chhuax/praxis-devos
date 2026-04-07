@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.7] - 2026-03-31
 
+### Changed
+- Claude native OpenSpec projection now writes bundled `opsx-*` skills to `~/.claude/skills/` as `SKILL.md` directories instead of duplicating them into `~/.claude/commands/`
+- Claude and OpenCode now share the same `~/.claude/skills/` projection surface for bundled OpenSpec skills
+
 ### Fixed
 - OpenCode global config updates now preserve existing `plugin` entries and top-level settings instead of overwriting user-owned configuration during `setup` and `bootstrap`
 - OpenCode global config rewrites now create a backup first and fail safe when the existing `~/.config/opencode/config.json` cannot be safely merged

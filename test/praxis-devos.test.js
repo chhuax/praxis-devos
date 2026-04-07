@@ -94,6 +94,10 @@ const listBackupFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
   .filter((entry) => entry.startsWith(`${fileName}.bak-`))
   .sort();
 
+const listTempFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
+  .filter((entry) => entry.startsWith(`${fileName}.tmp-`))
+  .sort();
+
 const installFakeClaude = (homeDir) => {
   const binDir = path.join(homeDir, 'fake-claude-bin');
   const scriptPath = path.join(binDir, 'claude');
@@ -287,8 +291,8 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
       path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
-    const projectedClaudeCommand = fs.readFileSync(
-      path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md'),
+    const projectedClaudeSkill = fs.readFileSync(
+      path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
     const projectedOpenCodeSkill = fs.readFileSync(
@@ -297,7 +301,7 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
     );
 
     assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
-    assert.match(projectedClaudeCommand, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedClaudeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedOpenCodeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
   });
 
@@ -513,6 +517,46 @@ test('setupProject does not overwrite unsafe OpenCode config', () => {
     assert.equal(backups.length, 1);
     assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
   });
+});
+
+test('setupProject leaves the live OpenCode config unchanged when atomic replace fails', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-atomic-fail-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  const original = JSON.stringify({ plugin: ['existing-plugin'], theme: 'night' }, null, 2);
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(globalConfigPath, `${original}\n`, 'utf8');
+
+  const originalRenameSync = fs.renameSync;
+  fs.renameSync = (...args) => {
+    if (args[1] === globalConfigPath) {
+      throw new Error('rename failed');
+    }
+
+    return originalRenameSync(...args);
+  };
+
+  try {
+    withEnv('HOME', fakeHome, () => {
+      assert.throws(
+        () => setupProject({
+          projectDir,
+          agents: ['opencode'],
+        }),
+        /rename failed/i,
+      );
+    });
+  } finally {
+    fs.renameSync = originalRenameSync;
+  }
+
+  const backups = listBackupFiles(globalConfigDir, 'config.json');
+  assert.equal(fs.readFileSync(globalConfigPath, 'utf8'), `${original}\n`);
+  assert.equal(backups.length, 1);
+  assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
+  assert.deepEqual(listTempFiles(globalConfigDir, 'config.json'), []);
 });
 
 test('setupProject installs Claude SuperPowers with user scope when Claude CLI is available', () => {

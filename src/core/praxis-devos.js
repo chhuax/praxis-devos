@@ -956,6 +956,8 @@ const ensureOpenCodePluginsConfigured = () => {
   }
 
   const config = current.value ?? {};
+  let backupPath = null;
+  let tempPath = null;
 
   try {
     validateOpenCodeConfigShape(configPath, config);
@@ -970,15 +972,25 @@ const ensureOpenCodePluginsConfigured = () => {
       };
     }
 
-    const backupPath = current.exists ? backupFile(configPath) : null;
-    writeProjectJson(configPath, next);
+    backupPath = current.exists ? backupFile(configPath) : null;
+    tempPath = `${configPath}.tmp-${process.pid}-${Date.now()}`;
+    writeText(tempPath, nextText);
+    fs.renameSync(tempPath, configPath);
+
     return {
       changed: true,
       configPath,
       backupPath,
     };
   } catch (error) {
-    const backupPath = current.exists ? backupFile(configPath) : null;
+    if (tempPath && fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+
+    if (!backupPath && current.exists) {
+      backupPath = backupFile(configPath);
+    }
+
     const backupNote = backupPath ? ` Backed up the original file to ${backupPath}.` : '';
     throw new Error(`${error.message}${backupNote} Left the config unchanged.`);
   }
