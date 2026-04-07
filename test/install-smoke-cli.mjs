@@ -271,17 +271,13 @@ const installQuotedWindowsCommandWrappers = ({ tempRoot, fakeHome, env }) => {
   assert.equal(process.platform, 'win32', 'quoted-windows-space mode is only supported on Windows');
 
   const realNpmPath = resolveFirstCommandPath('npm.cmd');
-  const realWherePath = resolveFirstCommandPath('where.exe');
-  const harnessDir = path.join(tempRoot, 'quoted-command-harness');
   const commandDir = path.join(tempRoot, 'Program Files', 'nodejs');
   const invocationLogPath = path.join(tempRoot, 'quoted-command-invocations.log');
   const npmShimPath = path.join(commandDir, 'npm-shim.cjs');
   const claudeShimPath = path.join(commandDir, 'claude-shim.cjs');
   const npmCmdPath = path.join(commandDir, 'npm.cmd');
   const claudeCmdPath = path.join(commandDir, 'claude.cmd');
-  const whereCmdPath = path.join(harnessDir, 'where.cmd');
 
-  fs.mkdirSync(harnessDir, { recursive: true });
   fs.mkdirSync(commandDir, { recursive: true });
 
   fs.writeFileSync(
@@ -322,31 +318,7 @@ process.exit(1);
     '@echo off\r\nnode "%~dp0\\claude-shim.cjs" %*\r\n',
   );
 
-  fs.writeFileSync(
-    whereCmdPath,
-    `@echo off
-setlocal
-if /I "%~1"=="npm" (
-  echo "${npmCmdPath}"
-  exit /b 0
-)
-if /I "%~1"=="npm.cmd" (
-  echo "${npmCmdPath}"
-  exit /b 0
-)
-if /I "%~1"=="claude" (
-  echo "${claudeCmdPath}"
-  exit /b 0
-)
-if /I "%~1"=="claude.cmd" (
-  echo "${claudeCmdPath}"
-  exit /b 0
-)
-"${realWherePath}" %*
-`,
-  );
-
-  prependToPath(env, harnessDir);
+  prependToPath(env, commandDir);
   return {
     invocationLogPath,
   };
