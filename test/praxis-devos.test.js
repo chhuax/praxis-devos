@@ -184,7 +184,7 @@ esac
     `#!/bin/sh
 set -eu
 while [ "$#" -gt 0 ]; do
-  if [ "$1" = "/c" ]; then
+  if [ "$1" = "/c" ] || [ "$1" = "-c" ]; then
     shift
     break
   fi
