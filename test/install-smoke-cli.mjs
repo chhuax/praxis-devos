@@ -274,6 +274,7 @@ const installQuotedWindowsCommandWrappers = ({ tempRoot, fakeHome, env }) => {
   const realWherePath = resolveFirstCommandPath('where.exe');
   const harnessDir = path.join(tempRoot, 'quoted-command-harness');
   const commandDir = path.join(tempRoot, 'Program Files', 'nodejs');
+  const invocationLogPath = path.join(tempRoot, 'quoted-command-invocations.log');
   const npmShimPath = path.join(commandDir, 'npm-shim.cjs');
   const claudeShimPath = path.join(commandDir, 'claude-shim.cjs');
   const npmCmdPath = path.join(commandDir, 'npm.cmd');
@@ -285,7 +286,9 @@ const installQuotedWindowsCommandWrappers = ({ tempRoot, fakeHome, env }) => {
 
   fs.writeFileSync(
     npmShimPath,
-    `const { spawnSync } = require('node:child_process');
+    `const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
+fs.appendFileSync(${JSON.stringify(invocationLogPath)}, 'npm.cmd\\n');
 const result = spawnSync(${JSON.stringify(realNpmPath)}, process.argv.slice(2), { stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `,
@@ -296,6 +299,7 @@ process.exit(result.status ?? 1);
     `const fs = require('node:fs');
 const path = require('node:path');
 const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(invocationLogPath)}, 'claude.cmd\\n');
 if (args[0] === 'plugin' && args[1] === 'install' && args[2] === 'superpowers@claude-plugins-official' && args[3] === '--scope' && args[4] === 'user') {
   const settingsPath = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'settings.json');
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
@@ -344,9 +348,7 @@ if /I "%~1"=="claude.cmd" (
 
   prependToPath(env, harnessDir);
   return {
-    commandDir,
-    npmCmdPath,
-    claudeCmdPath,
+    invocationLogPath,
   };
 };
 
@@ -438,7 +440,9 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   assertProjectedClaudeSkills(fakeHome);
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
   if (quotedWindowsWrappers) {
-    assert.match(setupResult.stdout, new RegExp(quotedWindowsWrappers.commandDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
+    assert.match(invocationLog, /npm\.cmd/);
+    assert.match(invocationLog, /claude\.cmd/);
   }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];
