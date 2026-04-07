@@ -119,16 +119,29 @@ const normalizeCommandPath = (value) => {
     return value;
   }
 
-  const trimmed = value.trim();
-  if (trimmed.length >= 2) {
-    const first = trimmed[0];
-    const last = trimmed[trimmed.length - 1];
-    if ((first === '"' && last === '"') || (first === '\'' && last === '\'')) {
-      return trimmed.slice(1, -1);
+  let normalized = value.trim();
+
+  while (normalized.length >= 2) {
+    if (
+      (normalized.startsWith('"') && normalized.endsWith('"'))
+      || (normalized.startsWith('\'') && normalized.endsWith('\''))
+    ) {
+      normalized = normalized.slice(1, -1).trim();
+      continue;
     }
+
+    if (
+      (normalized.startsWith('\\"') && normalized.endsWith('\\"'))
+      || (normalized.startsWith("\\'") && normalized.endsWith("\\'"))
+    ) {
+      normalized = normalized.slice(2, -2).trim();
+      continue;
+    }
+
+    break;
   }
 
-  return trimmed;
+  return normalized;
 };
 
 const findCommandPath = (cmd) => {

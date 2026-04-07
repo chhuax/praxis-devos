@@ -159,14 +159,14 @@ const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
 set -eu
 case "$1" in
   npm|npm.cmd)
-    printf '"%s"\\n' "${npmPath}"
+    printf '\'"%s"\'\\n' "${npmPath}"
     ;;
   claude|claude.cmd)
-    printf '"%s"\\n' "${claudePath}"
+    printf '\'"%s"\'\\n' "${claudePath}"
     ;;
   openspec|openspec.cmd)
     if [ -f "${openspecPath}" ]; then
-      printf '"%s"\\n' "${openspecPath}"
+      printf '\'"%s"\'\\n' "${openspecPath}"
     else
       exit 1
     fi
