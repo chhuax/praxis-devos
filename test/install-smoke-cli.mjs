@@ -423,10 +423,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     const diagnosticLog = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8');
     assert.match(invocationLog, /npm\.cmd/);
     assert.match(invocationLog, /claude\.cmd/);
-    const escapedCommandDir = quotedWindowsWrappers.commandDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     assert.match(diagnosticLog, /"command":"npm\.cmd"/);
     assert.match(diagnosticLog, /"command":"claude\.cmd"/);
-    assert.match(diagnosticLog, new RegExp(escapedCommandDir));
+    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\npm-shim\.cjs/);
+    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\claude-shim\.cjs/);
   }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];
