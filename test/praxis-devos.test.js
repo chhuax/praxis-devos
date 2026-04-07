@@ -190,7 +190,13 @@ while [ "$#" -gt 0 ]; do
   fi
   shift
 done
-/bin/sh -c "$1"
+command="$1"
+first_char=$(printf '%.1s' "$command")
+last_char=$(printf '%s' "$command" | sed 's/.*\\(.\\)$/\\1/')
+if [ "$first_char" = '"' ] && [ "$last_char" = '"' ]; then
+  command=$(printf '%s' "$command" | sed 's/^"//; s/"$//')
+fi
+/bin/sh -c "$command"
 `,
     { mode: 0o755 },
   );
