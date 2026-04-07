@@ -224,7 +224,11 @@ const runFile = (cmd, args, opts = {}) => {
     const execOpts = { encoding: 'utf8', timeout: 120_000, ...opts };
     const normalizedCmd = normalizeCommandPath(cmd);
     const stdout = isWindowsBatchScript(normalizedCmd)
-      ? execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', buildWindowsBatchCommand(normalizedCmd, args)], execOpts)
+      ? execFileSync(
+        process.env.ComSpec || 'cmd.exe',
+        ['/d', '/s', '/c', buildWindowsBatchCommand(normalizedCmd, args)],
+        { ...execOpts, windowsVerbatimArguments: true },
+      )
       : execFileSync(normalizedCmd, args, execOpts);
     return { ok: true, stdout: stdout.trim(), stderr: '' };
   } catch (err) {
