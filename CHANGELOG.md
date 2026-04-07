@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-04-07
+
+### Fixed
+- normalized quoted Windows command paths before invoking `npm.cmd` and `claude.cmd` during `setup`, so automatic installs no longer fail when the resolved executable path contains spaces
+- added a Windows install-smoke variant that simulates quoted command paths with spaces to catch this regression in CI before release
+
 ## [0.4.7] - 2026-03-31
 
 ### Changed
