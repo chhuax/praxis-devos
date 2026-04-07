@@ -27,7 +27,7 @@ export const buildQuotedWindowsNpmShim = ({
   openspecShimPath,
 }) => {
   const diagnosticLine = diagnosticLogPath
-    ? `fs.appendFileSync('${escapeForSingleQuotedJs(diagnosticLogPath)}', JSON.stringify({ command: 'npm.cmd', cwd: process.cwd(), argv: args }) + '\\n');\n`
+    ? `fs.appendFileSync('${escapeForSingleQuotedJs(diagnosticLogPath)}', JSON.stringify({ command: 'npm.cmd', shimPath: __filename, cwd: process.cwd(), argv: args }) + '\\n');\n`
     : '';
 
   return `const fs = require('node:fs');
@@ -51,7 +51,7 @@ export const buildQuotedWindowsClaudeShim = ({
   diagnosticLogPath = null,
 }) => {
   const diagnosticLine = diagnosticLogPath
-    ? `fs.appendFileSync('${escapeForSingleQuotedJs(diagnosticLogPath)}', JSON.stringify({ command: 'claude.cmd', cwd: process.cwd(), argv: args }) + '\\n');\n`
+    ? `fs.appendFileSync('${escapeForSingleQuotedJs(diagnosticLogPath)}', JSON.stringify({ command: 'claude.cmd', shimPath: __filename, cwd: process.cwd(), argv: args }) + '\\n');\n`
     : '';
 
   return `const fs = require('node:fs');

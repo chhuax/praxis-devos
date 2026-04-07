@@ -420,10 +420,13 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
   if (quotedWindowsWrappers) {
     const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
+    const diagnosticLog = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8');
     assert.match(invocationLog, /npm\.cmd/);
     assert.match(invocationLog, /claude\.cmd/);
     const escapedCommandDir = quotedWindowsWrappers.commandDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    assert.match(setupResult.stdout, new RegExp(escapedCommandDir));
+    assert.match(diagnosticLog, /"command":"npm\.cmd"/);
+    assert.match(diagnosticLog, /"command":"claude\.cmd"/);
+    assert.match(diagnosticLog, new RegExp(escapedCommandDir));
   }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];
