@@ -5,6 +5,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import {
+  buildQuotedWindowsClaudeShim,
+  buildQuotedWindowsNodeCmdWrapper,
+  buildQuotedWindowsNpmShim,
+} from './support/quoted-windows-smoke.mjs';
 
 const WINDOWS_BATCH_EXTENSIONS = new Set(['.cmd', '.bat']);
 const PROJECTED_OPENSPEC_SKILLS = [
@@ -81,6 +86,7 @@ const parseArgs = (argv) => {
   const parsed = {
     packageFile: '',
     scenario: '',
+    commandPathMode: 'normal',
   };
 
   while (args.length > 0) {
@@ -93,6 +99,10 @@ const parseArgs = (argv) => {
       parsed.scenario = args.shift() || '';
       continue;
     }
+    if (token === '--command-path-mode') {
+      parsed.commandPathMode = args.shift() || '';
+      continue;
+    }
     throw new Error(`Unknown argument: ${token}`);
   }
 
@@ -101,6 +111,9 @@ const parseArgs = (argv) => {
   }
   if (!parsed.scenario) {
     throw new Error('Missing `--scenario <codex|opencode|claude>`.');
+  }
+  if (!['normal', 'quoted-windows-space'].includes(parsed.commandPathMode)) {
+    throw new Error('Invalid `--command-path-mode`. Use `normal` or `quoted-windows-space`.');
   }
 
   return parsed;
@@ -155,11 +168,11 @@ const assertProjectedCodexSkills = (fakeHome) => {
 };
 
 const assertProjectedClaudeSkills = (fakeHome) => {
-  const commandsRoot = path.join(fakeHome, '.claude', 'commands');
+  const skillsRoot = path.join(fakeHome, '.claude', 'skills');
   for (const name of PROJECTED_OPENSPEC_SKILLS) {
     assert.ok(
-      fs.existsSync(path.join(commandsRoot, `${name}.md`)),
-      `Expected Claude projected command at ${path.join(commandsRoot, `${name}.md`)}`,
+      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
+      `Expected Claude projected skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
     );
   }
 };
@@ -234,7 +247,81 @@ exit 1
   return binDir;
 };
 
-const runSmoke = ({ packageFile, scenario }) => {
+const installQuotedWindowsCommandWrappers = ({ tempRoot, fakeHome, env }) => {
+  assert.equal(process.platform, 'win32', 'quoted-windows-space mode is only supported on Windows');
+
+  const commandDir = path.join(tempRoot, 'Program Files', 'nodejs');
+  const invocationLogPath = path.join(tempRoot, 'quoted-command-invocations.log');
+  const diagnosticLogPath = path.join(tempRoot, 'quoted-command-diagnostics.log');
+  const npmShimPath = path.join(commandDir, 'npm-shim.cjs');
+  const claudeShimPath = path.join(commandDir, 'claude-shim.cjs');
+  const npmCmdPath = path.join(commandDir, 'npm.cmd');
+  const claudeCmdPath = path.join(commandDir, 'claude.cmd');
+  const openspecCmdPath = path.join(tempRoot, 'project', 'node_modules', '.bin', 'openspec.cmd');
+  const openspecShimPath = path.join(tempRoot, 'project', 'node_modules', '.bin', 'openspec-shim.cjs');
+
+  fs.mkdirSync(commandDir, { recursive: true });
+
+  fs.writeFileSync(
+    npmShimPath,
+    buildQuotedWindowsNpmShim({
+      invocationLogPath,
+      diagnosticLogPath,
+      openspecCmdPath,
+      openspecShimPath,
+    }),
+  );
+
+  fs.writeFileSync(
+    claudeShimPath,
+    buildQuotedWindowsClaudeShim({
+      fakeHome,
+      invocationLogPath,
+      diagnosticLogPath,
+    }),
+  );
+
+  fs.writeFileSync(
+    npmCmdPath,
+    buildQuotedWindowsNodeCmdWrapper('npm-shim.cjs'),
+  );
+
+  fs.writeFileSync(
+    claudeCmdPath,
+    buildQuotedWindowsNodeCmdWrapper('claude-shim.cjs'),
+  );
+
+  prependToPath(env, commandDir);
+  return {
+    commandDir,
+    diagnosticLogPath,
+    invocationLogPath,
+  };
+};
+
+const readOptionalFile = (filePath) => {
+  try {
+    return fs.readFileSync(filePath, 'utf8').trim();
+  } catch {
+    return '';
+  }
+};
+
+const appendQuotedWindowsDiagnostics = (message, quotedWindowsWrappers) => {
+  if (!quotedWindowsWrappers) {
+    return message;
+  }
+
+  const invocationLog = readOptionalFile(quotedWindowsWrappers.invocationLogPath);
+  const diagnosticLog = readOptionalFile(quotedWindowsWrappers.diagnosticLogPath);
+  return [
+    message,
+    invocationLog ? `wrapper invocations:\n${invocationLog}` : null,
+    diagnosticLog ? `wrapper diagnostics:\n${diagnosticLog}` : null,
+  ].filter(Boolean).join('\n\n');
+};
+
+const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   const { agent, strictDoctor } = scenarioConfig(scenario);
   const packagePath = path.resolve(packageFile);
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `praxis-devos-${scenario}-smoke-`));
@@ -263,10 +350,25 @@ const runSmoke = ({ packageFile, scenario }) => {
   runCommand(npmCmd, ['init', '-y'], { cwd: projectDir, env });
   runCommand(npmCmd, ['install', '-D', packagePath], { cwd: projectDir, env });
 
-  const setupResult = runCommand(npxCmd, ['praxis-devos', 'setup', '--agent', agent], {
-    cwd: projectDir,
-    env,
-  });
+  let quotedWindowsWrappers = null;
+  if (commandPathMode === 'quoted-windows-space') {
+    quotedWindowsWrappers = installQuotedWindowsCommandWrappers({ tempRoot, fakeHome, env });
+  }
+
+  let setupResult;
+  try {
+    setupResult = runCommand(npxCmd, ['praxis-devos', 'setup', '--agent', agent], {
+      cwd: projectDir,
+      env,
+    });
+  } catch (err) {
+    throw new Error(
+      appendQuotedWindowsDiagnostics(
+        err instanceof Error ? err.message : String(err),
+        quotedWindowsWrappers,
+      ),
+    );
+  }
   const secondSetupResult = runCommand(npxCmd, ['praxis-devos', 'setup', '--agent', agent], {
     cwd: projectDir,
     env,
@@ -316,6 +418,16 @@ const runSmoke = ({ packageFile, scenario }) => {
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), `Expected CLAUDE.md in ${projectDir}`);
   assertProjectedClaudeSkills(fakeHome);
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
+  if (quotedWindowsWrappers) {
+    const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
+    const diagnosticLog = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8');
+    assert.match(invocationLog, /npm\.cmd/);
+    assert.match(invocationLog, /claude\.cmd/);
+    assert.match(diagnosticLog, /"command":"npm\.cmd"/);
+    assert.match(diagnosticLog, /"command":"claude\.cmd"/);
+    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\npm-shim\.cjs/);
+    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\claude-shim\.cjs/);
+  }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];
   if (strictDoctor) {
@@ -337,7 +449,7 @@ try {
 
   const parsed = parseArgs(process.argv.slice(2));
   runSmoke(parsed);
-  console.log(`Install smoke passed for scenario: ${parsed.scenario}`);
+  console.log(`Install smoke passed for scenario: ${parsed.scenario} (${parsed.commandPathMode})`);
 } catch (err) {
   console.error(err instanceof Error ? err.message : String(err));
   process.exit(1);

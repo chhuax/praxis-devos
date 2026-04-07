@@ -59,6 +59,20 @@ const withPrependedPath = (binDir, fn) => withEnv(
   fn,
 );
 
+const withPlatform = (platform, fn) => {
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', {
+    value: platform,
+    configurable: true,
+  });
+
+  try {
+    return fn();
+  } finally {
+    Object.defineProperty(process, 'platform', descriptor);
+  }
+};
+
 const installFakeOpenSpec = (projectDir, label = 'LOCAL') => {
   const binDir = path.join(projectDir, 'node_modules', '.bin');
   const scriptPath = path.join(binDir, 'openspec');
@@ -90,6 +104,14 @@ const ensureOpenSpecWorkspace = (projectDir) => {
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
+const listBackupFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
+  .filter((entry) => entry.startsWith(`${fileName}.bak-`))
+  .sort();
+
+const listTempFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
+  .filter((entry) => entry.startsWith(`${fileName}.tmp-`))
+  .sort();
+
 const installFakeClaude = (homeDir) => {
   const binDir = path.join(homeDir, 'fake-claude-bin');
   const scriptPath = path.join(binDir, 'claude');
@@ -117,6 +139,129 @@ exit 1
   );
   fs.chmodSync(scriptPath, 0o755);
   return binDir;
+};
+
+const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
+  const harnessDir = path.join(homeDir, 'fake-win-tools');
+  const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
+  const npmPath = path.join(commandDir, 'npm.cmd');
+  const claudePath = path.join(commandDir, 'claude.cmd');
+  const comSpecPath = path.join(harnessDir, 'cmd.exe');
+  const wherePath = path.join(harnessDir, 'where');
+  const openspecPath = path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd');
+
+  fs.mkdirSync(harnessDir, { recursive: true });
+  fs.mkdirSync(commandDir, { recursive: true });
+
+  fs.writeFileSync(
+    wherePath,
+    `#!/bin/sh
+set -eu
+case "$1" in
+  npm|npm.cmd)
+    printf '\'"%s"\'\\n' "${npmPath}"
+    ;;
+  claude|claude.cmd)
+    printf '\'"%s"\'\\n' "${claudePath}"
+    ;;
+  openspec|openspec.cmd)
+    if [ -f "${openspecPath}" ]; then
+      printf '\'"%s"\'\\n' "${openspecPath}"
+    else
+      exit 1
+    fi
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+
+  fs.writeFileSync(
+    comSpecPath,
+    `#!/bin/sh
+set -eu
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "/c" ] || [ "$1" = "-c" ]; then
+    shift
+    break
+  fi
+  shift
+done
+command="$1"
+first_char=$(printf '%.1s' "$command")
+last_char=$(printf '%s' "$command" | sed 's/.*\\(.\\)$/\\1/')
+if [ "$first_char" = '"' ] && [ "$last_char" = '"' ]; then
+  command=$(printf '%s' "$command" | sed 's/^"//; s/"$//')
+fi
+/bin/sh -c "$command"
+`,
+    { mode: 0o755 },
+  );
+
+  fs.writeFileSync(
+    npmPath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
+  bin_dir="${path.join(projectDir, 'node_modules', '.bin')}"
+  mkdir -p "$bin_dir"
+  cat > "$bin_dir/openspec.cmd" <<'EOF'
+#!/bin/sh
+set -eu
+cmd="\${1:-}"
+if [ "$cmd" = "init" ]; then
+  target="$2"
+  mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive"
+  cat > "$target/openspec/config.yaml" <<'EOF_CONFIG'
+# context:
+EOF_CONFIG
+  exit 0
+fi
+printf 'LOCAL:%s\\n' "$*"
+EOF
+  chmod +x "$bin_dir/openspec.cmd"
+  exit 0
+fi
+echo "unsupported npm invocation: $*" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+
+  fs.writeFileSync(
+    claudePath,
+    `#!/bin/sh
+set -eu
+if [ "$1" = "plugin" ] && [ "$2" = "install" ] && [ "$3" = "superpowers@claude-plugins-official" ] && [ "$4" = "--scope" ] && [ "$5" = "user" ]; then
+  mkdir -p "$HOME/.claude"
+  cat > "$HOME/.claude/settings.json" <<'EOF'
+{
+  "enabledPlugins": [
+    "superpowers@claude-plugins-official"
+  ]
+}
+EOF
+  printf 'installed\\n'
+  exit 0
+fi
+echo "unsupported claude invocation: $*" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+
+  fs.chmodSync(wherePath, 0o755);
+  fs.chmodSync(comSpecPath, 0o755);
+  fs.chmodSync(npmPath, 0o755);
+  fs.chmodSync(claudePath, 0o755);
+
+  return {
+    harnessDir,
+    comSpecPath,
+  };
 };
 
 test('renderHelp reflects the current CLI surface', () => {
@@ -283,8 +428,8 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
       path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
-    const projectedClaudeCommand = fs.readFileSync(
-      path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md'),
+    const projectedClaudeSkill = fs.readFileSync(
+      path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
     const projectedOpenCodeSkill = fs.readFileSync(
@@ -293,7 +438,7 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
     );
 
     assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
-    assert.match(projectedClaudeCommand, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedClaudeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedOpenCodeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
   });
 
@@ -374,9 +519,20 @@ test('bootstrapOpenSpec prefers the local runtime when available', () => {
   assert.doesNotMatch(output, /praxis-devos openspec/);
 });
 
-test('bootstrapProject updates OpenCode plugins and prints runtime guidance', () => {
+test('bootstrapProject updates OpenCode plugins and preserves existing config', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-bootstrap-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(
+    globalConfigPath,
+    JSON.stringify({
+      theme: 'night',
+      plugin: ['existing-plugin'],
+    }, null, 2),
+    'utf8',
+  );
 
   withEnv('HOME', fakeHome, () => {
     const output = bootstrapProject({
@@ -384,13 +540,16 @@ test('bootstrapProject updates OpenCode plugins and prints runtime guidance', ()
       agents: ['opencode', 'codex', 'claude'],
     });
 
-    const globalConfigPath = path.join(fakeHome, '.config', 'opencode', 'config.json');
     const config = readJson(globalConfigPath);
+    const backups = listBackupFiles(globalConfigDir, 'config.json');
     assert.match(output, /== opencode ==/);
     assert.match(output, /== codex ==/);
     assert.match(output, /== claude ==/);
+    assert.equal(config.theme, 'night');
+    assert.ok(config.plugin.includes('existing-plugin'));
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
-    assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
+    assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
+    assert.equal(backups.length, 1);
   });
 });
 
@@ -416,7 +575,129 @@ test('setupProject initializes the current structure for OpenCode without networ
   });
 });
 
+test('setupProject preserves existing OpenCode plugins and top-level settings', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-preserve-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(
+    globalConfigPath,
+    JSON.stringify({
+      theme: 'night',
+      model: 'gpt-5',
+      plugin: ['existing-plugin', 'another-plugin'],
+    }, null, 2),
+    'utf8',
+  );
+
+  withEnv('HOME', fakeHome, () => {
+    setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const config = readJson(globalConfigPath);
+    assert.equal(config.theme, 'night');
+    assert.equal(config.model, 'gpt-5');
+    assert.ok(config.plugin.includes('existing-plugin'));
+    assert.ok(config.plugin.includes('another-plugin'));
+    assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+    assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
+  });
+});
+
+test('setupProject creates a backup before rewriting OpenCode config', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-backup-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  const original = JSON.stringify({ plugin: ['existing-plugin'] }, null, 2);
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(globalConfigPath, `${original}\n`, 'utf8');
+
+  withEnv('HOME', fakeHome, () => {
+    setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const backups = listBackupFiles(globalConfigDir, 'config.json');
+    assert.equal(backups.length, 1);
+    assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
+  });
+});
+
+test('setupProject does not overwrite unsafe OpenCode config', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-unsafe-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  const original = JSON.stringify({ plugin: { existing: true } }, null, 2);
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(globalConfigPath, `${original}\n`, 'utf8');
+
+  withEnv('HOME', fakeHome, () => {
+    assert.throws(
+      () => setupProject({
+        projectDir,
+        agents: ['opencode'],
+      }),
+      /cannot safely merge OpenCode config/i,
+    );
+
+    const backups = listBackupFiles(globalConfigDir, 'config.json');
+    assert.equal(fs.readFileSync(globalConfigPath, 'utf8'), `${original}\n`);
+    assert.equal(backups.length, 1);
+    assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
+  });
+});
+
+test('setupProject leaves the live OpenCode config unchanged when atomic replace fails', () => {
+  const projectDir = makeTempProject();
+  installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-atomic-fail-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  const original = JSON.stringify({ plugin: ['existing-plugin'], theme: 'night' }, null, 2);
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(globalConfigPath, `${original}\n`, 'utf8');
+
+  const originalRenameSync = fs.renameSync;
+  fs.renameSync = (...args) => {
+    if (args[1] === globalConfigPath) {
+      throw new Error('rename failed');
+    }
+
+    return originalRenameSync(...args);
+  };
+
+  try {
+    withEnv('HOME', fakeHome, () => {
+      assert.throws(
+        () => setupProject({
+          projectDir,
+          agents: ['opencode'],
+        }),
+        /rename failed/i,
+      );
+    });
+  } finally {
+    fs.renameSync = originalRenameSync;
+  }
+
+  const backups = listBackupFiles(globalConfigDir, 'config.json');
+  assert.equal(fs.readFileSync(globalConfigPath, 'utf8'), `${original}\n`);
+  assert.equal(backups.length, 1);
+  assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
+  assert.deepEqual(listTempFiles(globalConfigDir, 'config.json'), []);
+});
+
 test('setupProject installs Claude SuperPowers with user scope when Claude CLI is available', () => {
+
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-home-'));
   const fakeClaudeBin = installFakeClaude(fakeHome);
@@ -432,6 +713,24 @@ test('setupProject installs Claude SuperPowers with user scope when Claude CLI i
     assert.match(output, /\[OK\] superpowers:claude/);
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
   }));
+});
+
+test('setupProject handles quoted Windows command paths with spaces during automatic installs', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-home-'));
+  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({ homeDir: fakeHome, projectDir });
+
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
+  }))));
 });
 
 test('createChangeScaffold remains available as an internal scaffold helper', () => {

@@ -114,6 +114,36 @@ export const listDirs = (dirPath) => {
   }
 };
 
+const normalizeCommandPath = (value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  let normalized = value.trim();
+
+  while (normalized.length >= 2) {
+    if (
+      (normalized.startsWith('"') && normalized.endsWith('"'))
+      || (normalized.startsWith('\'') && normalized.endsWith('\''))
+    ) {
+      normalized = normalized.slice(1, -1).trim();
+      continue;
+    }
+
+    if (
+      (normalized.startsWith('\\"') && normalized.endsWith('\\"'))
+      || (normalized.startsWith("\\'") && normalized.endsWith("\\'"))
+    ) {
+      normalized = normalized.slice(2, -2).trim();
+      continue;
+    }
+
+    break;
+  }
+
+  return normalized;
+};
+
 const findCommandPath = (cmd) => {
   try {
     const whichCmd = process.platform === 'win32' ? 'where' : 'which';
@@ -173,7 +203,7 @@ const run = (cmd, opts = {}) => {
 };
 
 const isWindowsBatchScript = (cmd) => process.platform === 'win32'
-  && ['.cmd', '.bat'].includes(path.extname(cmd).toLowerCase());
+  && ['.cmd', '.bat'].includes(path.extname(normalizeCommandPath(cmd)).toLowerCase());
 
 const quoteWindowsCmdArg = (value) => {
   if (value.length === 0) {
@@ -192,9 +222,13 @@ const buildWindowsBatchCommand = (cmd, args) => [
 const runFile = (cmd, args, opts = {}) => {
   try {
     const execOpts = { encoding: 'utf8', timeout: 120_000, ...opts };
-    const stdout = isWindowsBatchScript(cmd)
-      ? execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', buildWindowsBatchCommand(cmd, args)], execOpts)
-      : execFileSync(cmd, args, execOpts);
+    const normalizedCmd = normalizeCommandPath(cmd);
+    const stdout = isWindowsBatchScript(normalizedCmd)
+      ? execSync(
+        buildWindowsBatchCommand(normalizedCmd, args),
+        { ...execOpts, shell: process.env.ComSpec || true },
+      )
+      : execFileSync(normalizedCmd, args, execOpts);
     return { ok: true, stdout: stdout.trim(), stderr: '' };
   } catch (err) {
     return { ok: false, stdout: '', stderr: err.stderr?.trim() || err.message };
@@ -231,19 +265,23 @@ const hasSkillMarkdownFiles = (rootDir) => {
 };
 
 const resolveCommandForExecution = (cmd) => {
-  if (path.extname(cmd)) {
-    return findCommandPath(cmd) || cmd;
+  const normalizedCmd = normalizeCommandPath(cmd);
+
+  if (path.extname(normalizedCmd)) {
+    return normalizeCommandPath(findCommandPath(normalizedCmd) || normalizedCmd);
   }
 
   if (process.platform === 'win32') {
-    return findCommandPath(`${cmd}.cmd`)
-      || findCommandPath(`${cmd}.bat`)
-      || findCommandPath(`${cmd}.exe`)
-      || findCommandPath(cmd)
-      || cmd;
+    return normalizeCommandPath(
+      findCommandPath(`${normalizedCmd}.cmd`)
+      || findCommandPath(`${normalizedCmd}.bat`)
+      || findCommandPath(`${normalizedCmd}.exe`)
+      || findCommandPath(normalizedCmd)
+      || normalizedCmd,
+    );
   }
 
-  return findCommandPath(cmd) || cmd;
+  return normalizeCommandPath(findCommandPath(normalizedCmd) || normalizedCmd);
 };
 
 const ensureDir = (dirPath) => {
@@ -889,6 +927,118 @@ const writeProjectJson = (filePath, value) => {
   writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
 };
 
+const readJsonFileWithRaw = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    return {
+      ok: true,
+      exists: false,
+      raw: null,
+      value: null,
+    };
+  }
+
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return {
+      ok: true,
+      exists: true,
+      raw,
+      value: JSON.parse(raw),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      exists: true,
+      raw: readFile(filePath),
+      error,
+    };
+  }
+};
+
+const backupFile = (filePath) => {
+  const backupPath = `${filePath}.bak-${Date.now()}`;
+  ensureDir(path.dirname(backupPath));
+  fs.copyFileSync(filePath, backupPath);
+  return backupPath;
+};
+
+const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+
+const validateOpenCodeConfigShape = (configPath, config) => {
+  if (!isPlainObject(config)) {
+    throw new Error(`Cannot safely merge OpenCode config at ${configPath}: expected a JSON object at the top level.`);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(config, 'plugin') && !Array.isArray(config.plugin)) {
+    throw new Error(`Cannot safely merge OpenCode config at ${configPath}: expected "plugin" to be an array.`);
+  }
+};
+
+const mergeOpenCodePlugins = (config) => ({
+  ...config,
+  plugin: [...new Set([
+    ...(Array.isArray(config.plugin) ? config.plugin : []),
+    PRAXIS_OPENCODE_PLUGIN,
+    SUPERPOWERS_OPENCODE_PLUGIN,
+  ])],
+});
+
+const ensureOpenCodePluginsConfigured = () => {
+  const configPath = globalOpencodeConfigPath();
+  ensureDir(path.dirname(configPath));
+
+  const current = readJsonFileWithRaw(configPath);
+  if (!current.ok) {
+    let backupPath = null;
+    try {
+      backupPath = backupFile(configPath);
+    } catch (backupError) {
+      throw new Error(`Cannot safely merge OpenCode config at ${configPath}. Failed to back up the original file: ${backupError.message}. Left the config unchanged.`);
+    }
+    throw new Error(`Cannot safely merge OpenCode config at ${configPath}. Backed up the original file to ${backupPath} and left the config unchanged.`);
+  }
+
+  const config = current.value ?? {};
+  let backupPath = null;
+  let tempPath = null;
+
+  try {
+    validateOpenCodeConfigShape(configPath, config);
+    const next = mergeOpenCodePlugins(config);
+    const nextText = `${JSON.stringify(next, null, 2)}\n`;
+
+    if (current.raw === nextText) {
+      return {
+        changed: false,
+        configPath,
+        backupPath: null,
+      };
+    }
+
+    backupPath = current.exists ? backupFile(configPath) : null;
+    tempPath = `${configPath}.tmp-${process.pid}-${Date.now()}`;
+    writeText(tempPath, nextText);
+    fs.renameSync(tempPath, configPath);
+
+    return {
+      changed: true,
+      configPath,
+      backupPath,
+    };
+  } catch (error) {
+    if (tempPath && fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+
+    if (!backupPath && current.exists) {
+      backupPath = backupFile(configPath);
+    }
+
+    const backupNote = backupPath ? ` Backed up the original file to ${backupPath}.` : '';
+    throw new Error(`${error.message}${backupNote} Left the config unchanged.`);
+  }
+};
+
 const detectOpenCodeSuperpowers = () => {
   const configPath = globalOpencodeConfigPath();
   const config = readProjectJson(configPath);
@@ -946,20 +1096,18 @@ const ensureOpenSpecRuntime = (projectDir) => {
 };
 
 const ensureOpenCodeSuperpowers = () => {
-  const configPath = globalOpencodeConfigPath();
-  ensureDir(path.dirname(configPath));
-  const config = readProjectJson(configPath) || {};
-  const next = {
-    ...config,
-    plugin: [...new Set([
-      ...(Array.isArray(config.plugin) ? config.plugin : []),
-      PRAXIS_OPENCODE_PLUGIN,
-      SUPERPOWERS_OPENCODE_PLUGIN,
-    ])],
-  };
+  const result = ensureOpenCodePluginsConfigured();
+  const lines = [`Configured OpenCode plugins in ${result.configPath}`];
 
-  writeProjectJson(configPath, next);
-  return `Configured OpenCode plugins in ${configPath}`;
+  if (result.backupPath) {
+    lines.push(`Backed up existing OpenCode config to ${result.backupPath}`);
+  }
+
+  if (!result.changed) {
+    lines.push('OpenCode plugin config already contained the required plugins');
+  }
+
+  return lines.join('\n');
 };
 
 const detectCodexSuperpowers = () => {
@@ -1178,29 +1326,30 @@ const renderBootstrapInstructions = ({ projectDir, agent }) => {
   const paths = projectPaths(projectDir);
 
   if (agent === 'opencode') {
-    const configPath = globalOpencodeConfigPath();
-    ensureDir(path.dirname(configPath));
-    const config = readProjectJson(configPath) || {};
-    const next = {
-      ...config,
-      plugin: [...new Set([
-        ...(Array.isArray(config.plugin) ? config.plugin : []),
-        PRAXIS_OPENCODE_PLUGIN,
-        SUPERPOWERS_OPENCODE_PLUGIN,
-      ])],
-    };
-
-    writeProjectJson(configPath, next);
-    return [
-      `Updated ${configPath}`,
+    const result = ensureOpenCodePluginsConfigured();
+    const lines = [
+      `Updated ${result.configPath}`,
       'Added OpenCode plugins:',
       `- ${PRAXIS_OPENCODE_PLUGIN}`,
       `- ${SUPERPOWERS_OPENCODE_PLUGIN}`,
+    ];
+
+    if (result.backupPath) {
+      lines.push(`Backed up existing OpenCode config to ${result.backupPath}`);
+    }
+
+    if (!result.changed) {
+      lines.push('OpenCode plugin config already contained the required plugins.');
+    }
+
+    lines.push(
       'Next steps:',
       '- Restart OpenCode',
       '- Start a new session and verify Superpowers skills are available',
       `Reference: ${SUPERPOWERS_DOCS.opencode}`,
-    ].join('\n');
+    );
+
+    return lines.join('\n');
   }
 
   if (agent === 'codex') {

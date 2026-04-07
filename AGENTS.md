@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Commands
 
@@ -27,7 +27,7 @@ No build step — pure ESM, runs directly with Node >=20.19.0.
 
 ## Architecture
 
-`praxis-devos` is a CLI tool that installs OpenSpec governance + SuperPowers execution rules into a user's project, then projects skills into agent-specific directories so each coding agent (Claude Code, OpenCode, Codex) discovers them natively.
+`praxis-devos` is a CLI tool that installs OpenSpec governance + SuperPowers execution rules into a user's project, then projects skills into agent-specific directories so each coding agent (Codex, OpenCode, Codex) discovers them natively.
 
 ### Core flow (`src/core/praxis-devos.js`)
 
@@ -36,13 +36,13 @@ All CLI commands are handled here: `setup`, `sync`, `teardown`, `migrate`. This 
 ### Projection layer (`src/projection/`)
 
 Each agent has its own projector:
-- `claude.js` → writes `~/.claude/skills/<name>/SKILL.md` (skill dirs)
-- `opencode.js` → writes `~/.claude/skills/<name>/SKILL.md` (skill dirs)
+- `Codex.js` → writes `~/.Codex/skills/<name>/SKILL.md` (skill dirs)
+- `opencode.js` → writes `~/.Codex/skills/<name>/SKILL.md` (skill dirs)
 - `codex.js` → writes `~/.codex/skills/<name>/SKILL.md` (skill dirs)
 - `index.js` — dispatches to the right projector based on selected agents
 - `markers.js` — injects/parses `<!-- PRAXIS_PROJECTION ... -->` markers so projections can be identified and cleaned up later
 
 ### Key design decisions
 - Skills are stamped with a version marker on write. On `sync`, stale projections (marker present but name no longer in the skill set) are removed.
-- `src/templates/managed-entry.md` is the template injected into a user project's `AGENTS.md`/`CLAUDE.md` during `setup`. It contains the OpenSpec flow gating rules.
+- `src/templates/managed-entry.md` is the template injected into a user project's `AGENTS.md`/`AGENTS.md` during `setup`. It contains the OpenSpec flow gating rules.
 - `opencode-plugin.js` is the package entry for OpenCode's plugin system.
