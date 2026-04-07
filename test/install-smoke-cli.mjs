@@ -293,6 +293,7 @@ const installQuotedWindowsCommandWrappers = ({ tempRoot, fakeHome, env }) => {
 
   prependToPath(env, commandDir);
   return {
+    commandDir,
     diagnosticLogPath,
     invocationLogPath,
   };
@@ -421,6 +422,8 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
     assert.match(invocationLog, /npm\.cmd/);
     assert.match(invocationLog, /claude\.cmd/);
+    const escapedCommandDir = quotedWindowsWrappers.commandDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(setupResult.stdout, new RegExp(escapedCommandDir));
   }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];

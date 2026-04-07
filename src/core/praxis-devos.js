@@ -989,7 +989,12 @@ const ensureOpenCodePluginsConfigured = () => {
 
   const current = readJsonFileWithRaw(configPath);
   if (!current.ok) {
-    const backupPath = backupFile(configPath);
+    let backupPath = null;
+    try {
+      backupPath = backupFile(configPath);
+    } catch (backupError) {
+      throw new Error(`Cannot safely merge OpenCode config at ${configPath}. Failed to back up the original file: ${backupError.message}. Left the config unchanged.`);
+    }
     throw new Error(`Cannot safely merge OpenCode config at ${configPath}. Backed up the original file to ${backupPath} and left the config unchanged.`);
   }
 

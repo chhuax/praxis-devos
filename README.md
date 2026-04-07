@@ -1,92 +1,178 @@
-# Praxis Devos
+# praxis-devos
 
+> OpenSpec governance + SuperPowers execution for OpenCode, Codex, and Claude Code.
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-## Getting started
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## What It Does
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+`praxis-devos` prepares a user project so different coding agents follow the same workflow rules:
 
-## Add your files
+- OpenSpec for proposal, spec, validation, and archive flows
+- SuperPowers for execution skills such as planning, debugging, and completion verification
+- Agent-specific adapters for OpenCode, Codex, and Claude Code
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+This package is meant to be installed into the user project and then run there with `npx praxis-devos ...`.
 
+## Project Layout
+
+After `setup`, a user project typically contains:
+
+```text
+your-project/
+├── AGENTS.md          # Shared project rules for Codex/OpenCode
+├── CLAUDE.md          # Thin Claude wrapper that imports @AGENTS.md
+├── openspec/          # OpenSpec workspace
+├── .opencode/         # OpenCode compatibility marker when selected
+└── opencode.json      # OpenCode plugin config when selected
 ```
-cd existing_repo
-git remote add origin https://git.yyrd.com/iUAP_gPaaS/praxis-devos.git
-git branch -M main
-git push -uf origin main
+
+`AGENTS.md` is the shared project instruction file. `CLAUDE.md` stays thin and imports `@AGENTS.md` so Claude Code reads the shared rules without duplicating them.
+
+## Quick Start
+
+### Codex
+
+```bash
+npx praxis-devos setup --agent codex
+npx praxis-devos doctor --strict
 ```
 
-## Integrate with your tools
+### Claude Code
 
-- [ ] [Set up project integrations](https://git.yyrd.com/iUAP_gPaaS/praxis-devos/-/settings/integrations)
+```bash
+npx praxis-devos setup --agent claude
+npx praxis-devos doctor --strict
+```
 
-## Collaborate with your team
+Praxis now uses the Claude CLI to install SuperPowers automatically:
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+```bash
+claude plugin install superpowers@claude-plugins-official --scope user
+```
 
-## Test and Deploy
+### OpenCode
 
-Use the built-in continuous integration in GitLab.
+```bash
+npx praxis-devos setup --agent opencode
+npx praxis-devos doctor --strict
+```
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+### Multi-Agent Project
 
-***
+```bash
+npx praxis-devos setup --agents opencode,codex,claude
+npx praxis-devos doctor --strict
+```
 
-# Editing this README
+## Commands
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!).  Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+| Command | Purpose |
+|---|---|
+| `setup` | Primary onboarding and repair entrypoint |
+| `init` | Lower-level project skeleton initialization |
+| `sync` | Refresh managed adapter outputs |
+| `migrate` | Legacy compatibility command; currently re-syncs adapters |
+| `status` | Show current project/runtime state |
+| `doctor` | Check OpenSpec and SuperPowers dependencies |
+| `bootstrap` | Print repair/install guidance without full setup |
+| `validate-session` | Validate a transcript against Praxis hook evidence |
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## Runtime Behavior
 
-## Name
-Choose a self-explaining name for your project.
+`setup` currently does the following:
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+- ensure OpenSpec is available, installing it locally when needed
+- install or configure SuperPowers for the selected agents when the runtime supports automation
+- create or refresh `openspec/`
+- write the shared managed rules block into `AGENTS.md`
+- write a thin Claude wrapper into `CLAUDE.md` that imports `@AGENTS.md`
+- create the minimal `.opencode/README.md` compatibility marker for OpenCode
+- run dependency checks after setup
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Agent-specific runtime behavior:
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- OpenCode: writes plugin declarations into `opencode.json` and projects shared OpenSpec skills under `~/.claude/skills`
+- Codex: clones SuperPowers into `~/.codex/superpowers` and links skills into `~/.codex/skills/superpowers`
+- Claude Code: runs `claude plugin install superpowers@claude-plugins-official --scope user`
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## OpenSpec + SuperPowers Contract
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+Praxis does not replace OpenSpec or SuperPowers. It binds them together.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+The managed project rules tell agents to:
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- use `/opsx:propose` or `/opsx:explore` for proposal/exploration flow
+- perform Proposal Intake before implementation
+- treat OpenSpec as the only visible workflow once an OpenSpec stage is active
+- use SuperPowers only as stage-local execution method, without a second workflow announcement
+- keep brainstorming/planning/debugging/verification outputs inside the current `openspec/changes/<change>/...` artifacts
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Praxis does not currently fork or override the upstream SuperPowers plugin. The coordination contract is enforced through:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+- the shared managed rules in `AGENTS.md` plus the thin `CLAUDE.md` wrapper
+- projected OpenSpec skills (`opsx-*`) that define OpenSpec as the outer workflow
+- transcript/session validation rules that flag duplicate workflow announcements or `docs/superpowers/...` outputs inside OpenSpec flow
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Enterprise Extension Packs
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Praxis is intentionally kept as the core framework layer. Enterprise-specific assets are expected to live in separate extension packages rather than being hardcoded into this repository.
+
+That extension-pack model is meant for assets such as:
+
+- company rules
+- company skills
+- company hooks
+- language- or domain-specific standards
+- common layer + stack layer packaging
+
+One example is an external rules pack such as `iuap-rules-pack`, which organizes:
+
+- `common/` shared enterprise assets
+- `stacks/<stack>/` stack-specific assets
+- `rules/`, `skills/`, and `hooks/` as separate deliverable types
+- target-specific projection into Claude, Codex, and OpenCode native surfaces
+
+That gives Praxis a useful split of responsibilities:
+
+- `praxis-devos`: OpenSpec governance, SuperPowers runtime setup, agent adapter management, unified workflow entrypoints
+- enterprise extension pack: enterprise rules/skills/hooks content and target-specific projection logic
+
+The next planned step is for `praxis-devos` to expose a unified extension-pack entrypoint such as `praxis-devos install-rules`. That integration is close and should be understood as the near-term product direction, but it is not yet a finished command in this repository today.
+
+## Repository Layout
+
+This repository itself is a package source repo. The important directories are:
+
+```text
+assets/            # Bundled OpenSpec skill assets
+bin/               # Published CLI entrypoint
+src/core/          # Main setup/doctor/sync CLI logic
+src/projection/    # Agent-specific projection logic
+src/templates/     # Managed entry block templates
+test/              # Unit tests and install smoke scripts
+```
+
+## Development
+
+Run tests locally:
+
+```bash
+npm test
+```
+
+Install smoke for a packed tarball:
+
+```bash
+npm pack
+node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario opencode
+node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario claude
+```
+
+`codex` install smoke is also supported, but it exercises the Codex clone/link path and is more environment-sensitive.
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Apache-2.0
