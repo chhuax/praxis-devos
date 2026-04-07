@@ -155,11 +155,11 @@ const assertProjectedCodexSkills = (fakeHome) => {
 };
 
 const assertProjectedClaudeSkills = (fakeHome) => {
-  const commandsRoot = path.join(fakeHome, '.claude', 'commands');
+  const skillsRoot = path.join(fakeHome, '.claude', 'skills');
   for (const name of PROJECTED_OPENSPEC_SKILLS) {
     assert.ok(
-      fs.existsSync(path.join(commandsRoot, `${name}.md`)),
-      `Expected Claude projected command at ${path.join(commandsRoot, `${name}.md`)}`,
+      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
+      `Expected Claude projected skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
     );
   }
 };
