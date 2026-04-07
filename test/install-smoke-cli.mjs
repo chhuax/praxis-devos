@@ -81,6 +81,7 @@ const parseArgs = (argv) => {
   const parsed = {
     packageFile: '',
     scenario: '',
+    commandPathMode: 'normal',
   };
 
   while (args.length > 0) {
@@ -93,6 +94,10 @@ const parseArgs = (argv) => {
       parsed.scenario = args.shift() || '';
       continue;
     }
+    if (token === '--command-path-mode') {
+      parsed.commandPathMode = args.shift() || '';
+      continue;
+    }
     throw new Error(`Unknown argument: ${token}`);
   }
 
@@ -101,6 +106,9 @@ const parseArgs = (argv) => {
   }
   if (!parsed.scenario) {
     throw new Error('Missing `--scenario <codex|opencode|claude>`.');
+  }
+  if (!['normal', 'quoted-windows-space'].includes(parsed.commandPathMode)) {
+    throw new Error('Invalid `--command-path-mode`. Use `normal` or `quoted-windows-space`.');
   }
 
   return parsed;
@@ -234,7 +242,115 @@ exit 1
   return binDir;
 };
 
-const runSmoke = ({ packageFile, scenario }) => {
+const resolveFirstCommandPath = (command) => {
+  const locator = process.platform === 'win32' ? 'where' : 'which';
+  const result = spawnSync(locator, [command], { encoding: 'utf8' });
+  const stdout = result.stdout?.trim() || '';
+  const stderr = result.stderr?.trim() || '';
+
+  assert.equal(
+    result.status,
+    0,
+    [
+      `Failed to resolve command path for ${command}`,
+      stdout ? `stdout:\n${stdout}` : null,
+      stderr ? `stderr:\n${stderr}` : null,
+    ].filter(Boolean).join('\n\n'),
+  );
+
+  const resolved = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+
+  assert.ok(resolved, `Expected a resolved command path for ${command}`);
+  return resolved;
+};
+
+const installQuotedWindowsCommandWrappers = ({ tempRoot, fakeHome, env }) => {
+  assert.equal(process.platform, 'win32', 'quoted-windows-space mode is only supported on Windows');
+
+  const realNpmPath = resolveFirstCommandPath('npm.cmd');
+  const realWherePath = resolveFirstCommandPath('where.exe');
+  const harnessDir = path.join(tempRoot, 'quoted-command-harness');
+  const commandDir = path.join(tempRoot, 'Program Files', 'nodejs');
+  const npmShimPath = path.join(commandDir, 'npm-shim.cjs');
+  const claudeShimPath = path.join(commandDir, 'claude-shim.cjs');
+  const npmCmdPath = path.join(commandDir, 'npm.cmd');
+  const claudeCmdPath = path.join(commandDir, 'claude.cmd');
+  const whereCmdPath = path.join(harnessDir, 'where.cmd');
+
+  fs.mkdirSync(harnessDir, { recursive: true });
+  fs.mkdirSync(commandDir, { recursive: true });
+
+  fs.writeFileSync(
+    npmShimPath,
+    `const { spawnSync } = require('node:child_process');
+const result = spawnSync(${JSON.stringify(realNpmPath)}, process.argv.slice(2), { stdio: 'inherit' });
+process.exit(result.status ?? 1);
+`,
+  );
+
+  fs.writeFileSync(
+    claudeShimPath,
+    `const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+if (args[0] === 'plugin' && args[1] === 'install' && args[2] === 'superpowers@claude-plugins-official' && args[3] === '--scope' && args[4] === 'user') {
+  const settingsPath = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'settings.json');
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify({ enabledPlugins: ['superpowers@claude-plugins-official'] }, null, 2));
+  process.stdout.write('installed\\n');
+  process.exit(0);
+}
+process.stderr.write(\`unsupported claude invocation: \${args.join(' ')}\\n\`);
+process.exit(1);
+`,
+  );
+
+  fs.writeFileSync(
+    npmCmdPath,
+    '@echo off\r\nnode "%~dp0\\npm-shim.cjs" %*\r\n',
+  );
+
+  fs.writeFileSync(
+    claudeCmdPath,
+    '@echo off\r\nnode "%~dp0\\claude-shim.cjs" %*\r\n',
+  );
+
+  fs.writeFileSync(
+    whereCmdPath,
+    `@echo off
+setlocal
+if /I "%~1"=="npm" (
+  echo "${npmCmdPath}"
+  exit /b 0
+)
+if /I "%~1"=="npm.cmd" (
+  echo "${npmCmdPath}"
+  exit /b 0
+)
+if /I "%~1"=="claude" (
+  echo "${claudeCmdPath}"
+  exit /b 0
+)
+if /I "%~1"=="claude.cmd" (
+  echo "${claudeCmdPath}"
+  exit /b 0
+)
+"${realWherePath}" %*
+`,
+  );
+
+  prependToPath(env, harnessDir);
+  return {
+    commandDir,
+    npmCmdPath,
+    claudeCmdPath,
+  };
+};
+
+const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   const { agent, strictDoctor } = scenarioConfig(scenario);
   const packagePath = path.resolve(packageFile);
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `praxis-devos-${scenario}-smoke-`));
@@ -262,6 +378,11 @@ const runSmoke = ({ packageFile, scenario }) => {
 
   runCommand(npmCmd, ['init', '-y'], { cwd: projectDir, env });
   runCommand(npmCmd, ['install', '-D', packagePath], { cwd: projectDir, env });
+
+  let quotedWindowsWrappers = null;
+  if (commandPathMode === 'quoted-windows-space') {
+    quotedWindowsWrappers = installQuotedWindowsCommandWrappers({ tempRoot, fakeHome, env });
+  }
 
   const setupResult = runCommand(npxCmd, ['praxis-devos', 'setup', '--agent', agent], {
     cwd: projectDir,
@@ -316,6 +437,9 @@ const runSmoke = ({ packageFile, scenario }) => {
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), `Expected CLAUDE.md in ${projectDir}`);
   assertProjectedClaudeSkills(fakeHome);
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
+  if (quotedWindowsWrappers) {
+    assert.match(setupResult.stdout, new RegExp(quotedWindowsWrappers.commandDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];
   if (strictDoctor) {
@@ -337,7 +461,7 @@ try {
 
   const parsed = parseArgs(process.argv.slice(2));
   runSmoke(parsed);
-  console.log(`Install smoke passed for scenario: ${parsed.scenario}`);
+  console.log(`Install smoke passed for scenario: ${parsed.scenario} (${parsed.commandPathMode})`);
 } catch (err) {
   console.error(err instanceof Error ? err.message : String(err));
   process.exit(1);

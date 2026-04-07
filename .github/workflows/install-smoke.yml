@@ -19,18 +19,28 @@ jobs:
         include:
           - os: ubuntu-latest
             scenario: codex
+            command_path_mode: normal
           - os: macos-latest
             scenario: codex
+            command_path_mode: normal
           - os: windows-latest
             scenario: codex
+            command_path_mode: normal
           - os: ubuntu-latest
             scenario: opencode
+            command_path_mode: normal
           - os: windows-latest
             scenario: opencode
+            command_path_mode: normal
           - os: ubuntu-latest
             scenario: claude
+            command_path_mode: normal
           - os: windows-latest
             scenario: claude
+            command_path_mode: normal
+          - os: windows-latest
+            scenario: claude
+            command_path_mode: quoted-windows-space
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -61,4 +71,4 @@ jobs:
           echo "PACK_FILE=$PACK_FILE" >> "$GITHUB_ENV"
 
       - name: Run install smoke
-        run: node test/install-smoke-cli.mjs --package "${{ env.PACK_FILE }}" --scenario "${{ matrix.scenario }}"
+        run: node test/install-smoke-cli.mjs --package "${{ env.PACK_FILE }}" --scenario "${{ matrix.scenario }}" --command-path-mode "${{ matrix.command_path_mode }}"

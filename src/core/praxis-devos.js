@@ -114,6 +114,23 @@ export const listDirs = (dirPath) => {
   }
 };
 
+const normalizeCommandPath = (value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
+    if ((first === '"' && last === '"') || (first === '\'' && last === '\'')) {
+      return trimmed.slice(1, -1);
+    }
+  }
+
+  return trimmed;
+};
+
 const findCommandPath = (cmd) => {
   try {
     const whichCmd = process.platform === 'win32' ? 'where' : 'which';
@@ -173,7 +190,7 @@ const run = (cmd, opts = {}) => {
 };
 
 const isWindowsBatchScript = (cmd) => process.platform === 'win32'
-  && ['.cmd', '.bat'].includes(path.extname(cmd).toLowerCase());
+  && ['.cmd', '.bat'].includes(path.extname(normalizeCommandPath(cmd)).toLowerCase());
 
 const quoteWindowsCmdArg = (value) => {
   if (value.length === 0) {
@@ -192,9 +209,10 @@ const buildWindowsBatchCommand = (cmd, args) => [
 const runFile = (cmd, args, opts = {}) => {
   try {
     const execOpts = { encoding: 'utf8', timeout: 120_000, ...opts };
-    const stdout = isWindowsBatchScript(cmd)
-      ? execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', buildWindowsBatchCommand(cmd, args)], execOpts)
-      : execFileSync(cmd, args, execOpts);
+    const normalizedCmd = normalizeCommandPath(cmd);
+    const stdout = isWindowsBatchScript(normalizedCmd)
+      ? execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', buildWindowsBatchCommand(normalizedCmd, args)], execOpts)
+      : execFileSync(normalizedCmd, args, execOpts);
     return { ok: true, stdout: stdout.trim(), stderr: '' };
   } catch (err) {
     return { ok: false, stdout: '', stderr: err.stderr?.trim() || err.message };
@@ -231,19 +249,23 @@ const hasSkillMarkdownFiles = (rootDir) => {
 };
 
 const resolveCommandForExecution = (cmd) => {
-  if (path.extname(cmd)) {
-    return findCommandPath(cmd) || cmd;
+  const normalizedCmd = normalizeCommandPath(cmd);
+
+  if (path.extname(normalizedCmd)) {
+    return normalizeCommandPath(findCommandPath(normalizedCmd) || normalizedCmd);
   }
 
   if (process.platform === 'win32') {
-    return findCommandPath(`${cmd}.cmd`)
-      || findCommandPath(`${cmd}.bat`)
-      || findCommandPath(`${cmd}.exe`)
-      || findCommandPath(cmd)
-      || cmd;
+    return normalizeCommandPath(
+      findCommandPath(`${normalizedCmd}.cmd`)
+      || findCommandPath(`${normalizedCmd}.bat`)
+      || findCommandPath(`${normalizedCmd}.exe`)
+      || findCommandPath(normalizedCmd)
+      || normalizedCmd,
+    );
   }
 
-  return findCommandPath(cmd) || cmd;
+  return normalizeCommandPath(findCommandPath(normalizedCmd) || normalizedCmd);
 };
 
 const ensureDir = (dirPath) => {
