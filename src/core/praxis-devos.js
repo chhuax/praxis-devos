@@ -219,17 +219,14 @@ const buildWindowsBatchCommand = (cmd, args) => [
   ...args.map((arg) => quoteWindowsCmdArg(String(arg))),
 ].join(' ');
 
-const wrapWindowsCmdInvocation = (command) => `"${command}"`;
-
 const runFile = (cmd, args, opts = {}) => {
   try {
     const execOpts = { encoding: 'utf8', timeout: 120_000, ...opts };
     const normalizedCmd = normalizeCommandPath(cmd);
     const stdout = isWindowsBatchScript(normalizedCmd)
-      ? execFileSync(
-        process.env.ComSpec || 'cmd.exe',
-        ['/d', '/s', '/c', wrapWindowsCmdInvocation(buildWindowsBatchCommand(normalizedCmd, args))],
-        { ...execOpts, windowsVerbatimArguments: true },
+      ? execSync(
+        buildWindowsBatchCommand(normalizedCmd, args),
+        { ...execOpts, shell: process.env.ComSpec || true },
       )
       : execFileSync(normalizedCmd, args, execOpts);
     return { ok: true, stdout: stdout.trim(), stderr: '' };
