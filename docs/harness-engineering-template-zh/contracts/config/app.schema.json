@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "应用配置契约",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "PORT": {
+      "type": "integer",
+      "description": "HTTP 监听端口",
+      "default": 3000
+    },
+    "LOG_LEVEL": {
+      "type": "string",
+      "description": "应用日志级别",
+      "enum": ["debug", "info", "warn", "error"],
+      "default": "info"
+    }
+  }
+}
+

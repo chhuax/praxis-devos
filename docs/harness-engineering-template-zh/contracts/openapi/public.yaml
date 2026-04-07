@@ -1,0 +1,42 @@
+openapi: 3.1.0
+info:
+  title: <项目公共 API>
+  version: 0.1.0
+  description: <项目名称> 的公共 API 契约。
+servers:
+  - url: https://api.example.com
+tags:
+  - name: health
+    description: 服务健康检查接口
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: 检查服务健康状态
+      operationId: getHealth
+      responses:
+        "200":
+          description: 服务健康时的返回
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: 服务状态
+          examples:
+            - ok
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

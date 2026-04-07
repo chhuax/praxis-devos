@@ -1,0 +1,90 @@
+artifacts:
+  - id: public-http-api
+    kind: api-reference
+    contract: contracts/openapi/public.yaml
+    outputs:
+      - docs/reference/api.md
+    detect:
+      contractPaths:
+        - contracts/openapi/public.yaml
+      sourcePaths:
+        - src/controllers/**
+        - src/api/**
+        - src/routes/**
+      changeKinds:
+        - public-api
+    triggers:
+      - controller
+      - request-dto
+      - response-dto
+      - auth-scope
+      - error-code
+    checks:
+      contractRequired: true
+      referenceRequired: true
+      placeholderCheck: true
+      migrationRequiredWhen:
+        - breaking-change
+    requireGuideWhen:
+      - breaking-change
+      - onboarding-flow-change
+
+  - id: app-config
+    kind: config-reference
+    contract: contracts/config/app.schema.json
+    outputs:
+      - docs/reference/config.md
+    detect:
+      contractPaths:
+        - contracts/config/app.schema.json
+      sourcePaths:
+        - src/config/**
+        - src/**/application*.yml
+        - src/**/application*.yaml
+        - src/**/application*.properties
+      changeKinds:
+        - runtime-config
+    triggers:
+      - env-var
+      - config-binding
+      - default-value-change
+    checks:
+      contractRequired: true
+      referenceRequired: true
+      placeholderCheck: true
+
+  - id: permissions
+    kind: permission-reference
+    contract: contracts/permissions/permissions.yaml
+    outputs:
+      - docs/reference/permissions.md
+    detect:
+      contractPaths:
+        - contracts/permissions/permissions.yaml
+      sourcePaths:
+        - src/security/**
+        - src/auth/**
+        - src/**/permission/**
+      changeKinds:
+        - permission-model
+    triggers:
+      - auth-annotation
+      - permission-code
+      - role-binding
+    checks:
+      contractRequired: true
+      referenceRequired: true
+      placeholderCheck: true
+
+links:
+  - from: contracts/openapi/public.yaml
+    to: contracts/errors/errors.yaml
+    relation: uses-error-codes
+
+  - from: contracts/openapi/public.yaml
+    to: contracts/permissions/permissions.yaml
+    relation: protected-by
+
+  - from: contracts/cli/cli.yaml
+    to: contracts/config/app.schema.json
+    relation: depends-on-config
