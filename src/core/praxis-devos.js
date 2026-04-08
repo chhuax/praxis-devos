@@ -148,10 +148,28 @@ const findCommandPath = (cmd) => {
   try {
     const whichCmd = process.platform === 'win32' ? 'where' : 'which';
     const stdout = execFileSync(whichCmd, [cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return stdout
+    const candidates = stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .find((line) => line.length > 0) || null;
+      .filter((line) => line.length > 0);
+
+    for (const candidate of candidates) {
+      const normalized = normalizeCommandPath(candidate);
+      if (fs.existsSync(normalized)) {
+        return normalized;
+      }
+
+      if (process.platform === 'win32' && path.extname(normalized).length === 0) {
+        for (const ext of ['.cmd', '.exe', '.bat']) {
+          const withExt = `${normalized}${ext}`;
+          if (fs.existsSync(withExt)) {
+            return withExt;
+          }
+        }
+      }
+    }
+
+    return candidates[0] || null;
   } catch {
     return null;
   }

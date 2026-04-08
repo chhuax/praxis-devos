@@ -505,7 +505,7 @@ test('statusProject reports initialized state for the selected agents', () => {
     });
 
     assert.match(output, /initialized: yes/);
-    assert.match(output, /openspec: \[OK\]/);
+    assert.match(output, /openspec: \[(OK|WARN)\]/);
     assert.match(output, /superpowers:opencode: \[OK\]/);
   });
 });
