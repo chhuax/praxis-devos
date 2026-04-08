@@ -162,10 +162,15 @@ export const canSafelyOverwrite = ({
   assetPath,
   projectDir = null,
   agent = null,
+  allowAnyManagedOwner = false,
   allowLegacyProjection = false,
   isLegacyProjection = () => false,
 }) => {
   if (!fs.existsSync(assetPath)) {
+    return true;
+  }
+
+  if (allowAnyManagedOwner && isManagedAsset({ assetPath })) {
     return true;
   }
 

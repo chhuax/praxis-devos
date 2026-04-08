@@ -34,6 +34,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
     if (!canSafelyOverwrite({
       assetPath: targetPath,
       projectDir,
+      agent: 'claude',
+      allowAnyManagedOwner: true,
       allowLegacyProjection: true,
       isLegacyProjection: isProjection,
     })) {
@@ -70,7 +72,12 @@ export const projectCommands = ({ projectDir, version, log }) => {
   for (const name of commandNames) {
     const templatePath = path.join(commandTemplateRoot(), `${name}.md`);
     const targetPath = path.join(claudeCommandsDir(), `${name}.md`);
-    if (!canSafelyOverwrite({ assetPath: targetPath, projectDir })) {
+    if (!canSafelyOverwrite({
+      assetPath: targetPath,
+      projectDir,
+      agent: 'claude',
+      allowAnyManagedOwner: true,
+    })) {
       results.push({ name, targetPath, status: 'skipped' });
       log(`⊘ Claude: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
       continue;

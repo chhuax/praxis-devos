@@ -441,6 +441,41 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.match(logs.join('\n'), /OpenCode: projected docs command devos-docs-refresh/);
 });
 
+test('projectNativeSkills allows a second project to adopt existing Praxis-managed user-level commands', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-shared-managed-home-'));
+  const firstProjectDir = makeTempProject();
+  const secondProjectDir = makeTempProject();
+  const logs = [];
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir: firstProjectDir,
+      agents: ['claude'],
+      log: () => {},
+    });
+
+    const commandPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md');
+    fs.writeFileSync(commandPath, '# stale from first project\n', 'utf8');
+
+    projectNativeSkills({
+      projectDir: secondProjectDir,
+      agents: ['claude'],
+      log: (msg) => logs.push(msg),
+    });
+
+    const refreshed = fs.readFileSync(commandPath, 'utf8');
+    const manifest = readJson(path.join(fakeHome, '.praxis-devos', 'managed-assets.json'));
+    const owners = manifest.assets[commandPath]?.owners || [];
+
+    assert.match(refreshed, /^# devos-docs-init/m);
+    assert.ok(owners.some((entry) => entry.startsWith(`${path.resolve(firstProjectDir)}::claude`)));
+    assert.ok(owners.some((entry) => entry.startsWith(`${path.resolve(secondProjectDir)}::claude`)));
+  });
+
+  assert.doesNotMatch(logs.join('\n'), /skipped docs command devos-docs-init/i);
+  assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
+});
+
 test('runCli sync refreshes managed user-level docs commands and skips user-owned same-name commands', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-sync-home-'));

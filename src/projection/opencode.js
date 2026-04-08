@@ -34,6 +34,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
     if (!canSafelyOverwrite({
       assetPath: targetPath,
       projectDir,
+      agent: 'opencode',
+      allowAnyManagedOwner: true,
       allowLegacyProjection: true,
       isLegacyProjection: isProjection,
     })) {
@@ -71,7 +73,12 @@ export const projectCommands = ({ projectDir, version, log }) => {
   for (const name of commandNames) {
     const templatePath = path.join(commandTemplateRoot(), `${name}.md`);
     const targetPath = path.join(openCodeCommandsDir(), `${name}.md`);
-    if (!canSafelyOverwrite({ assetPath: targetPath, projectDir })) {
+    if (!canSafelyOverwrite({
+      assetPath: targetPath,
+      projectDir,
+      agent: 'opencode',
+      allowAnyManagedOwner: true,
+    })) {
       results.push({ name, targetPath, status: 'skipped' });
       log(`⊘ OpenCode: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
       continue;

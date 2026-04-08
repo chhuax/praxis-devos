@@ -29,6 +29,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
     if (!canSafelyOverwrite({
       assetPath: targetPath,
       projectDir,
+      agent: 'codex',
+      allowAnyManagedOwner: true,
       allowLegacyProjection: true,
       isLegacyProjection: isProjection,
     })) {
