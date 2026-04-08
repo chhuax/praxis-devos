@@ -28,12 +28,12 @@
 ## 4. 运行时与 validation 对齐
 
 - [x] 4.1 将当前 deterministic docs 生成逻辑重构为 fallback 或内部 helper 模式
-- [x] 4.2 在兼容阶段保留 `contracts/surfaces.yaml` 作为 canonical path
+- [x] 4.2 在兼容阶段统一使用 `docs/surfaces.yaml` 作为 canonical path
 - [x] 4.3 让文件 writeback 与结构化 docs 生成 contract 以及 canonical path 规则保持一致
 - [x] 4.4 当检测到 Maven 多模块时，扩展 deterministic validation，覆盖 `module-map.md`、模块 codemap 文件以及路径冲突
 - [x] 4.5 为空白 `surfacesYaml`、重复 codemap 路径和空内容 codemap 增加 contract validation 规则
-- [x] 4.6 在仓库 writeback 之前拒绝非 canonical 的 `docs/surfaces.yaml` 写入目标
-- [x] 4.7 增加迁移保护，阻止从 `contracts/surfaces.yaml` 自动迁移
+- [x] 4.6 在仓库 writeback 之前拒绝非 canonical 的 `contracts/surfaces.yaml` 写入目标
+- [x] 4.7 保持单一 canonical path，阻止回写到 `contracts/surfaces.yaml`
 
 ## 5. Codemap 最小内容 contract
 

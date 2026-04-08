@@ -4,7 +4,7 @@ Refresh existing project documentation using the `devos-docs` skill.
 
 ## What this does
 
-- Updates `contracts/surfaces.yaml` when the external surface changes
+- Updates `docs/surfaces.yaml` when the external surface changes
 - Updates `docs/codemaps/project-overview.md` to match the current structure
 - Preserves existing docs artifacts where possible
 
@@ -24,7 +24,7 @@ Run this command when:
 
 - Invoke the `devos-docs` skill with `mode=refresh`
 - Canonical paths:
-  - `contracts/surfaces.yaml`
+  - `docs/surfaces.yaml`
   - `docs/codemaps/**`
 - Validation:
   - results must pass the existing docs contract before writeback

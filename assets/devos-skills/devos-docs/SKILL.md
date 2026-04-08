@@ -43,7 +43,7 @@ Minimum contract shape:
 
 Only these repository paths are valid write targets in Phase 2:
 
-- `contracts/surfaces.yaml`
+- `docs/surfaces.yaml`
 - `docs/codemaps/project-overview.md`
 - `docs/codemaps/module-map.md`
 - `docs/codemaps/modules/<artifactId>.md`
@@ -58,7 +58,7 @@ Use when the project does not yet have docs contract artifacts or needs a first 
 
 Generate:
 
-- `contracts/surfaces.yaml`
+- `docs/surfaces.yaml`
 - `docs/codemaps/project-overview.md`
 - For detected Maven multi-module projects:
   - `docs/codemaps/module-map.md`
@@ -110,7 +110,7 @@ The caller validates the result before writeback. Your result must satisfy:
 - each codemap entry has non-empty `path`, non-empty `content`, and `action=upsert`
 - duplicate codemap paths are invalid
 - paths outside the allowed target set are invalid
-- `docs/surfaces.yaml` is not a valid output target
+- `contracts/surfaces.yaml` is not a valid output target
 
 ## Compatibility Notes
 

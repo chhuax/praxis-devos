@@ -2,6 +2,8 @@
 
 这是一套面向 AI 协作开发的最小项目文档模板。
 
+> **阶段提醒**：当前 Phase 1 实际只落地 `docs/codemaps/` + `docs/surfaces.yaml`，模板里展示的 `reference`、`guides`、`runbooks` 等目录属于后续迭代计划，用于帮助团队在准备下一阶段治理时快速填充结构。
+
 说明：
 
 - 本目录本身位于当前仓库的 `docs/` 下，只是为了沉淀模板。

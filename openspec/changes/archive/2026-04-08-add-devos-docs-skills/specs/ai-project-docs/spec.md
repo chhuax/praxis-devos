@@ -18,12 +18,12 @@
 - **当** 宿主 command 为一个尚未存在文档 contract 产物的项目触发 docs initialization
 - **则** 系统派发一个普通子 agent，并让其以 `mode=init` 执行 `devos-docs` skill
 - **并且** 子 agent 收到足以识别主对外面和仓库核心地图的项目上下文
-- **并且** 结果中包含 `contracts/surfaces.yaml` 和 `docs/codemaps/project-overview.md`
+- **并且** 结果中包含 `docs/surfaces.yaml` 和 `docs/codemaps/project-overview.md`
 
 #### 场景：为 Maven 多模块项目初始化文档
 - **当** 宿主 command 为一个 Maven 多模块项目触发 docs initialization
 - **则** 系统派发一个普通子 agent，并让其以 `mode=init` 执行 `devos-docs` skill
-- **并且** 结果中包含 `contracts/surfaces.yaml`
+- **并且** 结果中包含 `docs/surfaces.yaml`
 - **并且** 结果中包含 `docs/codemaps/project-overview.md`
 - **并且** 结果中包含 `docs/codemaps/module-map.md`
 - **并且** 对每个已发现模块，结果中都包含一个 `docs/codemaps/modules/<artifactId>.md`
@@ -82,7 +82,7 @@
 #### 场景：允许写入目标集合是显式且封闭的
 - **当** 仓库对 docs 生成结果做 validation
 - **则** 当前阶段唯一合法的写入目标是：
-- **并且** `contracts/surfaces.yaml`
+- **并且** `docs/surfaces.yaml`
 - **并且** `docs/codemaps/project-overview.md`
 - **并且** `docs/codemaps/module-map.md`
 - **并且** `docs/codemaps/modules/<artifactId>.md`
@@ -90,7 +90,7 @@
 
 #### 场景：主流程根据 contract 写回文件
 - **当** 主流程收到 docs 生成结果
-- **则** 主流程从结构化 contract 中写入 `contracts/surfaces.yaml`
+- **则** 主流程从结构化 contract 中写入 `docs/surfaces.yaml`
 - **并且** 只把 codemap 写到允许目标集合内
 - **并且** 保留托管区块之外的用户自定义内容
 
@@ -116,11 +116,11 @@
 系统必须在生成或刷新后，以机械方式验证文档 contract 产物。
 
 #### 场景：validation 拒绝不完整的 surfaces contract
-- **当** `contracts/surfaces.yaml` 缺少 `primary_surface` 或必填 surface 字段
+- **当** `docs/surfaces.yaml` 缺少 `primary_surface` 或必填 surface 字段
 - **则** validation 报告缺失字段
 
 #### 场景：validation 拒绝空白的 surfaces contract
-- **当** `contracts/surfaces.yaml` 存在但为空或仅包含空白字符
+- **当** `docs/surfaces.yaml` 存在但为空或仅包含空白字符
 - **则** validation 将其判定为 invalid
 
 #### 场景：validation 拒绝非法的 contract 元数据
@@ -152,11 +152,11 @@
 - **则** validation 在写回前拒绝该结果
 
 #### 场景：validation 检测到冲突的 surfaces 路径
-- **当** 仓库中同时存在 `contracts/surfaces.yaml` 和 `docs/surfaces.yaml`
+- **当** 仓库中同时存在 `docs/surfaces.yaml` 和 `contracts/surfaces.yaml`
 - **则** validation 报告路径冲突
 
 #### 场景：写回流程拒绝非 canonical 的 surfaces 路径
-- **当** docs 生成结果试图写入 `docs/surfaces.yaml`
+- **当** docs 生成结果试图写入 `contracts/surfaces.yaml`
 - **则** contract validation 在文件写回前拒绝该结果
 - **并且** 仓库保持不变
 
@@ -176,5 +176,5 @@
 - **并且** 不得引入另一套独立的 writeback 协议
 
 #### 场景：迁移保护阻止自动迁移 surfaces 路径
-- **当** 这个 change 应用到一个已经存在 `contracts/surfaces.yaml` 的仓库
-- **则** 系统不得自动把它移动、重命名或改写为 `docs/surfaces.yaml`
+- **当** 这个 change 应用到一个已经存在 `docs/surfaces.yaml` 的仓库
+- **则** 系统不得自动把它移动、重命名或改写为 `contracts/surfaces.yaml`

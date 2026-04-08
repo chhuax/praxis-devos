@@ -53,7 +53,7 @@ const CODEMAP_MANAGED_START = '<!-- PRAXIS_DOCS_REFRESH_START -->';
 const CODEMAP_MANAGED_END = '<!-- PRAXIS_DOCS_REFRESH_END -->';
 const DOCS_LITE_TEMPLATE_FILES = [
   'docs/codemaps/project-overview.md',
-  'contracts/surfaces.yaml',
+  'docs/surfaces.yaml',
 ];
 const DOCS_PLACEHOLDER_PATTERNS = [
   /TODO/i,
@@ -64,7 +64,7 @@ const DOCS_PLACEHOLDER_PATTERNS = [
   /待补充/,
 ];
 const DOCS_ALLOWED_TARGET_BASE = [
-  'contracts/surfaces.yaml',
+  'docs/surfaces.yaml',
   'docs/codemaps/project-overview.md',
   'docs/codemaps/module-map.md',
 ];
@@ -592,9 +592,8 @@ const projectPaths = (projectDir) => ({
   codemapOverviewPath: path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'),
   codemapModuleMapPath: path.join(projectDir, 'docs', 'codemaps', 'module-map.md'),
   codemapModulesDir: path.join(projectDir, 'docs', 'codemaps', 'modules'),
-  contractsDir: path.join(projectDir, 'contracts'),
-  surfacesPath: path.join(projectDir, 'contracts', 'surfaces.yaml'),
-  nonCanonicalSurfacesPath: path.join(projectDir, 'docs', 'surfaces.yaml'),
+  surfacesPath: path.join(projectDir, 'docs', 'surfaces.yaml'),
+  nonCanonicalSurfacesPath: path.join(projectDir, 'contracts', 'surfaces.yaml'),
   rootPomPath: path.join(projectDir, 'pom.xml'),
 });
 
@@ -640,7 +639,7 @@ const collectPreferredReadPaths = ({ projectDir, primarySurfaceLocation }) => {
     'AGENTS.md',
     'README.md',
     'docs/codemaps/project-overview.md',
-    'contracts/surfaces.yaml',
+    'docs/surfaces.yaml',
     primarySurfaceLocation || null,
     firstExistingRelativePath(projectDir, ['src/index.ts', 'src/index.js', 'src/main.ts', 'src/main.js', 'index.ts', 'index.js']),
     firstExistingRelativePath(projectDir, ['test', 'tests', 'spec']),
@@ -663,10 +662,10 @@ const renderProblemRouting = ({ primarySurfaceLocation, testPath, sourcePath }) 
   const lines = [
     '## Problem Routing',
     '',
-    '- External surface changes: read `contracts/surfaces.yaml`.',
+    '- External surface changes: read `docs/surfaces.yaml`.',
     `- Source code changes: read ${formatPathRef(sourcePath || 'src/', !sourcePath || !/\.[a-z0-9]+$/i.test(sourcePath))}.`,
     `- Tests: read ${formatPathRef(testPath || 'test/', !testPath || !/\.[a-z0-9]+$/i.test(testPath))}.`,
-    '- Docs and project map updates: read `docs/codemaps/project-overview.md` and `contracts/surfaces.yaml`.',
+    '- Docs and project map updates: read `docs/codemaps/project-overview.md` and `docs/surfaces.yaml`.',
   ];
 
   return lines.join('\n');
@@ -1034,7 +1033,7 @@ export const buildDocsSubagentRequest = ({ projectDir, mode }) => {
   return {
     schemaVersion: 1,
     mode,
-    canonicalSurfacesPath: 'contracts/surfaces.yaml',
+    canonicalSurfacesPath: 'docs/surfaces.yaml',
     allowedTargets: allowedDocsWriteTargets({ projectDir }),
     readPaths: collectPreferredReadPaths({
       projectDir,
@@ -1105,8 +1104,8 @@ export const validateDocsGenerationResult = ({ projectDir, result }) => {
           findings.push(`Path is outside the allowed target set: ${pathValue}`);
         }
 
-        if (pathValue === 'docs/surfaces.yaml') {
-          findings.push('docs/surfaces.yaml is not a valid write target');
+        if (pathValue === 'contracts/surfaces.yaml') {
+          findings.push('contracts/surfaces.yaml is not a valid write target');
         }
 
         const modulePathMatch = pathValue.match(/^docs\/codemaps\/modules\/(.+)\.md$/);
@@ -1231,15 +1230,15 @@ export const checkDocsLite = ({ projectDir }) => {
   }
 
   const surfacesExists = fs.existsSync(paths.surfacesPath);
-  lines.push(`- contracts/surfaces.yaml: ${surfacesExists ? 'ok' : 'missing'}`);
+  lines.push(`- docs/surfaces.yaml: ${surfacesExists ? 'ok' : 'missing'}`);
   if (!surfacesExists) {
-    findings.push('Missing contracts/surfaces.yaml');
+    findings.push('Missing docs/surfaces.yaml');
   }
 
   const nonCanonicalSurfacesExists = fs.existsSync(paths.nonCanonicalSurfacesPath);
-  lines.push(`- docs/surfaces.yaml: ${nonCanonicalSurfacesExists ? 'conflict' : 'absent'}`);
+  lines.push(`- contracts/surfaces.yaml: ${nonCanonicalSurfacesExists ? 'conflict' : 'absent'}`);
   if (nonCanonicalSurfacesExists) {
-    findings.push('Conflict: docs/surfaces.yaml exists but contracts/surfaces.yaml is the canonical path');
+    findings.push('Conflict: contracts/surfaces.yaml exists but docs/surfaces.yaml is the canonical path');
   }
 
   if (codemapExists) {
@@ -1254,14 +1253,14 @@ export const checkDocsLite = ({ projectDir }) => {
   if (surfacesExists) {
     const surfacesContent = fs.readFileSync(paths.surfacesPath, 'utf8');
     if (!surfacesContent.trim()) {
-      findings.push('contracts/surfaces.yaml is blank');
+      findings.push('docs/surfaces.yaml is blank');
     } else if (hasPlaceholderText(surfacesContent)) {
-      findings.push('Placeholder text remains in contracts/surfaces.yaml');
+      findings.push('Placeholder text remains in docs/surfaces.yaml');
     }
 
     const parsed = parseSurfacesYaml(surfacesContent);
     if (!parsed.primarySurface) {
-      findings.push('Missing primary_surface in contracts/surfaces.yaml');
+      findings.push('Missing primary_surface in docs/surfaces.yaml');
     }
 
     if (parsed.primarySurface && !parsed.surfaces.some((surface) => surface.id === parsed.primarySurface)) {

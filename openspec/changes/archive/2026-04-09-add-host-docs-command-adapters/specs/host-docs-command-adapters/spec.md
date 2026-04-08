@@ -75,13 +75,13 @@
 
 #### 场景：command 模板引用 canonical docs path
 - **当** Claude 或 OpenCode command 模板被安装
-- **则** 模板引用当前 canonical docs path：`contracts/surfaces.yaml`
+- **则** 模板引用当前 canonical docs path：`docs/surfaces.yaml`
 - **并且** 模板引用 `docs/codemaps/**`
 
 #### 场景：command 模板不改变 allowed target set
 - **当** Claude 或 OpenCode command 模板触发 `devos-docs`
 - **则** 它们必须遵守已有 allowed target set
-- **并且** 不得把 `docs/surfaces.yaml` 之类非 canonical path 讲成有效目标
+- **并且** 不得把 `contracts/surfaces.yaml` 之类非 canonical path 讲成有效目标
 
 #### 场景：refresh command 明确保守更新
 - **当** `devos-docs-refresh` command 被投放
@@ -151,7 +151,7 @@
 #### 场景：command 模板包含 mode 与 canonical paths
 - **当** docs command 模板被写入用户级宿主目录
 - **则** 模板明确对应的 `mode=init` 或 `mode=refresh`
-- **并且** 模板明确引用 canonical paths：`contracts/surfaces.yaml` 与 `docs/codemaps/**`
+- **并且** 模板明确引用 canonical paths：`docs/surfaces.yaml` 与 `docs/codemaps/**`
 
 #### 场景：command 模板说明自己是薄包装
 - **当** docs command 模板被用户阅读
