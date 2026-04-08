@@ -165,16 +165,6 @@ const localExecutablePath = (projectDir, executable) => {
 };
 
 const resolveOpenSpecRuntime = (projectDir) => {
-  const localPath = localExecutablePath(projectDir, 'openspec');
-  if (fs.existsSync(localPath)) {
-    return {
-      status: 'ok',
-      source: 'project-local',
-      command: localPath,
-      detail: `OpenSpec available via ${localPath}`,
-    };
-  }
-
   const globalPath = findCommandPath('openspec');
   if (globalPath) {
     return {
@@ -182,6 +172,16 @@ const resolveOpenSpecRuntime = (projectDir) => {
       source: 'global',
       command: globalPath,
       detail: `OpenSpec CLI is available on PATH via ${globalPath}`,
+    };
+  }
+
+  const localPath = localExecutablePath(projectDir, 'openspec');
+  if (fs.existsSync(localPath)) {
+    return {
+      status: 'warning',
+      source: 'project-local',
+      command: localPath,
+      detail: `OpenSpec is only available project-locally via ${localPath}; user-level global install is recommended`,
     };
   }
 
@@ -1065,7 +1065,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   const logs = [];
   const current = resolveOpenSpecRuntime(projectDir);
 
-  if (current.status === 'ok') {
+  if (current.status === 'ok' && current.source === 'global') {
     logs.push(`== openspec ==`);
     logs.push(`⊘ OpenSpec already available (${current.source})`);
     logs.push(`- ${current.detail}`);
@@ -1077,7 +1077,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const npmCommand = resolveCommandForExecution('npm');
-  const installResult = runFile(npmCommand, ['install', '-D', OPENSPEC_PACKAGE], {
+  const installResult = runFile(npmCommand, ['install', '-g', OPENSPEC_PACKAGE], {
     cwd: projectDir,
   });
   if (!installResult.ok) {
@@ -1085,12 +1085,12 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const next = resolveOpenSpecRuntime(projectDir);
-  if (next.status !== 'ok') {
-    throw new Error(`OpenSpec install completed but runtime is still unavailable: ${next.detail}`);
+  if (next.status !== 'ok' || next.source !== 'global') {
+    throw new Error(`OpenSpec install completed but global runtime is still unavailable: ${next.detail}`);
   }
 
   logs.push('== openspec ==');
-  logs.push(`✓ Installed OpenSpec locally with npm (${OPENSPEC_PACKAGE})`);
+  logs.push(`✓ Installed OpenSpec globally with npm (user-level command) (${OPENSPEC_PACKAGE})`);
   logs.push(`- ${next.detail}`);
   return logs.join('\n');
 };
@@ -1409,7 +1409,7 @@ export const bootstrapProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
 
 export const bootstrapOpenSpec = ({ projectDir }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status === 'ok') {
+  if (runtime.status === 'ok' || runtime.status === 'warning') {
     return [
       '== openspec ==',
       `OpenSpec already available (${runtime.source})`,
@@ -1422,14 +1422,14 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
   return [
     '== openspec ==',
     'OpenSpec is a hard dependency of Praxis DevOS.',
-    'Preferred install (project-local):',
-    `- npm install -D ${OPENSPEC_PACKAGE}`,
-    'Then run OpenSpec directly:',
-    '  ./node_modules/.bin/openspec list --specs',
-    'Fallback install (global):',
+    'Preferred install (user-global):',
     `- npm install -g ${OPENSPEC_PACKAGE}`,
     '- Then run:',
     '  openspec list --specs',
+    'Project-local fallback (if global is blocked by policy):',
+    `- npm install -D ${OPENSPEC_PACKAGE}`,
+    '- Then run OpenSpec directly:',
+    '  ./node_modules/.bin/openspec list --specs',
     `Reference: ${OPENSPEC_INSTALL_DOC}`,
   ].join('\n');
 };
@@ -1482,7 +1482,11 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
 
   lines.push('');
   lines.push('Recommended next step:');
-  lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  if (selectedAgents.length === 1) {
+    lines.push(`- npx praxis-devos setup --agent ${selectedAgents[0]}`);
+  } else {
+    lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  }
   lines.push('');
   lines.push('Advanced repair command:');
   lines.push(`- npx praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);

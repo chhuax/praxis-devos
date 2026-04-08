@@ -146,6 +146,7 @@ const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
   const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
   const npmPath = path.join(commandDir, 'npm.cmd');
   const claudePath = path.join(commandDir, 'claude.cmd');
+  const globalOpenSpecPath = path.join(commandDir, 'openspec.cmd');
   const comSpecPath = path.join(harnessDir, 'cmd.exe');
   const wherePath = path.join(harnessDir, 'where');
   const openspecPath = path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd');
@@ -165,7 +166,9 @@ case "$1" in
     printf '\'"%s"\'\\n' "${claudePath}"
     ;;
   openspec|openspec.cmd)
-    if [ -f "${openspecPath}" ]; then
+    if [ -f "${globalOpenSpecPath}" ]; then
+      printf '\'"%s"\'\\n' "${globalOpenSpecPath}"
+    elif [ -f "${openspecPath}" ]; then
       printf '\'"%s"\'\\n' "${openspecPath}"
     else
       exit 1
@@ -205,10 +208,10 @@ fi
     npmPath,
     `#!/bin/sh
 set -eu
-if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
-  bin_dir="${path.join(projectDir, 'node_modules', '.bin')}"
+if [ "$1" = "install" ] && [ "$2" = "-g" ] && [ "$3" = "@fission-ai/openspec" ]; then
+  bin_dir="${commandDir}"
   mkdir -p "$bin_dir"
-  cat > "$bin_dir/openspec.cmd" <<'EOF'
+  cat > "${globalOpenSpecPath}" <<'EOF'
 #!/bin/sh
 set -eu
 cmd="\${1:-}"
@@ -222,7 +225,7 @@ EOF_CONFIG
 fi
 printf 'LOCAL:%s\\n' "$*"
 EOF
-  chmod +x "$bin_dir/openspec.cmd"
+  chmod +x "${globalOpenSpecPath}"
   exit 0
 fi
 echo "unsupported npm invocation: $*" >&2
@@ -466,7 +469,7 @@ test('projectNativeSkills does not overwrite user-authored same-name skills with
   assert.match(logs.join('\n'), /skipped opsx-apply because .* is not a Praxis projection/);
 });
 
-test('initProject bootstraps openspec workspace through a local runtime', () => {
+test('initProject bootstraps openspec workspace through the detected runtime', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
 
@@ -475,7 +478,7 @@ test('initProject bootstraps openspec workspace through a local runtime', () => 
     agents: ['codex', 'opencode'],
   });
 
-  assert.match(output, /openspec init completed \(project-local\)/);
+  assert.match(output, /openspec init completed \((global|project-local)\)/);
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
@@ -507,15 +510,15 @@ test('statusProject reports initialized state for the selected agents', () => {
   });
 });
 
-test('bootstrapOpenSpec prefers the local runtime when available', () => {
+test('bootstrapOpenSpec reports the detected runtime', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
 
   const output = bootstrapOpenSpec({ projectDir });
 
-  assert.match(output, /OpenSpec already available \(project-local\)/);
+  assert.match(output, /OpenSpec already available \((global|project-local)\)/);
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
-  assert.match(output, /node_modules\/\.bin\/openspec list --specs/);
+  assert.match(output, /openspec list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
 });
 
@@ -726,9 +729,9 @@ test('setupProject handles quoted Windows command paths with spaces during autom
       agents: ['claude'],
     });
 
-    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.match(output, /Installed OpenSpec globally with npm \(user-level command\)/);
     assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
-    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd')));
+    assert.ok(fs.existsSync(path.join(fakeHome, 'Program Files', 'nodejs', 'openspec.cmd')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
   }))));
 });
@@ -960,7 +963,7 @@ test('doctorProject reports current dependency status for OpenCode', () => {
     assert.match(output, /Dependency doctor:/);
     assert.match(output, /\[OK\] openspec/);
     assert.match(output, /\[MISSING\] superpowers:opencode/);
-    assert.match(output, /npx praxis-devos setup --agents opencode/);
+    assert.match(output, /npx praxis-devos setup --agent opencode/);
   });
 });
 
