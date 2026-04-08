@@ -375,6 +375,10 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /keep all parallel work, subtasks, outputs, and status under the current change/);
   assert.match(agentsMd, /docs\/codemaps\//);
   assert.match(agentsMd, /contracts\/surfaces\.yaml/);
+  assert.match(agentsMd, /\/devos-docs-init/);
+  assert.match(agentsMd, /\/devos-docs-refresh/);
+  assert.doesNotMatch(agentsMd, /\/devos:docs-init/);
+  assert.doesNotMatch(agentsMd, /\/devos:docs-refresh/);
   assert.match(agentsMd, /docs sub-agent/i);
   assert.match(agentsMd, /OpenSpec \+ Superpowers Contract/);
   assert.match(agentsMd, /Stage Gates/);
@@ -392,6 +396,85 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
   assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')));
   assert.ok(fs.existsSync(path.join(projectDir, 'contracts', 'surfaces.yaml')));
+});
+
+test('projectNativeSkills writes user-level docs commands and registers managed assets', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-native-assets-home-'));
+  const logs = [];
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir: makeTempProject(),
+      agents: ['claude', 'opencode', 'codex'],
+      log: (msg) => logs.push(msg),
+    });
+  });
+
+  const claudeInitPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md');
+  const claudeRefreshPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md');
+  const opencodeInitPath = path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md');
+  const opencodeRefreshPath = path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md');
+  const manifestPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
+
+  assert.ok(fs.existsSync(claudeInitPath));
+  assert.ok(fs.existsSync(claudeRefreshPath));
+  assert.ok(fs.existsSync(opencodeInitPath));
+  assert.ok(fs.existsSync(opencodeRefreshPath));
+  assert.ok(fs.existsSync(manifestPath));
+
+  const claudeInit = fs.readFileSync(claudeInitPath, 'utf8');
+  const opencodeRefresh = fs.readFileSync(opencodeRefreshPath, 'utf8');
+  assert.match(claudeInit, /^# devos-docs-init/m);
+  assert.match(claudeInit, /mode=init/i);
+  assert.match(opencodeRefresh, /^# devos-docs-refresh/m);
+  assert.match(opencodeRefresh, /mode=refresh/i);
+
+  const manifest = readJson(manifestPath);
+  assert.equal(manifest.version, 1);
+  assert.equal(manifest.assets[claudeInitPath]?.type, 'command');
+  assert.equal(manifest.assets[claudeRefreshPath]?.type, 'command');
+  assert.equal(manifest.assets[opencodeInitPath]?.type, 'command');
+  assert.equal(manifest.assets[opencodeRefreshPath]?.type, 'command');
+  assert.equal(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.type, 'skill');
+
+  assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
+  assert.match(logs.join('\n'), /OpenCode: projected docs command devos-docs-refresh/);
+});
+
+test('runCli sync refreshes managed user-level docs commands and skips user-owned same-name commands', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-sync-home-'));
+  const managedClaudeInitPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md');
+  const userOwnedClaudeRefreshPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md');
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: () => {},
+    });
+
+    fs.writeFileSync(managedClaudeInitPath, '# stale managed command\n', 'utf8');
+    fs.writeFileSync(userOwnedClaudeRefreshPath, '# user custom refresh command\n', 'utf8');
+
+    const manifestPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
+    const manifest = readJson(manifestPath);
+    delete manifest.assets[userOwnedClaudeRefreshPath];
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+
+    const output = runCli([
+      'sync',
+      '--project-dir',
+      projectDir,
+      '--agent',
+      'claude',
+    ]);
+
+    assert.match(output, /Claude: projected docs command devos-docs-init/);
+    assert.match(output, /skipped docs command devos-docs-refresh/i);
+    assert.match(fs.readFileSync(managedClaudeInitPath, 'utf8'), /^# devos-docs-init/m);
+    assert.equal(fs.readFileSync(userOwnedClaudeRefreshPath, 'utf8'), '# user custom refresh command\n');
+  });
 });
 
 test('syncProject restores missing docs-lite files', () => {
@@ -1079,6 +1162,7 @@ test('setupProject initializes the current structure for OpenCode without networ
     });
 
     const globalConfigPath = path.join(fakeHome, '.config', 'opencode', 'config.json');
+    const managedAssetsPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
     assert.match(output, /== openspec ==/);
     assert.match(output, /== opencode ==/);
     assert.match(output, /Configured OpenCode plugins in/);
@@ -1086,6 +1170,9 @@ test('setupProject initializes the current structure for OpenCode without networ
     assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
     assert.ok(fs.existsSync(globalConfigPath));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md')));
+    assert.ok(readJson(managedAssetsPath).assets[path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')]);
   }));
 });
 
@@ -1223,9 +1310,13 @@ test('setupProject installs Claude SuperPowers with user scope when Claude CLI i
       agents: ['claude'],
     });
 
+    const managedAssetsPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
     assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
     assert.match(output, /\[OK\] superpowers:claude/);
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
+    assert.ok(readJson(managedAssetsPath).assets[path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')]);
   })));
 });
 

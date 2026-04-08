@@ -29,9 +29,9 @@ export const collectBundledSkillSources = () =>
   }))).filter(({ sourcePath }) => fs.existsSync(sourcePath));
 
 /**
- * Project bundled Praxis skills to a specific agent's native directory.
+ * Project bundled Praxis user-level assets to a specific agent's native directories.
  */
-export const projectToAgent = ({ agent, version, log }) => {
+export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log }) => {
   const adapter = adapters[agent];
   if (!adapter) {
     log(`⊘ Projection: unknown agent "${agent}", skipping`);
@@ -46,8 +46,17 @@ export const projectToAgent = ({ agent, version, log }) => {
 
   const validNames = skillSources.map((s) => s.name);
   adapter.cleanStaleProjections({ validNames, log });
+  if (typeof adapter.pruneManagedUserAssets === 'function') {
+    adapter.pruneManagedUserAssets({ projectDir, validSkillNames: validNames, log });
+  }
 
-  return adapter.projectSkills({ skillSources, version, log });
+  const results = [];
+  results.push(...adapter.projectSkills({ projectDir, skillSources, version, log }));
+  if (typeof adapter.projectCommands === 'function') {
+    results.push(...adapter.projectCommands({ projectDir, version, log }));
+  }
+
+  return results;
 };
 
 /**

@@ -1,6 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { buildMarker, canWriteProjection, injectMarker, isProjection } from './markers.js';
+import { buildMarker, injectMarker, isProjection } from './markers.js';
+import {
+  canSafelyOverwrite,
+  pruneManagedAssets,
+  registerManagedAsset,
+} from './managed-assets.js';
 import { resolveUserHomeDir } from '../support/home.js';
 
 const codexSkillsDir = () => path.join(resolveUserHomeDir(), '.codex', 'skills');
@@ -13,7 +18,7 @@ const ensureDir = (dirPath) => {
  * Project bundled Praxis skills to ~/.codex/skills/ as directories with SKILL.md.
  * Codex discovers these as native skills.
  */
-export const projectSkills = ({ skillSources, version, log }) => {
+export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(codexSkillsDir());
   const results = [];
 
@@ -21,7 +26,12 @@ export const projectSkills = ({ skillSources, version, log }) => {
     const targetDir = path.join(codexSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
     ensureDir(targetDir);
-    if (!canWriteProjection(targetPath)) {
+    if (!canSafelyOverwrite({
+      assetPath: targetPath,
+      projectDir,
+      allowLegacyProjection: true,
+      isLegacyProjection: isProjection,
+    })) {
       results.push({ name, targetPath, status: 'skipped' });
       log(`⊘ Codex: skipped ${name} because ${targetPath} is not a Praxis projection`);
       continue;
@@ -32,6 +42,16 @@ export const projectSkills = ({ skillSources, version, log }) => {
     const projected = injectMarker(content, marker);
 
     fs.writeFileSync(targetPath, projected, 'utf8');
+    registerManagedAsset({
+      projectDir,
+      assetPath: targetPath,
+      type: 'skill',
+      version,
+      agent: 'codex',
+      extra: {
+        sourcePath: path.relative(process.cwd(), sourcePath),
+      },
+    });
     results.push({ name, targetPath, status: 'projected' });
     log(`✓ Codex: projected ${name} → ${targetPath}`);
   }
@@ -65,4 +85,19 @@ export const cleanStaleProjections = ({ validNames, log }) => {
       log(`✓ Codex: removed stale projection ${entry.name}`);
     }
   }
+};
+
+export const pruneManagedUserAssets = ({ projectDir, validSkillNames, log }) => {
+  const validSkillPaths = validSkillNames.map((name) => path.join(codexSkillsDir(), name, 'SKILL.md'));
+  const removed = pruneManagedAssets({
+    projectDir,
+    agent: 'codex',
+    validPaths: validSkillPaths,
+  });
+
+  for (const removedPath of removed) {
+    log(`✓ Codex: removed managed asset ${removedPath}`);
+  }
+
+  return removed;
 };
