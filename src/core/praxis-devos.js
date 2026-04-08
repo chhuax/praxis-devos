@@ -491,7 +491,7 @@ const projectPaths = (projectDir) => ({
 
 const ensureOpenSpecLayout = ({ projectDir, log }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status !== 'ok' || !runtime.command) {
+  if ((runtime.status !== 'ok' && runtime.status !== 'warning') || !runtime.command) {
     throw new Error(
       `OpenSpec is required before project initialization. ${runtime.detail}`,
     );
