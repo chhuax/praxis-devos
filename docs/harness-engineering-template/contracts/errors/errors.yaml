@@ -1,0 +1,13 @@
+errors:
+  - code: AUTH_UNAUTHORIZED
+    httpStatus: 401
+    messageKey: auth.unauthorized
+    description: Caller is not authenticated.
+    retryable: false
+
+  - code: VALIDATION_FAILED
+    httpStatus: 400
+    messageKey: request.validation_failed
+    description: Request payload is invalid.
+    retryable: false
+

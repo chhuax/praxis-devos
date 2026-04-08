@@ -12,11 +12,12 @@ import {
 } from './support/quoted-windows-smoke.mjs';
 
 const WINDOWS_BATCH_EXTENSIONS = new Set(['.cmd', '.bat']);
-const PROJECTED_OPENSPEC_SKILLS = [
+const PROJECTED_PRAXIS_SKILLS = [
   'opsx-propose',
   'opsx-explore',
   'opsx-apply',
   'opsx-archive',
+  'devos-docs',
 ];
 
 const quoteWindowsArg = (value) => {
@@ -159,7 +160,7 @@ const findSkillMarkdown = (rootDir) => {
 
 const assertProjectedCodexSkills = (fakeHome) => {
   const skillsRoot = path.join(fakeHome, '.codex', 'skills');
-  for (const name of PROJECTED_OPENSPEC_SKILLS) {
+  for (const name of PROJECTED_PRAXIS_SKILLS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
       `Expected Codex projected skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
@@ -169,7 +170,7 @@ const assertProjectedCodexSkills = (fakeHome) => {
 
 const assertProjectedClaudeSkills = (fakeHome) => {
   const skillsRoot = path.join(fakeHome, '.claude', 'skills');
-  for (const name of PROJECTED_OPENSPEC_SKILLS) {
+  for (const name of PROJECTED_PRAXIS_SKILLS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
       `Expected Claude projected skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
@@ -179,7 +180,7 @@ const assertProjectedClaudeSkills = (fakeHome) => {
 
 const assertProjectedOpenCodeSkills = (fakeHome) => {
   const skillsRoot = path.join(fakeHome, '.claude', 'skills');
-  for (const name of PROJECTED_OPENSPEC_SKILLS) {
+  for (const name of PROJECTED_PRAXIS_SKILLS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
       `Expected OpenCode shared skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,

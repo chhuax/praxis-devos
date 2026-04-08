@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Application Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "PORT": {
+      "type": "integer",
+      "description": "HTTP listen port",
+      "default": 3000
+    },
+    "LOG_LEVEL": {
+      "type": "string",
+      "description": "Application log level",
+      "enum": ["debug", "info", "warn", "error"],
+      "default": "info"
+    }
+  }
+}
+

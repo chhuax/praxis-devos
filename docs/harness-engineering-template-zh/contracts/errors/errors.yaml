@@ -1,0 +1,13 @@
+errors:
+  - code: AUTH_UNAUTHORIZED
+    httpStatus: 401
+    messageKey: auth.unauthorized
+    description: 调用方未完成认证。
+    retryable: false
+
+  - code: VALIDATION_FAILED
+    httpStatus: 400
+    messageKey: request.validation_failed
+    description: 请求参数或请求体不合法。
+    retryable: false
+

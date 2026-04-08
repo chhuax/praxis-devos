@@ -1,0 +1,13 @@
+commands:
+  - name: sync
+    description: 同步本地状态与远端状态
+    arguments:
+      - name: --project-dir
+        required: true
+        type: string
+    outputs:
+      - code: 0
+        meaning: 执行成功
+      - code: 1
+        meaning: 校验失败或运行时失败
+

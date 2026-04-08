@@ -10,7 +10,7 @@ const ensureDir = (dirPath) => {
 };
 
 /**
- * Project OpenSpec skills to ~/.codex/skills/ as directories with SKILL.md.
+ * Project bundled Praxis skills to ~/.codex/skills/ as directories with SKILL.md.
  * Codex discovers these as native skills.
  */
 export const projectSkills = ({ skillSources, version, log }) => {
@@ -39,15 +39,12 @@ export const projectSkills = ({ skillSources, version, log }) => {
   return results;
 };
 
-/**
- * Detect existing Codex projections.
- */
 export const detectProjections = () => {
   if (!fs.existsSync(codexSkillsDir())) {
     return [];
   }
   const dirs = fs.readdirSync(codexSkillsDir(), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.startsWith('opsx-'));
+    .filter((d) => d.isDirectory());
 
   return dirs
     .map((d) => {
