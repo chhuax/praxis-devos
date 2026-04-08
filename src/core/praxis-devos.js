@@ -168,10 +168,40 @@ const findCommandPath = (cmd) => {
   try {
     const whichCmd = process.platform === 'win32' ? 'where' : 'which';
     const stdout = execFileSync(whichCmd, [cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return stdout
+    const candidates = stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .find((line) => line.length > 0) || null;
+      .filter((line) => line.length > 0);
+
+    for (const candidate of candidates) {
+      const normalized = normalizeCommandPath(candidate);
+      if (process.platform === 'win32' && path.extname(normalized).length === 0) {
+        const pathExts = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+          .split(';')
+          .map((ext) => ext.trim().toLowerCase())
+          .filter((ext) => ext.length > 0)
+          .map((ext) => (ext.startsWith('.') ? ext : `.${ext}`));
+        const fallbackExts = ['.cmd', '.exe', '.bat', '.com'];
+        const executableExts = Array.from(new Set([...pathExts, ...fallbackExts]));
+        for (const ext of executableExts) {
+          const withExt = `${normalized}${ext}`;
+          if (fs.existsSync(withExt)) {
+            return withExt;
+          }
+        }
+
+        if (fs.existsSync(normalized)) {
+          return normalized;
+        }
+        continue;
+      }
+
+      if (fs.existsSync(normalized)) {
+        return normalized;
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -212,6 +242,8 @@ const resolveOpenSpecRuntime = (projectDir) => {
     detail: 'OpenSpec CLI is missing. Install it with `npx praxis-devos setup --agent <name>` or `npx praxis-devos bootstrap --agents <name>`.',
   };
 };
+
+const isGlobalOpenSpecRuntime = (runtime) => runtime?.status === 'ok' && runtime?.source === 'global';
 
 const run = (cmd, opts = {}) => {
   try {
@@ -1874,7 +1906,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   const logs = [];
   const current = resolveOpenSpecRuntime(projectDir);
 
-  if (current.status === 'ok' && current.source === 'global') {
+  if (isGlobalOpenSpecRuntime(current)) {
     logs.push(`== openspec ==`);
     logs.push(`⊘ OpenSpec already available (${current.source})`);
     logs.push(`- ${current.detail}`);
@@ -1894,7 +1926,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const next = resolveOpenSpecRuntime(projectDir);
-  if (next.status !== 'ok' || next.source !== 'global') {
+  if (!isGlobalOpenSpecRuntime(next)) {
     throw new Error(`OpenSpec install completed but global runtime is still unavailable: ${next.detail}`);
   }
 

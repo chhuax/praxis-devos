@@ -377,8 +377,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
 
   assertOpenSpecWorkspace(projectDir);
   assert.ok(
-    fs.existsSync(localOpenSpecPath(projectDir)) || /OpenSpec already available \(global\)/.test(setupResult.stdout),
-    `Expected a project-local OpenSpec install or an acknowledged global runtime.\n${setupResult.stdout}`,
+    fs.existsSync(localOpenSpecPath(projectDir))
+    || /OpenSpec already available \(global\)/.test(setupResult.stdout)
+    || /Installed OpenSpec globally with npm \(user-level command\)/.test(setupResult.stdout),
+    `Expected project-local OpenSpec, existing global OpenSpec, or successful global OpenSpec install.\n${setupResult.stdout}`,
   );
   assert.match(secondSetupResult.stdout, /Project already initialized; refreshing selected agents and managed adapters\./);
 

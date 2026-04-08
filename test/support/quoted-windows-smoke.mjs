@@ -34,7 +34,7 @@ export const buildQuotedWindowsNpmShim = ({
 const path = require('node:path');
 const args = process.argv.slice(2);
 fs.appendFileSync('${escapeForSingleQuotedJs(invocationLogPath)}', 'npm.cmd ' + args.join(' ') + '\\n');
-${diagnosticLine}if (args.length === 3 && args[0] === 'install' && args[1] === '-D' && args[2] === '@fission-ai/openspec') {
+${diagnosticLine}if (args.length === 3 && args[0] === 'install' && args[1] === '-g' && args[2] === '@fission-ai/openspec') {
   fs.mkdirSync(path.dirname('${escapeForSingleQuotedJs(openspecCmdPath)}'), { recursive: true });
   fs.writeFileSync('${escapeForSingleQuotedJs(openspecShimPath)}', ${JSON.stringify(buildQuotedWindowsOpenSpecShim())});
   fs.writeFileSync('${escapeForSingleQuotedJs(openspecCmdPath)}', ${JSON.stringify(buildQuotedWindowsNodeCmdWrapper('openspec-shim.cjs'))});

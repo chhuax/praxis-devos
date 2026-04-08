@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-04-08
+
+### Changed
+- `setup` now treats OpenSpec as a user-level global CLI by default and installs it with `npm install -g` when missing
+
+### Fixed
+- Windows command discovery now prefers real executable shims for `openspec`, avoiding invalid extensionless paths that caused `setup` to fail with `ENOENT`
+- `init` continues to work when only a project-local OpenSpec runtime is present, while still keeping global OpenSpec as the required steady-state runtime
+
 ## [0.4.8] - 2026-04-07
 
 ### Fixed

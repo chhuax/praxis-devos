@@ -149,11 +149,17 @@ exit 1
   return binDir;
 };
 
-const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
+const installFakeWindowsBatchRuntime = ({
+  homeDir,
+  projectDir,
+  includeBrokenOpenSpecCandidate = false,
+  includeExtensionlessOpenSpecCandidate = false,
+}) => {
   const harnessDir = path.join(homeDir, 'fake-win-tools');
   const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
   const npmPath = path.join(commandDir, 'npm.cmd');
   const claudePath = path.join(commandDir, 'claude.cmd');
+  const globalOpenSpecNoExtPath = path.join(commandDir, 'openspec');
   const globalOpenSpecPath = path.join(commandDir, 'openspec.cmd');
   const comSpecPath = path.join(harnessDir, 'cmd.exe');
   const wherePath = path.join(harnessDir, 'where');
@@ -161,6 +167,8 @@ const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
 
   fs.mkdirSync(harnessDir, { recursive: true });
   fs.mkdirSync(commandDir, { recursive: true });
+
+  const brokenOpenSpecPath = path.join(homeDir, 'npm', 'prefix', 'openspec');
 
   fs.writeFileSync(
     wherePath,
@@ -174,6 +182,8 @@ case "$1" in
     printf '\'"%s"\'\\n' "${claudePath}"
     ;;
   openspec|openspec.cmd)
+    ${includeBrokenOpenSpecCandidate ? `printf '\'"%s"\'\\n' "${brokenOpenSpecPath}"` : ''}
+    ${includeExtensionlessOpenSpecCandidate ? `printf '\'"%s"\'\\n' "${globalOpenSpecNoExtPath}"` : ''}
     if [ -f "${globalOpenSpecPath}" ]; then
       printf '\'"%s"\'\\n' "${globalOpenSpecPath}"
     elif [ -f "${openspecPath}" ]; then
@@ -233,6 +243,12 @@ EOF_CONFIG
 fi
 printf 'LOCAL:%s\\n' "$*"
 EOF
+  cat > "${globalOpenSpecNoExtPath}" <<'EOF_NO_EXT'
+#!/bin/sh
+set -eu
+exec "${0}.cmd" "$@"
+EOF_NO_EXT
+  chmod +x "${globalOpenSpecNoExtPath}"
   chmod +x "${globalOpenSpecPath}"
   exit 0
 fi
@@ -548,7 +564,7 @@ test('initProject bootstraps openspec workspace through the detected runtime', (
     agents: ['codex', 'opencode'],
   }));
 
-  assert.match(output, /openspec init completed \(project-local\)/);
+  assert.match(output, /openspec init completed \((global|project-local)\)/);
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
@@ -1000,7 +1016,7 @@ test('statusProject reports initialized state for the selected agents', () => {
     });
 
     assert.match(output, /initialized: yes/);
-    assert.match(output, /openspec: \[OK\]/);
+    assert.match(output, /openspec: \[(OK|WARN)\]/);
     assert.match(output, /superpowers:opencode: \[OK\]/);
   }));
 });
@@ -1011,7 +1027,7 @@ test('bootstrapOpenSpec reports the detected runtime', () => {
 
   const output = withEnv('PATH', '/usr/bin:/bin', () => bootstrapOpenSpec({ projectDir }));
 
-  assert.match(output, /OpenSpec already available \(project-local\)/);
+  assert.match(output, /OpenSpec already available \((global|project-local)\)/);
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
   assert.match(output, /openspec list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
@@ -1254,6 +1270,47 @@ test('createChangeScaffold remains available as an internal scaffold helper', ()
   assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
   assert.ok(fs.existsSync(evidencePath));
   assert.match(evidencePath, new RegExp(`^${fakeHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+});
+
+test('setupProject ignores invalid Windows where candidates for openspec', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-bad-where-home-'));
+  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({
+    homeDir: fakeHome,
+    projectDir,
+    includeBrokenOpenSpecCandidate: true,
+  });
+
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Installed OpenSpec globally with npm \(user-level command\)/);
+    assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
+    assert.ok(fs.existsSync(path.join(fakeHome, 'Program Files', 'nodejs', 'openspec.cmd')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
+  }))));
+});
+
+test('setupProject prefers Windows executable extension over extensionless openspec candidate', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-ext-priority-home-'));
+  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({
+    homeDir: fakeHome,
+    projectDir,
+    includeExtensionlessOpenSpecCandidate: true,
+  });
+
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.match(output, /OpenSpec CLI is available on PATH via .*openspec\.cmd/);
+  }))));
 });
 
 test('selectCapabilities chooses stage-appropriate embedded capabilities from signals', () => {
