@@ -155,17 +155,29 @@ const findCommandPath = (cmd) => {
 
     for (const candidate of candidates) {
       const normalized = normalizeCommandPath(candidate);
-      if (fs.existsSync(normalized)) {
-        return normalized;
-      }
-
       if (process.platform === 'win32' && path.extname(normalized).length === 0) {
-        for (const ext of ['.cmd', '.exe', '.bat']) {
+        const pathExts = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+          .split(';')
+          .map((ext) => ext.trim().toLowerCase())
+          .filter((ext) => ext.length > 0)
+          .map((ext) => (ext.startsWith('.') ? ext : `.${ext}`));
+        const fallbackExts = ['.cmd', '.exe', '.bat', '.com'];
+        const executableExts = Array.from(new Set([...pathExts, ...fallbackExts]));
+        for (const ext of executableExts) {
           const withExt = `${normalized}${ext}`;
           if (fs.existsSync(withExt)) {
             return withExt;
           }
         }
+
+        if (fs.existsSync(normalized)) {
+          return normalized;
+        }
+        continue;
+      }
+
+      if (fs.existsSync(normalized)) {
+        return normalized;
       }
     }
 

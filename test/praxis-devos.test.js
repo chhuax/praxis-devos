@@ -141,11 +141,17 @@ exit 1
   return binDir;
 };
 
-const installFakeWindowsBatchRuntime = ({ homeDir, projectDir, includeBrokenOpenSpecCandidate = false }) => {
+const installFakeWindowsBatchRuntime = ({
+  homeDir,
+  projectDir,
+  includeBrokenOpenSpecCandidate = false,
+  includeExtensionlessOpenSpecCandidate = false,
+}) => {
   const harnessDir = path.join(homeDir, 'fake-win-tools');
   const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
   const npmPath = path.join(commandDir, 'npm.cmd');
   const claudePath = path.join(commandDir, 'claude.cmd');
+  const globalOpenSpecNoExtPath = path.join(commandDir, 'openspec');
   const globalOpenSpecPath = path.join(commandDir, 'openspec.cmd');
   const comSpecPath = path.join(harnessDir, 'cmd.exe');
   const wherePath = path.join(harnessDir, 'where');
@@ -169,6 +175,7 @@ case "$1" in
     ;;
   openspec|openspec.cmd)
     ${includeBrokenOpenSpecCandidate ? `printf '\'"%s"\'\\n' "${brokenOpenSpecPath}"` : ''}
+    ${includeExtensionlessOpenSpecCandidate ? `printf '\'"%s"\'\\n' "${globalOpenSpecNoExtPath}"` : ''}
     if [ -f "${globalOpenSpecPath}" ]; then
       printf '\'"%s"\'\\n' "${globalOpenSpecPath}"
     elif [ -f "${openspecPath}" ]; then
@@ -228,6 +235,12 @@ EOF_CONFIG
 fi
 printf 'LOCAL:%s\\n' "$*"
 EOF
+  cat > "${globalOpenSpecNoExtPath}" <<'EOF_NO_EXT'
+#!/bin/sh
+set -eu
+exec "${0}.cmd" "$@"
+EOF_NO_EXT
+  chmod +x "${globalOpenSpecNoExtPath}"
   chmod +x "${globalOpenSpecPath}"
   exit 0
 fi
@@ -776,7 +789,26 @@ test('setupProject ignores invalid Windows where candidates for openspec', () =>
   const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({
     projectDir,
     changeId: 'add-two-factor-auth',
-  }));
+}));
+
+test('setupProject prefers Windows executable extension over extensionless openspec candidate', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-ext-priority-home-'));
+  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({
+    homeDir: fakeHome,
+    projectDir,
+    includeExtensionlessOpenSpecCandidate: true,
+  });
+
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.match(output, /OpenSpec CLI is available on PATH via .*openspec\.cmd/);
+  }))));
+});
   assert.match(output, /Created OpenSpec full change scaffold: add-two-factor-auth/);
   assert.match(output, /type: auto -> full/);
   assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
