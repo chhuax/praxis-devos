@@ -3,7 +3,11 @@ import os from 'os';
 import path from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { projectToAgent, detectForAgent, expectedSkillNames } from '../projection/index.js';
+import {
+  projectToAgent,
+  detectForAgent,
+  expectedSkillNames,
+} from '../projection/index.js';
 import { resolveUserHomeDir } from '../support/home.js';
 import {
   handleInstrumentationCommand,
@@ -685,7 +689,7 @@ const renderGeneratedProjectOverview = ({ projectDir }) => {
   const lines = [
     '## Generated Overview',
     '',
-    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos:docs-refresh` when host command wiring is available.',
+    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos-docs-refresh` when host command wiring is available.',
     '',
     '## Project Summary',
     '',
@@ -959,7 +963,7 @@ const renderGeneratedModuleMap = ({ projectDir, modules }) => {
   const lines = [
     '## Generated Module Map',
     '',
-    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos:docs-refresh` when host command wiring is available.',
+    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos-docs-refresh` when host command wiring is available.',
     '',
     '## Modules',
     '',
@@ -980,7 +984,7 @@ const renderGeneratedModuleCodemap = ({ projectDir, module, modules }) => {
   const lines = [
     '## Generated Module Overview',
     '',
-    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos:docs-refresh` when host command wiring is available.',
+    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos-docs-refresh` when host command wiring is available.',
     '',
     '## Module Identity',
     '',
@@ -1496,7 +1500,7 @@ export const projectNativeSkills = ({ projectDir, agents, log }) => {
   const version = getPackageVersion();
   for (const agent of uniqueAgents(agents)) {
     try {
-      projectToAgent({ agent, version, log });
+      projectToAgent({ agent, projectDir, version, log });
     } catch (err) {
       log(`⚠ Projection to ${agent} failed: ${err.message}`);
     }
@@ -1539,12 +1543,13 @@ export const setupProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = f
 
   const projLogs = [];
   const projLog = (msg) => projLogs.push(msg);
-
-  outputs.push('');
-  outputs.push('== native projection ==');
   projectNativeSkills({ projectDir, agents: selectedAgents, log: projLog });
   populateOpenSpecConfig({ projectDir, log: projLog });
-  outputs.push(projLogs.join('\n'));
+  if (projLogs.length > 0) {
+    outputs.push('');
+    outputs.push('== native projection ==');
+    outputs.push(projLogs.join('\n'));
+  }
 
   outputs.push('');
   outputs.push(doctorProject({ projectDir, agents: selectedAgents, strict }));
@@ -3018,18 +3023,31 @@ export const runCli = (argv) => {
   }
 
   if (parsed.command === 'sync') {
-    return syncProject({
+    const outputParts = [];
+    outputParts.push(syncProject({
+      projectDir: parsed.projectDir,
+      agents,
+    }));
+
+    const projectionLogs = [];
+    projectNativeSkills({
+      projectDir: parsed.projectDir,
+      agents,
+      log: (msg) => projectionLogs.push(msg),
+    });
+    if (projectionLogs.length > 0) {
+      outputParts.push(projectionLogs.join('\n'));
+    }
+
+    return outputParts.filter(Boolean).join('\n');
+  }
+
+  if (parsed.command === 'migrate') {
+    return migrateProject({
       projectDir: parsed.projectDir,
       agents,
     });
   }
-
-    if (parsed.command === 'migrate') {
-      return migrateProject({
-        projectDir: parsed.projectDir,
-        agents,
-      });
-    }
 
   throw new Error(`Unknown command: ${parsed.command}`);
 };
