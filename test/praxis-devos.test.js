@@ -99,8 +99,11 @@ printf '${label}:%s\\n' "$*"
   fs.writeFileSync(globalScriptPath, scriptBody, { mode: 0o755 });
   fs.chmodSync(scriptPath, 0o755);
   fs.chmodSync(globalScriptPath, 0o755);
-  process.env.PATH = `${globalBinDir}${path.delimiter}${process.env.PATH || ''}`;
-  return scriptPath;
+  return {
+    localScriptPath: scriptPath,
+    globalBinDir,
+    globalScriptPath,
+  };
 };
 
 const ensureOpenSpecWorkspace = (projectDir) => {
@@ -540,12 +543,12 @@ test('initProject bootstraps openspec workspace through the detected runtime', (
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
 
-  const output = initProject({
+  const output = withEnv('PATH', '/usr/bin:/bin', () => initProject({
     projectDir,
     agents: ['codex', 'opencode'],
-  });
+  }));
 
-  assert.match(output, /openspec init completed \((global|project-local)\)/);
+  assert.match(output, /openspec init completed \(project-local\)/);
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
@@ -691,9 +694,56 @@ surfaces:
   assert.match(codemap, /Primary surface: `public-sdk`/);
   assert.match(codemap, /Surface kind: `sdk`/);
   assert.match(codemap, /Surface location: `src\/index\.ts`/);
+  assert.match(codemap, /External surface changes: read `contracts\/surfaces\.yaml`/);
   assert.match(codemap, /`README\.md`/);
   assert.match(codemap, /`src\/index\.ts`/);
   assert.match(codemap, /`test\/`/);
+  assert.match(codemap, /Keep this note\./);
+});
+
+test('runCli docs refresh replaces fallback placeholder when codemap exists without managed markers', () => {
+  const projectDir = makeTempProject();
+  const srcDir = path.join(projectDir, 'src');
+  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
+  const surfacesPath = path.join(projectDir, 'contracts', 'surfaces.yaml');
+
+  fs.mkdirSync(srcDir, { recursive: true });
+  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
+  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
+  fs.writeFileSync(path.join(srcDir, 'index.ts'), 'export const ok = true;\n', 'utf8');
+  fs.writeFileSync(
+    codemapPath,
+    `# Existing Overview
+
+## User Notes
+
+Keep this note.
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    surfacesPath,
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: src/index.ts
+`,
+    'utf8',
+  );
+
+  runCli([
+    'docs',
+    'refresh',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  const codemap = fs.readFileSync(codemapPath, 'utf8');
+  assert.match(codemap, /<!-- PRAXIS_DOCS_REFRESH_START -->/);
+  assert.match(codemap, /Primary surface: `public-sdk`/);
+  assert.doesNotMatch(codemap, /Praxis DevOS will refresh this block/);
   assert.match(codemap, /Keep this note\./);
 });
 
@@ -873,9 +923,67 @@ surfaces:
   assert.match(invalid.findings.join('\n'), /docs\/surfaces\.yaml/);
 });
 
+test('validateDocsGenerationResult rejects duplicate module names and sanitizes unsafe artifactIds in module targets', () => {
+  const projectDir = makeTempProject();
+  fs.mkdirSync(path.join(projectDir, 'contracts'), { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, 'contracts', 'surfaces.yaml'),
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: modules/a/src/index.ts
+`,
+    'utf8',
+  );
+  fs.mkdirSync(path.join(projectDir, 'modules', 'a'), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, 'modules', 'b'), { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, 'pom.xml'),
+    `<project>
+  <modules>
+    <module>modules/a</module>
+    <module>modules/b</module>
+  </modules>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectDir, 'modules', 'a', 'pom.xml'),
+    `<project><artifactId>../evil</artifactId></project>`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectDir, 'modules', 'b', 'pom.xml'),
+    `<project><artifactId>evil</artifactId></project>`,
+    'utf8',
+  );
+
+  const result = validateDocsGenerationResult({
+    projectDir,
+    result: {
+      schemaVersion: 1,
+      mode: 'refresh',
+      surfacesYaml: 'primary_surface: public-sdk',
+      codemaps: [
+        { path: 'docs/codemaps/project-overview.md', content: '# ok', action: 'upsert' },
+        { path: 'docs/codemaps/module-map.md', content: '# modules', action: 'upsert' },
+        { path: 'docs/codemaps/modules/evil.md', content: '# module', action: 'upsert' },
+      ],
+    },
+  });
+
+  assert.equal(result.status, 'invalid');
+  assert.match(result.findings.join('\n'), /Duplicate module codemap name detected: evil/);
+  assert.ok(result.allowedTargets.includes('docs/codemaps/modules/evil.md'));
+  assert.ok(!result.allowedTargets.some((entry) => entry.includes('..')));
+});
+
 test('statusProject reports initialized state for the selected agents', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-ok-'));
   const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
   fs.mkdirSync(globalConfigDir, { recursive: true });
@@ -885,7 +993,7 @@ test('statusProject reports initialized state for the selected agents', () => {
   );
   ensureOpenSpecWorkspace(projectDir);
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = statusProject({
       projectDir,
       agents: ['opencode'],
@@ -894,16 +1002,16 @@ test('statusProject reports initialized state for the selected agents', () => {
     assert.match(output, /initialized: yes/);
     assert.match(output, /openspec: \[OK\]/);
     assert.match(output, /superpowers:opencode: \[OK\]/);
-  });
+  }));
 });
 
 test('bootstrapOpenSpec reports the detected runtime', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
 
-  const output = bootstrapOpenSpec({ projectDir });
+  const output = withEnv('PATH', '/usr/bin:/bin', () => bootstrapOpenSpec({ projectDir }));
 
-  assert.match(output, /OpenSpec already available \((global|project-local)\)/);
+  assert.match(output, /OpenSpec already available \(project-local\)/);
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
   assert.match(output, /openspec list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
@@ -945,10 +1053,10 @@ test('bootstrapProject updates OpenCode plugins and preserves existing config', 
 
 test('setupProject initializes the current structure for OpenCode without networked side effects', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-setup-'));
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = setupProject({
       projectDir,
       agents: ['opencode'],
@@ -962,12 +1070,12 @@ test('setupProject initializes the current structure for OpenCode without networ
     assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
     assert.ok(fs.existsSync(globalConfigPath));
-  });
+  }));
 });
 
 test('setupProject preserves existing OpenCode plugins and top-level settings', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-preserve-'));
   const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
   const globalConfigPath = path.join(globalConfigDir, 'config.json');
@@ -982,7 +1090,7 @@ test('setupProject preserves existing OpenCode plugins and top-level settings', 
     'utf8',
   );
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     setupProject({
       projectDir,
       agents: ['opencode'],
@@ -995,12 +1103,12 @@ test('setupProject preserves existing OpenCode plugins and top-level settings', 
     assert.ok(config.plugin.includes('another-plugin'));
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
     assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
-  });
+  }));
 });
 
 test('setupProject creates a backup before rewriting OpenCode config', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-backup-'));
   const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
   const globalConfigPath = path.join(globalConfigDir, 'config.json');
@@ -1008,7 +1116,7 @@ test('setupProject creates a backup before rewriting OpenCode config', () => {
   fs.mkdirSync(globalConfigDir, { recursive: true });
   fs.writeFileSync(globalConfigPath, `${original}\n`, 'utf8');
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     setupProject({
       projectDir,
       agents: ['opencode'],
@@ -1017,12 +1125,12 @@ test('setupProject creates a backup before rewriting OpenCode config', () => {
     const backups = listBackupFiles(globalConfigDir, 'config.json');
     assert.equal(backups.length, 1);
     assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
-  });
+  }));
 });
 
 test('setupProject does not overwrite unsafe OpenCode config', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-unsafe-'));
   const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
   const globalConfigPath = path.join(globalConfigDir, 'config.json');
@@ -1030,7 +1138,7 @@ test('setupProject does not overwrite unsafe OpenCode config', () => {
   fs.mkdirSync(globalConfigDir, { recursive: true });
   fs.writeFileSync(globalConfigPath, `${original}\n`, 'utf8');
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     assert.throws(
       () => setupProject({
         projectDir,
@@ -1043,12 +1151,12 @@ test('setupProject does not overwrite unsafe OpenCode config', () => {
     assert.equal(fs.readFileSync(globalConfigPath, 'utf8'), `${original}\n`);
     assert.equal(backups.length, 1);
     assert.equal(fs.readFileSync(path.join(globalConfigDir, backups[0]), 'utf8'), `${original}\n`);
-  });
+  }));
 });
 
 test('setupProject leaves the live OpenCode config unchanged when atomic replace fails', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-atomic-fail-'));
   const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
   const globalConfigPath = path.join(globalConfigDir, 'config.json');
@@ -1066,7 +1174,7 @@ test('setupProject leaves the live OpenCode config unchanged when atomic replace
   };
 
   try {
-    withEnv('HOME', fakeHome, () => {
+    withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
       assert.throws(
         () => setupProject({
           projectDir,
@@ -1074,7 +1182,7 @@ test('setupProject leaves the live OpenCode config unchanged when atomic replace
         }),
         /rename failed/i,
       );
-    });
+    }));
   } finally {
     fs.renameSync = originalRenameSync;
   }
@@ -1091,9 +1199,9 @@ test('setupProject installs Claude SuperPowers with user scope when Claude CLI i
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-home-'));
   const fakeClaudeBin = installFakeClaude(fakeHome);
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
 
-  withEnv('HOME', fakeHome, () => withPrependedPath(fakeClaudeBin, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeClaudeBin, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = setupProject({
       projectDir,
       agents: ['claude'],
@@ -1102,7 +1210,7 @@ test('setupProject installs Claude SuperPowers with user scope when Claude CLI i
     assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
     assert.match(output, /\[OK\] superpowers:claude/);
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
-  }));
+  })));
 });
 
 test('setupProject handles quoted Windows command paths with spaces during automatic installs', () => {
@@ -1338,10 +1446,10 @@ test('capability evidence runtime APIs persist selection and merge stage evidenc
 
 test('doctorProject reports current dependency status for OpenCode', () => {
   const projectDir = makeTempProject();
-  installFakeOpenSpec(projectDir);
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-missing-'));
 
-  withEnv('HOME', fakeHome, () => {
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = doctorProject({
       projectDir,
       agents: ['opencode'],
@@ -1351,7 +1459,7 @@ test('doctorProject reports current dependency status for OpenCode', () => {
     assert.match(output, /\[OK\] openspec/);
     assert.match(output, /\[MISSING\] superpowers:opencode/);
     assert.match(output, /npx praxis-devos setup --agent opencode/);
-  });
+  }));
 });
 
 test('doctorProject reports missing Claude plugin when settings do not contain it', () => {
@@ -1482,7 +1590,7 @@ test('validateSessionTranscript rejects duplicate stage summaries or close-out r
 test('runCli routes help, validate-session, validate-change, and migrate but rejects openspec wrapper usage', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-cli-home-'));
-  installFakeOpenSpec(projectDir, 'CLI');
+  const fakeOpenSpec = installFakeOpenSpec(projectDir, 'CLI');
   ensureOpenSpecWorkspace(projectDir);
   const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({ projectDir, changeId: 'add-auth' }));
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
@@ -1526,13 +1634,13 @@ test('runCli routes help, validate-session, validate-change, and migrate but rej
     '--stage',
     'apply',
   ]));
-  const migration = runCli([
+  const migration = withPrependedPath(fakeOpenSpec.globalBinDir, () => runCli([
     'migrate',
     '--project-dir',
     projectDir,
     '--agent',
     'codex',
-  ]);
+  ]));
 
   assert.match(help, /praxis-devos <command> \[options\]/);
   assert.match(validation, /status: pass/);

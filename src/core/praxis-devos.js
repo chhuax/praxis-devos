@@ -526,7 +526,12 @@ const upsertManagedBlockInPlace = (filePath, startMarker, endMarker, blockConten
 
   const base = fallbackContent.trim();
   const next = base
-    ? `${base}\n\n${existing.trimStart()}`
+    ? (base.includes(startMarker) && base.includes(endMarker)
+      ? `${base.replace(
+        new RegExp(`${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`, 'm'),
+        managedBlock,
+      )}\n\n${existing.trimStart()}`
+      : `${managedBlock}\n\n${base}\n\n${existing.trimStart()}`)
     : `${managedBlock}\n\n${existing.trimStart()}`;
   writeText(filePath, next);
   return 'appended';
@@ -622,7 +627,7 @@ const renderProblemRouting = ({ primarySurfaceLocation, testPath, sourcePath }) 
   const lines = [
     '## Problem Routing',
     '',
-    `- External surface changes: read ${formatPathRef(primarySurfaceLocation || 'contracts/surfaces.yaml')}.`,
+    '- External surface changes: read `contracts/surfaces.yaml`.',
     `- Source code changes: read ${formatPathRef(sourcePath || 'src/', !sourcePath || !/\.[a-z0-9]+$/i.test(sourcePath))}.`,
     `- Tests: read ${formatPathRef(testPath || 'test/', !testPath || !/\.[a-z0-9]+$/i.test(testPath))}.`,
     '- Docs and project map updates: read `docs/codemaps/project-overview.md` and `contracts/surfaces.yaml`.',
@@ -785,6 +790,28 @@ const normalizeModuleFallbackName = (relativeDir) => relativeDir
   .filter(Boolean)
   .join('--');
 
+const sanitizeModuleStableName = (value) => value
+  .replace(/[\\/]+/g, '--')
+  .replace(/[^A-Za-z0-9._-]+/g, '-')
+  .replace(/^\.+/, '')
+  .replace(/\.+$/, '')
+  .replace(/^-+/, '')
+  .replace(/-+$/, '')
+  .replace(/-{2,}/g, '-');
+
+const uniqueDuplicateValues = (values) => {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const value of values) {
+    if (seen.has(value)) {
+      duplicates.add(value);
+    } else {
+      seen.add(value);
+    }
+  }
+  return [...duplicates].sort();
+};
+
 const discoverMavenModules = (projectDir) => {
   const paths = projectPaths(projectDir);
   if (!fs.existsSync(paths.rootPomPath)) {
@@ -814,7 +841,9 @@ const discoverMavenModules = (projectDir) => {
       const relativeDir = path.relative(projectDir, moduleDir).split(path.sep).join('/');
       const modulePomContent = fs.readFileSync(modulePomPath, 'utf8');
       const artifactId = parsePomArtifactId(modulePomContent);
-      const stableName = artifactId || normalizeModuleFallbackName(relativeDir);
+      const stableName = sanitizeModuleStableName(artifactId)
+        || sanitizeModuleStableName(normalizeModuleFallbackName(relativeDir))
+        || 'module';
 
       if (!discovered.some((entry) => entry.relativeDir === relativeDir)) {
         discovered.push({
@@ -831,10 +860,12 @@ const discoverMavenModules = (projectDir) => {
 
   visitPom(paths.rootPomPath);
 
+  const duplicateStableNames = uniqueDuplicateValues(discovered.map((entry) => entry.stableName));
   return {
     rootHasPom: true,
     isMultiModule: discovered.length > 0,
     modules: discovered.sort((a, b) => a.relativeDir.localeCompare(b.relativeDir)),
+    duplicateStableNames,
   };
 };
 
@@ -992,6 +1023,10 @@ export const validateDocsGenerationResult = ({ projectDir, result }) => {
   const allowedTargets = allowedDocsWriteTargets({ projectDir });
   const discoveredModules = discoverMavenModules(projectDir);
   const allowedModuleNames = new Set(discoveredModules.modules.map((module) => module.stableName));
+
+  for (const duplicateName of discoveredModules.duplicateStableNames || []) {
+    findings.push(`Duplicate module codemap name detected: ${duplicateName}`);
+  }
 
   if (!result || typeof result !== 'object') {
     return {
@@ -1260,7 +1295,7 @@ export const checkDocsLite = ({ projectDir }) => {
 
 const ensureOpenSpecLayout = ({ projectDir, log }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status !== 'ok' || !runtime.command) {
+  if ((runtime.status !== 'ok' && runtime.status !== 'warning') || !runtime.command) {
     throw new Error(
       `OpenSpec is required before project initialization. ${runtime.detail}`,
     );
