@@ -211,6 +211,8 @@ const resolveOpenSpecRuntime = (projectDir) => {
   };
 };
 
+const isGlobalOpenSpecRuntime = (runtime) => runtime?.status === 'ok' && runtime?.source === 'global';
+
 const run = (cmd, opts = {}) => {
   try {
     const stdout = execSync(cmd, { encoding: 'utf8', timeout: 120_000, ...opts });
@@ -1083,7 +1085,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   const logs = [];
   const current = resolveOpenSpecRuntime(projectDir);
 
-  if (current.status === 'ok' && current.source === 'global') {
+  if (isGlobalOpenSpecRuntime(current)) {
     logs.push(`== openspec ==`);
     logs.push(`⊘ OpenSpec already available (${current.source})`);
     logs.push(`- ${current.detail}`);
@@ -1103,7 +1105,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const next = resolveOpenSpecRuntime(projectDir);
-  if (next.status !== 'ok' || next.source !== 'global') {
+  if (!isGlobalOpenSpecRuntime(next)) {
     throw new Error(`OpenSpec install completed but global runtime is still unavailable: ${next.detail}`);
   }
 
