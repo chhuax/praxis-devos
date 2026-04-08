@@ -6,14 +6,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildQuotedWindowsNpmShim } from './support/quoted-windows-smoke.mjs';
 
-test('quoted windows npm shim installs a local openspec wrapper for setup smoke', () => {
+test('quoted windows npm shim installs a global openspec wrapper for setup smoke', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-quoted-npm-'));
   const projectDir = path.join(tempRoot, 'project');
   const invocationLogPath = path.join(tempRoot, 'quoted-command-invocations.log');
   const diagnosticLogPath = path.join(tempRoot, 'quoted-command-diagnostics.log');
   const shimPath = path.join(tempRoot, 'npm-shim.cjs');
-  const openspecCmdPath = path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd');
-  const openspecShimPath = path.join(projectDir, 'node_modules', '.bin', 'openspec-shim.cjs');
+  const openspecCmdPath = path.join(tempRoot, 'global-bin', 'openspec.cmd');
+  const openspecShimPath = path.join(tempRoot, 'global-bin', 'openspec-shim.cjs');
 
   fs.mkdirSync(projectDir, { recursive: true });
   fs.writeFileSync(
@@ -26,12 +26,12 @@ test('quoted windows npm shim installs a local openspec wrapper for setup smoke'
     }),
   );
 
-  const install = spawnSync(process.execPath, [shimPath, 'install', '-D', '@fission-ai/openspec'], {
+  const install = spawnSync(process.execPath, [shimPath, 'install', '-g', '@fission-ai/openspec'], {
     encoding: 'utf8',
   });
 
   assert.equal(install.status, 0, install.stderr);
-  assert.equal(fs.readFileSync(invocationLogPath, 'utf8').trim(), 'npm.cmd install -D @fission-ai/openspec');
+  assert.equal(fs.readFileSync(invocationLogPath, 'utf8').trim(), 'npm.cmd install -g @fission-ai/openspec');
   assert.match(fs.readFileSync(diagnosticLogPath, 'utf8'), /"shimPath":/);
   assert.match(fs.readFileSync(diagnosticLogPath, 'utf8'), new RegExp(shimPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.ok(fs.existsSync(openspecCmdPath));

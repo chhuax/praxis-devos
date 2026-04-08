@@ -148,10 +148,40 @@ const findCommandPath = (cmd) => {
   try {
     const whichCmd = process.platform === 'win32' ? 'where' : 'which';
     const stdout = execFileSync(whichCmd, [cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return stdout
+    const candidates = stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .find((line) => line.length > 0) || null;
+      .filter((line) => line.length > 0);
+
+    for (const candidate of candidates) {
+      const normalized = normalizeCommandPath(candidate);
+      if (process.platform === 'win32' && path.extname(normalized).length === 0) {
+        const pathExts = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+          .split(';')
+          .map((ext) => ext.trim().toLowerCase())
+          .filter((ext) => ext.length > 0)
+          .map((ext) => (ext.startsWith('.') ? ext : `.${ext}`));
+        const fallbackExts = ['.cmd', '.exe', '.bat', '.com'];
+        const executableExts = Array.from(new Set([...pathExts, ...fallbackExts]));
+        for (const ext of executableExts) {
+          const withExt = `${normalized}${ext}`;
+          if (fs.existsSync(withExt)) {
+            return withExt;
+          }
+        }
+
+        if (fs.existsSync(normalized)) {
+          return normalized;
+        }
+        continue;
+      }
+
+      if (fs.existsSync(normalized)) {
+        return normalized;
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -165,16 +195,6 @@ const localExecutablePath = (projectDir, executable) => {
 };
 
 const resolveOpenSpecRuntime = (projectDir) => {
-  const localPath = localExecutablePath(projectDir, 'openspec');
-  if (fs.existsSync(localPath)) {
-    return {
-      status: 'ok',
-      source: 'project-local',
-      command: localPath,
-      detail: `OpenSpec available via ${localPath}`,
-    };
-  }
-
   const globalPath = findCommandPath('openspec');
   if (globalPath) {
     return {
@@ -185,6 +205,16 @@ const resolveOpenSpecRuntime = (projectDir) => {
     };
   }
 
+  const localPath = localExecutablePath(projectDir, 'openspec');
+  if (fs.existsSync(localPath)) {
+    return {
+      status: 'warning',
+      source: 'project-local',
+      command: localPath,
+      detail: `OpenSpec is only available project-locally via ${localPath}; user-level global install is recommended`,
+    };
+  }
+
   return {
     status: 'missing',
     source: 'missing',
@@ -192,6 +222,8 @@ const resolveOpenSpecRuntime = (projectDir) => {
     detail: 'OpenSpec CLI is missing. Install it with `npx praxis-devos setup --agent <name>` or `npx praxis-devos bootstrap --agents <name>`.',
   };
 };
+
+const isGlobalOpenSpecRuntime = (runtime) => runtime?.status === 'ok' && runtime?.source === 'global';
 
 const run = (cmd, opts = {}) => {
   try {
@@ -491,7 +523,7 @@ const projectPaths = (projectDir) => ({
 
 const ensureOpenSpecLayout = ({ projectDir, log }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status !== 'ok' || !runtime.command) {
+  if ((runtime.status !== 'ok' && runtime.status !== 'warning') || !runtime.command) {
     throw new Error(
       `OpenSpec is required before project initialization. ${runtime.detail}`,
     );
@@ -1065,7 +1097,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   const logs = [];
   const current = resolveOpenSpecRuntime(projectDir);
 
-  if (current.status === 'ok') {
+  if (isGlobalOpenSpecRuntime(current)) {
     logs.push(`== openspec ==`);
     logs.push(`⊘ OpenSpec already available (${current.source})`);
     logs.push(`- ${current.detail}`);
@@ -1077,7 +1109,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const npmCommand = resolveCommandForExecution('npm');
-  const installResult = runFile(npmCommand, ['install', '-D', OPENSPEC_PACKAGE], {
+  const installResult = runFile(npmCommand, ['install', '-g', OPENSPEC_PACKAGE], {
     cwd: projectDir,
   });
   if (!installResult.ok) {
@@ -1085,12 +1117,12 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const next = resolveOpenSpecRuntime(projectDir);
-  if (next.status !== 'ok') {
-    throw new Error(`OpenSpec install completed but runtime is still unavailable: ${next.detail}`);
+  if (!isGlobalOpenSpecRuntime(next)) {
+    throw new Error(`OpenSpec install completed but global runtime is still unavailable: ${next.detail}`);
   }
 
   logs.push('== openspec ==');
-  logs.push(`✓ Installed OpenSpec locally with npm (${OPENSPEC_PACKAGE})`);
+  logs.push(`✓ Installed OpenSpec globally with npm (user-level command) (${OPENSPEC_PACKAGE})`);
   logs.push(`- ${next.detail}`);
   return logs.join('\n');
 };
@@ -1409,7 +1441,7 @@ export const bootstrapProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
 
 export const bootstrapOpenSpec = ({ projectDir }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status === 'ok') {
+  if (runtime.status === 'ok' || runtime.status === 'warning') {
     return [
       '== openspec ==',
       `OpenSpec already available (${runtime.source})`,
@@ -1422,14 +1454,14 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
   return [
     '== openspec ==',
     'OpenSpec is a hard dependency of Praxis DevOS.',
-    'Preferred install (project-local):',
-    `- npm install -D ${OPENSPEC_PACKAGE}`,
-    'Then run OpenSpec directly:',
-    '  ./node_modules/.bin/openspec list --specs',
-    'Fallback install (global):',
+    'Preferred install (user-global):',
     `- npm install -g ${OPENSPEC_PACKAGE}`,
     '- Then run:',
     '  openspec list --specs',
+    'Project-local fallback (if global is blocked by policy):',
+    `- npm install -D ${OPENSPEC_PACKAGE}`,
+    '- Then run OpenSpec directly:',
+    '  ./node_modules/.bin/openspec list --specs',
     `Reference: ${OPENSPEC_INSTALL_DOC}`,
   ].join('\n');
 };
@@ -1482,7 +1514,11 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
 
   lines.push('');
   lines.push('Recommended next step:');
-  lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  if (selectedAgents.length === 1) {
+    lines.push(`- npx praxis-devos setup --agent ${selectedAgents[0]}`);
+  } else {
+    lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  }
   lines.push('');
   lines.push('Advanced repair command:');
   lines.push(`- npx praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);
