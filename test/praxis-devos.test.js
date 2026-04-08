@@ -141,7 +141,7 @@ exit 1
   return binDir;
 };
 
-const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
+const installFakeWindowsBatchRuntime = ({ homeDir, projectDir, includeBrokenOpenSpecCandidate = false }) => {
   const harnessDir = path.join(homeDir, 'fake-win-tools');
   const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
   const npmPath = path.join(commandDir, 'npm.cmd');
@@ -153,6 +153,8 @@ const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
 
   fs.mkdirSync(harnessDir, { recursive: true });
   fs.mkdirSync(commandDir, { recursive: true });
+
+  const brokenOpenSpecPath = path.join(homeDir, 'npm', 'prefix', 'openspec');
 
   fs.writeFileSync(
     wherePath,
@@ -166,6 +168,7 @@ case "$1" in
     printf '\'"%s"\'\\n' "${claudePath}"
     ;;
   openspec|openspec.cmd)
+    ${includeBrokenOpenSpecCandidate ? `printf '\'"%s"\'\\n' "${brokenOpenSpecPath}"` : ''}
     if [ -f "${globalOpenSpecPath}" ]; then
       printf '\'"%s"\'\\n' "${globalOpenSpecPath}"
     elif [ -f "${openspecPath}" ]; then
@@ -745,7 +748,29 @@ test('createChangeScaffold remains available as an internal scaffold helper', ()
     projectDir,
     title: 'Add Two Factor Auth',
     summary: 'Harden account access.',
-  }));
+}));
+
+test('setupProject ignores invalid Windows where candidates for openspec', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-bad-where-home-'));
+  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({
+    homeDir: fakeHome,
+    projectDir,
+    includeBrokenOpenSpecCandidate: true,
+  });
+
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Installed OpenSpec globally with npm \(user-level command\)/);
+    assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
+    assert.ok(fs.existsSync(path.join(fakeHome, 'Program Files', 'nodejs', 'openspec.cmd')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
+  }))));
+});
 
   const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth');
   const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({

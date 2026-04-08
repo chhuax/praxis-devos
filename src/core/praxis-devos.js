@@ -169,7 +169,7 @@ const findCommandPath = (cmd) => {
       }
     }
 
-    return candidates[0] || null;
+    return null;
   } catch {
     return null;
   }
