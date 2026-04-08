@@ -761,7 +761,21 @@ test('createChangeScaffold remains available as an internal scaffold helper', ()
     projectDir,
     title: 'Add Two Factor Auth',
     summary: 'Harden account access.',
-}));
+  }));
+
+  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth');
+  const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({
+    projectDir,
+    changeId: 'add-two-factor-auth',
+  }));
+  assert.match(output, /Created OpenSpec full change scaffold: add-two-factor-auth/);
+  assert.match(output, /type: auto -> full/);
+  assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
+  assert.ok(fs.existsSync(path.join(changeDir, 'tasks.md')));
+  assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
+  assert.ok(fs.existsSync(evidencePath));
+  assert.match(evidencePath, new RegExp(`^${fakeHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+});
 
 test('setupProject ignores invalid Windows where candidates for openspec', () => {
   const projectDir = makeTempProject();
@@ -785,12 +799,6 @@ test('setupProject ignores invalid Windows where candidates for openspec', () =>
   }))));
 });
 
-  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth');
-  const evidencePath = withEnv('HOME', fakeHome, () => getCapabilityEvidencePath({
-    projectDir,
-    changeId: 'add-two-factor-auth',
-}));
-
 test('setupProject prefers Windows executable extension over extensionless openspec candidate', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-ext-priority-home-'));
@@ -808,14 +816,6 @@ test('setupProject prefers Windows executable extension over extensionless opens
 
     assert.match(output, /OpenSpec CLI is available on PATH via .*openspec\.cmd/);
   }))));
-});
-  assert.match(output, /Created OpenSpec full change scaffold: add-two-factor-auth/);
-  assert.match(output, /type: auto -> full/);
-  assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
-  assert.ok(fs.existsSync(path.join(changeDir, 'tasks.md')));
-  assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
-  assert.ok(fs.existsSync(evidencePath));
-  assert.match(evidencePath, new RegExp(`^${fakeHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
 });
 
 test('selectCapabilities chooses stage-appropriate embedded capabilities from signals', () => {
