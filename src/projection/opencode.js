@@ -10,7 +10,7 @@ const ensureDir = (dirPath) => {
 };
 
 /**
- * Project OpenSpec skills to ~/.claude/skills/ as shared skill directories with SKILL.md.
+ * Project bundled Praxis skills to ~/.claude/skills/ as shared skill directories with SKILL.md.
  * This mirrors the user-home shared skill drop used by OpenCode integrations.
  */
 export const projectSkills = ({ skillSources, version, log }) => {
@@ -45,7 +45,7 @@ export const detectProjections = () => {
   }
 
   const dirs = fs.readdirSync(openCodeSkillsDir(), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.startsWith('opsx-'));
+    .filter((d) => d.isDirectory());
 
   return dirs
     .map((d) => {

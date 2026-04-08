@@ -16,6 +16,7 @@ import {
   analyzeSessionTranscript,
   bootstrapOpenSpec,
   bootstrapProject,
+  buildDocsSubagentRequest,
   createChangeScaffold,
   doctorProject,
   initProject,
@@ -28,6 +29,7 @@ import {
   setupProject,
   statusProject,
   syncProject,
+  validateDocsGenerationResult,
   validateChangeEvidence,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
@@ -73,13 +75,12 @@ const withPlatform = (platform, fn) => {
   }
 };
 
-const installFakeOpenSpec = (projectDir, label = 'LOCAL') => {
+const installFakeOpenSpec = (projectDir, label = 'GLOBAL') => {
   const binDir = path.join(projectDir, 'node_modules', '.bin');
   const scriptPath = path.join(binDir, 'openspec');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    scriptPath,
-    `#!/bin/sh
+  const globalBinDir = path.join(projectDir, '.fake-global-bin');
+  const globalScriptPath = path.join(globalBinDir, 'openspec');
+  const scriptBody = `#!/bin/sh
 set -eu
 cmd="\${1:-}"
 if [ "$cmd" = "init" ]; then
@@ -91,10 +92,14 @@ EOF
   exit 0
 fi
 printf '${label}:%s\\n' "$*"
-`,
-    { mode: 0o755 },
-  );
+`;
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.mkdirSync(globalBinDir, { recursive: true });
+  fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
+  fs.writeFileSync(globalScriptPath, scriptBody, { mode: 0o755 });
   fs.chmodSync(scriptPath, 0o755);
+  fs.chmodSync(globalScriptPath, 0o755);
+  process.env.PATH = `${globalBinDir}${path.delimiter}${process.env.PATH || ''}`;
   return scriptPath;
 };
 
@@ -146,6 +151,7 @@ const installFakeWindowsBatchRuntime = ({ homeDir, projectDir }) => {
   const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
   const npmPath = path.join(commandDir, 'npm.cmd');
   const claudePath = path.join(commandDir, 'claude.cmd');
+  const globalOpenSpecPath = path.join(commandDir, 'openspec.cmd');
   const comSpecPath = path.join(harnessDir, 'cmd.exe');
   const wherePath = path.join(harnessDir, 'where');
   const openspecPath = path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd');
@@ -165,7 +171,9 @@ case "$1" in
     printf '\'"%s"\'\\n' "${claudePath}"
     ;;
   openspec|openspec.cmd)
-    if [ -f "${openspecPath}" ]; then
+    if [ -f "${globalOpenSpecPath}" ]; then
+      printf '\'"%s"\'\\n' "${globalOpenSpecPath}"
+    elif [ -f "${openspecPath}" ]; then
       printf '\'"%s"\'\\n' "${openspecPath}"
     else
       exit 1
@@ -205,10 +213,10 @@ fi
     npmPath,
     `#!/bin/sh
 set -eu
-if [ "$1" = "install" ] && [ "$2" = "-D" ] && [ "$3" = "@fission-ai/openspec" ]; then
-  bin_dir="${path.join(projectDir, 'node_modules', '.bin')}"
+if [ "$1" = "install" ] && [ "$2" = "-g" ] && [ "$3" = "@fission-ai/openspec" ]; then
+  bin_dir="${commandDir}"
   mkdir -p "$bin_dir"
-  cat > "$bin_dir/openspec.cmd" <<'EOF'
+  cat > "${globalOpenSpecPath}" <<'EOF'
 #!/bin/sh
 set -eu
 cmd="\${1:-}"
@@ -222,7 +230,7 @@ EOF_CONFIG
 fi
 printf 'LOCAL:%s\\n' "$*"
 EOF
-  chmod +x "$bin_dir/openspec.cmd"
+  chmod +x "${globalOpenSpecPath}"
   exit 0
 fi
 echo "unsupported npm invocation: $*" >&2
@@ -268,6 +276,7 @@ test('renderHelp reflects the current CLI surface', () => {
   const help = renderHelp();
 
   assert.match(help, /setup/);
+  assert.match(help, /docs\s+Compatibility\/fallback init, refresh, or check for codemap\/surfaces artifacts/);
   assert.match(help, /validate-session/);
   assert.match(help, /validate-change/);
   assert.match(help, /instrumentation/);
@@ -306,6 +315,16 @@ test('parseCliArgs parses current flags and rejects removed --openspec', () => {
   assert.deepEqual(parsed.positional, ['enable']);
   assert.equal(parsed.strict, true);
 
+  const docsParsed = parseCliArgs([
+    'docs',
+    'check',
+    '--project-dir',
+    'tmp/project',
+  ]);
+  assert.equal(docsParsed.command, 'docs');
+  assert.equal(docsParsed.projectDir, path.resolve('tmp/project'));
+  assert.deepEqual(docsParsed.positional, ['check']);
+
   assert.throws(
     () => parseCliArgs(['bootstrap', '--openspec']),
     /`--openspec` has been removed/,
@@ -335,6 +354,9 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /Do not re-announce `Using \[skill\]` or `superpowers:/);
   assert.match(agentsMd, /finish clarification and option comparison inside the current OpenSpec stage before implementation/);
   assert.match(agentsMd, /keep all parallel work, subtasks, outputs, and status under the current change/);
+  assert.match(agentsMd, /docs\/codemaps\//);
+  assert.match(agentsMd, /contracts\/surfaces\.yaml/);
+  assert.match(agentsMd, /docs sub-agent/i);
   assert.match(agentsMd, /OpenSpec \+ Superpowers Contract/);
   assert.match(agentsMd, /Stage Gates/);
   assert.match(agentsMd, /Capability execution is judged by evidence/);
@@ -349,6 +371,28 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(claudeMd, /Claude Code 通过 `CLAUDE\.md` 读取项目指令/);
   assert.doesNotMatch(claudeMd, /Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors/);
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'contracts', 'surfaces.yaml')));
+});
+
+test('syncProject restores missing docs-lite files', () => {
+  const projectDir = makeTempProject();
+
+  syncProject({
+    projectDir,
+    agents: ['codex'],
+  });
+
+  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
+  fs.rmSync(codemapPath);
+
+  const output = syncProject({
+    projectDir,
+    agents: ['codex'],
+  });
+
+  assert.match(output, /Synced adapters: codex/);
+  assert.ok(fs.existsSync(codemapPath));
 });
 
 test('injectMarker preserves YAML frontmatter at the top of projected skills', () => {
@@ -413,6 +457,19 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.doesNotMatch(explore, /[\u4e00-\u9fff]/u);
 });
 
+test('devos-docs bundled skill defines mode-based AI-first docs generation guidance', () => {
+  const docsSkill = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'devos-skills', 'devos-docs', 'SKILL.md'),
+    'utf8',
+  );
+
+  assert.match(docsSkill, /^---\nname: devos-docs\n/m);
+  assert.match(docsSkill, /mode=init/);
+  assert.match(docsSkill, /mode=refresh/);
+  assert.match(docsSkill, /contracts\/surfaces\.yaml/);
+  assert.match(docsSkill, /docs\/codemaps\/project-overview\.md/);
+});
+
 test('projectNativeSkills writes agent-native skills under the resolved user home with valid frontmatter', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-projection-home-'));
   const logs = [];
@@ -428,8 +485,16 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
       path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     );
+    const projectedCodexDocsSkill = fs.readFileSync(
+      path.join(fakeHome, '.codex', 'skills', 'devos-docs', 'SKILL.md'),
+      'utf8',
+    );
     const projectedClaudeSkill = fs.readFileSync(
       path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
+      'utf8',
+    );
+    const projectedClaudeDocsSkill = fs.readFileSync(
+      path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md'),
       'utf8',
     );
     const projectedOpenCodeSkill = fs.readFileSync(
@@ -438,13 +503,18 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
     );
 
     assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedCodexDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedClaudeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedClaudeDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedOpenCodeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
   });
 
   assert.match(logs.join('\n'), /Codex: projected opsx-propose/);
+  assert.match(logs.join('\n'), /Codex: projected devos-docs/);
   assert.match(logs.join('\n'), /Claude: projected opsx-propose/);
+  assert.match(logs.join('\n'), /Claude: projected devos-docs/);
   assert.match(logs.join('\n'), /OpenCode: projected opsx-propose/);
+  assert.match(logs.join('\n'), /OpenCode: projected devos-docs/);
 });
 
 test('projectNativeSkills does not overwrite user-authored same-name skills without Praxis projection markers', () => {
@@ -466,7 +536,7 @@ test('projectNativeSkills does not overwrite user-authored same-name skills with
   assert.match(logs.join('\n'), /skipped opsx-apply because .* is not a Praxis projection/);
 });
 
-test('initProject bootstraps openspec workspace through a local runtime', () => {
+test('initProject bootstraps openspec workspace through the detected runtime', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
 
@@ -475,12 +545,332 @@ test('initProject bootstraps openspec workspace through a local runtime', () => 
     agents: ['codex', 'opencode'],
   });
 
-  assert.match(output, /openspec init completed \(project-local\)/);
+  assert.match(output, /openspec init completed \((global|project-local)\)/);
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
   assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, 'contracts', 'surfaces.yaml')));
+});
+
+test('runCli docs init seeds the docs-lite skeleton without OpenSpec runtime', () => {
+  const projectDir = makeTempProject();
+
+  const output = runCli([
+    'docs',
+    'init',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  assert.match(output, /docs-lite/i);
+  const codemap = fs.readFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), 'utf8');
+  assert.match(codemap, /Primary surface: `public-interface`/);
+  assert.match(codemap, /Surface location: `src\/index\.ts`/);
+  assert.ok(fs.existsSync(path.join(projectDir, 'contracts', 'surfaces.yaml')));
+});
+
+test('runCli docs check reports missing primary_surface and missing fields', () => {
+  const projectDir = makeTempProject();
+  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
+  const surfacesPath = path.join(projectDir, 'contracts', 'surfaces.yaml');
+
+  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
+  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
+  fs.writeFileSync(codemapPath, '# overview\n', 'utf8');
+  fs.writeFileSync(
+    surfacesPath,
+    `surfaces:
+  - id: public-sdk
+    kind: sdk
+`,
+    'utf8',
+  );
+
+  const output = runCli([
+    'docs',
+    'check',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  assert.match(output, /status: needs-attention/);
+  assert.match(output, /primary_surface/);
+  assert.match(output, /location/);
+});
+
+test('runCli docs check reports non-canonical surfaces path conflicts', () => {
+  const projectDir = makeTempProject();
+  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
+  const canonicalSurfacesPath = path.join(projectDir, 'contracts', 'surfaces.yaml');
+  const nonCanonicalSurfacesPath = path.join(projectDir, 'docs', 'surfaces.yaml');
+
+  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
+  fs.mkdirSync(path.dirname(canonicalSurfacesPath), { recursive: true });
+  fs.writeFileSync(codemapPath, '# overview\n', 'utf8');
+  fs.writeFileSync(
+    canonicalSurfacesPath,
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: src/index.ts
+`,
+    'utf8',
+  );
+  fs.writeFileSync(nonCanonicalSurfacesPath, 'primary_surface: duplicate\n', 'utf8');
+
+  const output = runCli([
+    'docs',
+    'check',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  assert.match(output, /status: needs-attention/);
+  assert.match(output, /docs\/surfaces\.yaml/);
+  assert.match(output, /conflict/i);
+});
+
+test('runCli docs refresh populates codemap from project heuristics and preserves user notes', () => {
+  const projectDir = makeTempProject();
+  const srcDir = path.join(projectDir, 'src');
+  const testDir = path.join(projectDir, 'test');
+  const readmePath = path.join(projectDir, 'README.md');
+  const packageJsonPath = path.join(projectDir, 'package.json');
+  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
+  const surfacesPath = path.join(projectDir, 'contracts', 'surfaces.yaml');
+
+  fs.mkdirSync(srcDir, { recursive: true });
+  fs.mkdirSync(testDir, { recursive: true });
+  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
+  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
+  fs.writeFileSync(path.join(srcDir, 'index.ts'), 'export const ok = true;\n', 'utf8');
+  fs.writeFileSync(path.join(testDir, 'app.test.js'), 'test("ok", () => {});\n', 'utf8');
+  fs.writeFileSync(readmePath, '# Example\n', 'utf8');
+  fs.writeFileSync(packageJsonPath, '{\n  "name": "example"\n}\n', 'utf8');
+  fs.writeFileSync(
+    codemapPath,
+    `# Codemap: Project Overview
+
+<!-- PRAXIS_DOCS_REFRESH_START -->
+old
+<!-- PRAXIS_DOCS_REFRESH_END -->
+
+## User Notes
+
+Keep this note.
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    surfacesPath,
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: src/index.ts
+    description: Public SDK entry.
+`,
+    'utf8',
+  );
+
+  const output = runCli([
+    'docs',
+    'refresh',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  const codemap = fs.readFileSync(codemapPath, 'utf8');
+  assert.match(output, /Refreshed docs-lite codemap/);
+  assert.match(codemap, /Primary surface: `public-sdk`/);
+  assert.match(codemap, /Surface kind: `sdk`/);
+  assert.match(codemap, /Surface location: `src\/index\.ts`/);
+  assert.match(codemap, /`README\.md`/);
+  assert.match(codemap, /`src\/index\.ts`/);
+  assert.match(codemap, /`test\/`/);
+  assert.match(codemap, /Keep this note\./);
+});
+
+test('runCli docs refresh generates recursive Maven module codemaps and docs check enforces coverage', () => {
+  const projectDir = makeTempProject();
+  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
+  const surfacesPath = path.join(projectDir, 'contracts', 'surfaces.yaml');
+  const rootPomPath = path.join(projectDir, 'pom.xml');
+  const platformPomDir = path.join(projectDir, 'platform');
+  const servicePomDir = path.join(platformPomDir, 'service-a');
+  const sdkPomDir = path.join(projectDir, 'sdk');
+
+  fs.mkdirSync(servicePomDir, { recursive: true });
+  fs.mkdirSync(sdkPomDir, { recursive: true });
+  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
+  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
+
+  fs.writeFileSync(
+    rootPomPath,
+    `<project>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>root</artifactId>
+  <modules>
+    <module>platform</module>
+    <module>sdk</module>
+  </modules>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(platformPomDir, 'pom.xml'),
+    `<project>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>platform</artifactId>
+  <modules>
+    <module>service-a</module>
+  </modules>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(servicePomDir, 'pom.xml'),
+    `<project>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>service-a</artifactId>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(sdkPomDir, 'pom.xml'),
+    `<project>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>sdk</artifactId>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    surfacesPath,
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: sdk/src/main/java
+`,
+    'utf8',
+  );
+
+  runCli([
+    'docs',
+    'refresh',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  const moduleMapPath = path.join(projectDir, 'docs', 'codemaps', 'module-map.md');
+  const platformModulePath = path.join(projectDir, 'docs', 'codemaps', 'modules', 'platform.md');
+  const serviceModulePath = path.join(projectDir, 'docs', 'codemaps', 'modules', 'service-a.md');
+  const sdkModulePath = path.join(projectDir, 'docs', 'codemaps', 'modules', 'sdk.md');
+
+  assert.ok(fs.existsSync(moduleMapPath));
+  assert.ok(fs.existsSync(platformModulePath));
+  assert.ok(fs.existsSync(serviceModulePath));
+  assert.ok(fs.existsSync(sdkModulePath));
+  assert.match(fs.readFileSync(moduleMapPath, 'utf8'), /platform/);
+  assert.match(fs.readFileSync(moduleMapPath, 'utf8'), /service-a/);
+  assert.match(fs.readFileSync(moduleMapPath, 'utf8'), /sdk/);
+
+  fs.rmSync(serviceModulePath);
+
+  const checkOutput = runCli([
+    'docs',
+    'check',
+    '--project-dir',
+    projectDir,
+  ]);
+
+  assert.match(checkOutput, /status: needs-attention/);
+  assert.match(checkOutput, /docs\/codemaps\/modules\/service-a\.md/);
+});
+
+test('buildDocsSubagentRequest packages deterministic init and refresh context for host integration', () => {
+  const projectDir = makeTempProject();
+  fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, 'contracts'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'src', 'index.ts'), 'export const ok = true;\n', 'utf8');
+  fs.writeFileSync(
+    path.join(projectDir, 'contracts', 'surfaces.yaml'),
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: src/index.ts
+`,
+    'utf8',
+  );
+
+  const initRequest = buildDocsSubagentRequest({ projectDir, mode: 'init' });
+  const refreshRequest = buildDocsSubagentRequest({ projectDir, mode: 'refresh' });
+
+  assert.equal(initRequest.schemaVersion, 1);
+  assert.equal(initRequest.mode, 'init');
+  assert.equal(refreshRequest.mode, 'refresh');
+  assert.equal(initRequest.canonicalSurfacesPath, 'contracts/surfaces.yaml');
+  assert.deepEqual(
+    initRequest.allowedTargets.slice(0, 3),
+    [
+      'contracts/surfaces.yaml',
+      'docs/codemaps/project-overview.md',
+      'docs/codemaps/module-map.md',
+    ],
+  );
+  assert.equal(initRequest.context.primarySurface, 'public-sdk');
+  assert.equal(initRequest.context.primarySurfaceLocation, 'src/index.ts');
+  assert.match(initRequest.readPaths.join('\n'), /contracts\/surfaces\.yaml/);
+});
+
+test('validateDocsGenerationResult rejects invalid docs AI output contracts before writeback', () => {
+  const projectDir = makeTempProject();
+  fs.mkdirSync(path.join(projectDir, 'contracts'), { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, 'contracts', 'surfaces.yaml'),
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: src/index.ts
+`,
+    'utf8',
+  );
+
+  const invalid = validateDocsGenerationResult({
+    projectDir,
+    result: {
+      schemaVersion: 2,
+      mode: 'rewrite',
+      surfacesYaml: '   ',
+      codemaps: [
+        { path: 'docs/codemaps/project-overview.md', content: '', action: 'upsert' },
+        { path: 'docs/codemaps/project-overview.md', content: 'duplicate', action: 'upsert' },
+        { path: 'docs/surfaces.yaml', content: 'invalid', action: 'upsert' },
+      ],
+    },
+  });
+
+  assert.equal(invalid.status, 'invalid');
+  assert.match(invalid.findings.join('\n'), /schemaVersion/i);
+  assert.match(invalid.findings.join('\n'), /mode/i);
+  assert.match(invalid.findings.join('\n'), /surfacesYaml/i);
+  assert.match(invalid.findings.join('\n'), /duplicate/i);
+  assert.match(invalid.findings.join('\n'), /docs\/surfaces\.yaml/);
 });
 
 test('statusProject reports initialized state for the selected agents', () => {
@@ -507,15 +897,15 @@ test('statusProject reports initialized state for the selected agents', () => {
   });
 });
 
-test('bootstrapOpenSpec prefers the local runtime when available', () => {
+test('bootstrapOpenSpec reports the detected runtime', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
 
   const output = bootstrapOpenSpec({ projectDir });
 
-  assert.match(output, /OpenSpec already available \(project-local\)/);
+  assert.match(output, /OpenSpec already available \((global|project-local)\)/);
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
-  assert.match(output, /node_modules\/\.bin\/openspec list --specs/);
+  assert.match(output, /openspec list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
 });
 
@@ -726,9 +1116,9 @@ test('setupProject handles quoted Windows command paths with spaces during autom
       agents: ['claude'],
     });
 
-    assert.match(output, /Installed OpenSpec locally with npm/);
+    assert.match(output, /Installed OpenSpec globally with npm \(user-level command\)/);
     assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
-    assert.ok(fs.existsSync(path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd')));
+    assert.ok(fs.existsSync(path.join(fakeHome, 'Program Files', 'nodejs', 'openspec.cmd')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
   }))));
 });
@@ -960,7 +1350,7 @@ test('doctorProject reports current dependency status for OpenCode', () => {
     assert.match(output, /Dependency doctor:/);
     assert.match(output, /\[OK\] openspec/);
     assert.match(output, /\[MISSING\] superpowers:opencode/);
-    assert.match(output, /npx praxis-devos setup --agents opencode/);
+    assert.match(output, /npx praxis-devos setup --agent opencode/);
   });
 });
 

@@ -10,8 +10,8 @@ const ensureDir = (dirPath) => {
 };
 
 /**
- * Project OpenSpec skills to ~/.claude/skills/ as skill directories with SKILL.md.
- * Claude Code discovers these as native OpenSpec skills.
+ * Project bundled Praxis skills to ~/.claude/skills/ as skill directories with SKILL.md.
+ * Claude Code discovers these as native skills.
  */
 export const projectSkills = ({ skillSources, version, log }) => {
   ensureDir(claudeSkillsDir());
@@ -38,15 +38,12 @@ export const projectSkills = ({ skillSources, version, log }) => {
   return results;
 };
 
-/**
- * Detect existing Claude projections.
- */
 export const detectProjections = () => {
   if (!fs.existsSync(claudeSkillsDir())) {
     return [];
   }
   const dirs = fs.readdirSync(claudeSkillsDir(), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && d.name.startsWith('opsx-'));
+    .filter((d) => d.isDirectory());
   return dirs
     .map((d) => {
       const fullPath = path.join(claudeSkillsDir(), d.name, 'SKILL.md');

@@ -23,6 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PRAXIS_ROOT = path.resolve(__dirname, '../..');
 export const PACKAGE_JSON = path.join(PRAXIS_ROOT, 'package.json');
 export const MANAGED_ENTRY_TEMPLATE = path.join(PRAXIS_ROOT, 'src', 'templates', 'managed-entry.md');
+export const DOCS_LITE_TEMPLATE_ROOT = path.join(PRAXIS_ROOT, 'src', 'templates', 'docs-lite');
 
 export const SUPPORTED_AGENTS = ['opencode', 'codex', 'claude'];
 export const SUPERPOWERS_OPENCODE_PLUGIN = 'superpowers@git+https://github.com/obra/superpowers.git';
@@ -44,6 +45,25 @@ const AGENTS_MANAGED_END = '<!-- PRAXIS_DEVOS_END -->';
 
 const CLAUDE_MANAGED_START = '<!-- PRAXIS_DEVOS_START -->';
 const CLAUDE_MANAGED_END = '<!-- PRAXIS_DEVOS_END -->';
+const CODEMAP_MANAGED_START = '<!-- PRAXIS_DOCS_REFRESH_START -->';
+const CODEMAP_MANAGED_END = '<!-- PRAXIS_DOCS_REFRESH_END -->';
+const DOCS_LITE_TEMPLATE_FILES = [
+  'docs/codemaps/project-overview.md',
+  'contracts/surfaces.yaml',
+];
+const DOCS_PLACEHOLDER_PATTERNS = [
+  /TODO/i,
+  /TBD/i,
+  /<[^>\n]+>/,
+  /\[fill[^\]]*\]/i,
+  /\[填写[^\]]*\]/,
+  /待补充/,
+];
+const DOCS_ALLOWED_TARGET_BASE = [
+  'contracts/surfaces.yaml',
+  'docs/codemaps/project-overview.md',
+  'docs/codemaps/module-map.md',
+];
 
 const AGENTS_MD_TEMPLATE = `# [项目名称]
 
@@ -165,16 +185,6 @@ const localExecutablePath = (projectDir, executable) => {
 };
 
 const resolveOpenSpecRuntime = (projectDir) => {
-  const localPath = localExecutablePath(projectDir, 'openspec');
-  if (fs.existsSync(localPath)) {
-    return {
-      status: 'ok',
-      source: 'project-local',
-      command: localPath,
-      detail: `OpenSpec available via ${localPath}`,
-    };
-  }
-
   const globalPath = findCommandPath('openspec');
   if (globalPath) {
     return {
@@ -182,6 +192,16 @@ const resolveOpenSpecRuntime = (projectDir) => {
       source: 'global',
       command: globalPath,
       detail: `OpenSpec CLI is available on PATH via ${globalPath}`,
+    };
+  }
+
+  const localPath = localExecutablePath(projectDir, 'openspec');
+  if (fs.existsSync(localPath)) {
+    return {
+      status: 'warning',
+      source: 'project-local',
+      command: localPath,
+      detail: `OpenSpec is only available project-locally via ${localPath}; user-level global install is recommended`,
     };
   }
 
@@ -472,6 +492,46 @@ const upsertManagedBlock = (filePath, startMarker, endMarker, blockContent, fall
   return 'appended';
 };
 
+const upsertManagedBlockInPlace = (filePath, startMarker, endMarker, blockContent, fallbackContent = '') => {
+  const existing = readFile(filePath);
+  const managedBlock = `${startMarker}\n${blockContent.trim()}\n${endMarker}`;
+
+  if (!existing) {
+    const base = fallbackContent.trim();
+    const next = base
+      ? (base.includes(startMarker) && base.includes(endMarker)
+        ? `${base.replace(
+          new RegExp(`${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`, 'm'),
+          managedBlock,
+        )}\n`
+        : `${managedBlock}\n\n${base}\n`)
+      : `${managedBlock}\n`;
+    writeText(filePath, next);
+    return 'created';
+  }
+
+  if (existing.includes(startMarker) && existing.includes(endMarker)) {
+    const next = existing.replace(
+      new RegExp(`${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`, 'm'),
+      managedBlock,
+    );
+
+    if (next !== existing) {
+      writeText(filePath, next);
+      return 'updated';
+    }
+
+    return 'unchanged';
+  }
+
+  const base = fallbackContent.trim();
+  const next = base
+    ? `${base}\n\n${existing.trimStart()}`
+    : `${managedBlock}\n\n${existing.trimStart()}`;
+  writeText(filePath, next);
+  return 'appended';
+};
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const getPackageVersion = () => readJson(PACKAGE_JSON)?.version || '0.0.0';
@@ -487,7 +547,716 @@ const projectPaths = (projectDir) => ({
   openspecDir: path.join(projectDir, 'openspec'),
   legacyOpenCodeDir: path.join(projectDir, '.opencode'),
   legacyOpenCodeSkillsDir: path.join(projectDir, '.opencode', 'skills'),
+  docsCodemapsDir: path.join(projectDir, 'docs', 'codemaps'),
+  codemapOverviewPath: path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'),
+  codemapModuleMapPath: path.join(projectDir, 'docs', 'codemaps', 'module-map.md'),
+  codemapModulesDir: path.join(projectDir, 'docs', 'codemaps', 'modules'),
+  contractsDir: path.join(projectDir, 'contracts'),
+  surfacesPath: path.join(projectDir, 'contracts', 'surfaces.yaml'),
+  nonCanonicalSurfacesPath: path.join(projectDir, 'docs', 'surfaces.yaml'),
+  rootPomPath: path.join(projectDir, 'pom.xml'),
 });
+
+const formatRelativePath = (projectDir, targetPath) => {
+  const relative = path.relative(projectDir, targetPath);
+  return relative.split(path.sep).join('/');
+};
+
+const formatPathRef = (relativePath, isDir = false) => `\`${isDir ? `${relativePath.replace(/\/+$/, '')}/` : relativePath}\``;
+
+const listVisibleTopLevelEntries = (projectDir) => {
+  try {
+    return fs.readdirSync(projectDir, { withFileTypes: true })
+      .filter((entry) => !entry.name.startsWith('.'))
+      .filter((entry) => entry.name !== 'node_modules')
+      .map((entry) => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+      }))
+      .sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) {
+          return a.isDirectory ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  } catch {
+    return [];
+  }
+};
+
+const firstExistingRelativePath = (projectDir, candidates) => {
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(projectDir, candidate))) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const collectPreferredReadPaths = ({ projectDir, primarySurfaceLocation }) => {
+  const preferred = [
+    'AGENTS.md',
+    'README.md',
+    'docs/codemaps/project-overview.md',
+    'contracts/surfaces.yaml',
+    primarySurfaceLocation || null,
+    firstExistingRelativePath(projectDir, ['src/index.ts', 'src/index.js', 'src/main.ts', 'src/main.js', 'index.ts', 'index.js']),
+    firstExistingRelativePath(projectDir, ['test', 'tests', 'spec']),
+  ].filter(Boolean);
+
+  return [...new Set(preferred)];
+};
+
+const collectEntryCandidates = ({ projectDir, primarySurfaceLocation }) => {
+  const candidates = [
+    primarySurfaceLocation || null,
+    firstExistingRelativePath(projectDir, ['src/index.ts', 'src/index.js', 'src/main.ts', 'src/main.js', 'index.ts', 'index.js']),
+    firstExistingRelativePath(projectDir, ['bin', 'app', 'lib', 'packages']),
+  ].filter(Boolean);
+
+  return [...new Set(candidates)];
+};
+
+const renderProblemRouting = ({ primarySurfaceLocation, testPath, sourcePath }) => {
+  const lines = [
+    '## Problem Routing',
+    '',
+    `- External surface changes: read ${formatPathRef(primarySurfaceLocation || 'contracts/surfaces.yaml')}.`,
+    `- Source code changes: read ${formatPathRef(sourcePath || 'src/', !sourcePath || !/\.[a-z0-9]+$/i.test(sourcePath))}.`,
+    `- Tests: read ${formatPathRef(testPath || 'test/', !testPath || !/\.[a-z0-9]+$/i.test(testPath))}.`,
+    '- Docs and project map updates: read `docs/codemaps/project-overview.md` and `contracts/surfaces.yaml`.',
+  ];
+
+  return lines.join('\n');
+};
+
+const renderGeneratedProjectOverview = ({ projectDir }) => {
+  const paths = projectPaths(projectDir);
+  const surfacesContent = readFile(paths.surfacesPath) || '';
+  const parsed = parseSurfacesYaml(surfacesContent);
+  const primarySurface = parsed.primarySurface || 'not-declared';
+  const surface = parsed.surfaces.find((entry) => entry.id === parsed.primarySurface) || parsed.surfaces[0] || null;
+  const primarySurfaceKind = surface?.kind || 'unknown';
+  const primarySurfaceLocation = surface?.location || 'not-declared';
+  const topLevelEntries = listVisibleTopLevelEntries(projectDir);
+  const readPaths = collectPreferredReadPaths({ projectDir, primarySurfaceLocation });
+  const entryCandidates = collectEntryCandidates({ projectDir, primarySurfaceLocation });
+  const testPath = firstExistingRelativePath(projectDir, ['test', 'tests', 'spec']);
+  const sourcePath = firstExistingRelativePath(projectDir, ['src', 'app', 'lib', 'packages']);
+
+  const lines = [
+    '## Generated Overview',
+    '',
+    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos:docs-refresh` when host command wiring is available.',
+    '',
+    '## Project Summary',
+    '',
+    `- Primary surface: \`${primarySurface}\``,
+    `- Surface kind: \`${primarySurfaceKind}\``,
+    `- Surface location: \`${primarySurfaceLocation}\``,
+    '',
+    '## Read These Files First',
+    '',
+    ...readPaths.map((entry) => `- ${formatPathRef(entry, !/\.[a-z0-9]+$/i.test(entry))}`),
+    '',
+    '## Top-Level Structure',
+    '',
+    ...(topLevelEntries.length > 0
+      ? topLevelEntries.map((entry) => `- ${formatPathRef(entry.name, entry.isDirectory)}`)
+      : ['- No visible top-level entries detected yet.']),
+    '',
+    '## Entry Candidates',
+    '',
+    ...(entryCandidates.length > 0
+      ? entryCandidates.map((entry) => `- ${formatPathRef(entry, !/\.[a-z0-9]+$/i.test(entry))}`)
+      : ['- No entry candidates detected.']),
+    '',
+    renderProblemRouting({ primarySurfaceLocation, testPath, sourcePath }),
+  ];
+
+  return lines.join('\n');
+};
+
+const codemapFallbackContent = (title) => [
+  `# Codemap: ${title}`,
+  '',
+  `${CODEMAP_MANAGED_START}`,
+  'Praxis DevOS will refresh this block.',
+  `${CODEMAP_MANAGED_END}`,
+  '',
+  '## User Notes',
+  '',
+  'Add project-specific notes here. Praxis refresh preserves this section.',
+].join('\n');
+
+const normalizeYamlScalar = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    || (trimmed.startsWith('\'') && trimmed.endsWith('\''))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+};
+
+const parseSurfacesYaml = (content) => {
+  const parsed = {
+    primarySurface: '',
+    surfaces: [],
+  };
+
+  if (!content) {
+    return parsed;
+  }
+
+  let currentSurface = null;
+  let inSurfaces = false;
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+$/, '');
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const primaryMatch = trimmed.match(/^primary_surface:\s*(.+)?$/);
+    if (primaryMatch) {
+      parsed.primarySurface = normalizeYamlScalar(primaryMatch[1] || '');
+      continue;
+    }
+
+    if (trimmed === 'surfaces:') {
+      inSurfaces = true;
+      currentSurface = null;
+      continue;
+    }
+
+    if (!inSurfaces) {
+      continue;
+    }
+
+    const surfaceStartMatch = line.match(/^\s*-\s+id:\s*(.+)?$/);
+    if (surfaceStartMatch) {
+      currentSurface = { id: normalizeYamlScalar(surfaceStartMatch[1] || '') };
+      parsed.surfaces.push(currentSurface);
+      continue;
+    }
+
+    const fieldMatch = line.match(/^\s+([a-zA-Z_][a-zA-Z0-9_]*):\s*(.+)?$/);
+    if (fieldMatch && currentSurface) {
+      currentSurface[fieldMatch[1]] = normalizeYamlScalar(fieldMatch[2] || '');
+    }
+  }
+
+  return parsed;
+};
+
+const parsePomModules = (content) => {
+  const modulesBlock = content.match(/<modules>\s*([\s\S]*?)\s*<\/modules>/i);
+  if (!modulesBlock) {
+    return [];
+  }
+
+  return [...modulesBlock[1].matchAll(/<module>\s*([^<]+?)\s*<\/module>/gi)]
+    .map((match) => match[1].trim())
+    .filter(Boolean);
+};
+
+const parsePomArtifactId = (content) => {
+  const withoutParent = content.replace(/<parent>\s*[\s\S]*?\s*<\/parent>/i, '');
+  const artifactMatch = withoutParent.match(/<artifactId>\s*([^<]+?)\s*<\/artifactId>/i);
+  return artifactMatch?.[1]?.trim() || '';
+};
+
+const normalizeModuleFallbackName = (relativeDir) => relativeDir
+  .split(/[\\/]+/)
+  .filter(Boolean)
+  .join('--');
+
+const discoverMavenModules = (projectDir) => {
+  const paths = projectPaths(projectDir);
+  if (!fs.existsSync(paths.rootPomPath)) {
+    return { rootHasPom: false, isMultiModule: false, modules: [] };
+  }
+
+  const discovered = [];
+  const seenPomPaths = new Set();
+
+  const visitPom = (pomPath) => {
+    const normalizedPomPath = path.resolve(pomPath);
+    if (seenPomPaths.has(normalizedPomPath) || !fs.existsSync(normalizedPomPath)) {
+      return;
+    }
+    seenPomPaths.add(normalizedPomPath);
+
+    const pomContent = fs.readFileSync(normalizedPomPath, 'utf8');
+    const moduleRefs = parsePomModules(pomContent);
+
+    for (const moduleRef of moduleRefs) {
+      const moduleDir = path.resolve(path.dirname(normalizedPomPath), moduleRef);
+      const modulePomPath = path.join(moduleDir, 'pom.xml');
+      if (!fs.existsSync(modulePomPath)) {
+        continue;
+      }
+
+      const relativeDir = path.relative(projectDir, moduleDir).split(path.sep).join('/');
+      const modulePomContent = fs.readFileSync(modulePomPath, 'utf8');
+      const artifactId = parsePomArtifactId(modulePomContent);
+      const stableName = artifactId || normalizeModuleFallbackName(relativeDir);
+
+      if (!discovered.some((entry) => entry.relativeDir === relativeDir)) {
+        discovered.push({
+          artifactId,
+          stableName,
+          relativeDir,
+          pomPath: modulePomPath,
+        });
+      }
+
+      visitPom(modulePomPath);
+    }
+  };
+
+  visitPom(paths.rootPomPath);
+
+  return {
+    rootHasPom: true,
+    isMultiModule: discovered.length > 0,
+    modules: discovered.sort((a, b) => a.relativeDir.localeCompare(b.relativeDir)),
+  };
+};
+
+const moduleCodemapPath = ({ projectDir, moduleName }) => path.join(
+  projectDir,
+  'docs',
+  'codemaps',
+  'modules',
+  `${moduleName}.md`,
+);
+
+const moduleCodemapRelativePath = (moduleName) => `docs/codemaps/modules/${moduleName}.md`;
+
+const formatModuleSummary = (module) => {
+  if (module.relativeDir.includes('/')) {
+    return `Nested Maven module under \`${module.relativeDir.split('/').slice(0, -1).join('/')}\`.`;
+  }
+  return 'Top-level Maven module declared in explicit aggregation.';
+};
+
+const detectModuleEntryCandidates = ({ projectDir, module }) => {
+  const moduleRoot = path.join(projectDir, module.relativeDir);
+  const candidates = [
+    'src/main/java',
+    'src/main/kotlin',
+    'src/main/resources',
+    'src',
+    'README.md',
+  ];
+
+  return candidates
+    .filter((candidate) => fs.existsSync(path.join(moduleRoot, candidate)))
+    .map((candidate) => path.posix.join(module.relativeDir, candidate))
+    .slice(0, 4);
+};
+
+const detectInRepoModuleDependencies = ({ modules, module }) => {
+  const prefix = `${module.relativeDir}/`;
+  const childModules = modules
+    .filter((candidate) => candidate.relativeDir.startsWith(prefix))
+    .map((candidate) => candidate.stableName);
+  const parentModule = modules.find((candidate) => module.relativeDir.startsWith(`${candidate.relativeDir}/`));
+  const dependencies = [];
+
+  if (parentModule) {
+    dependencies.push(`Parent aggregate: \`${parentModule.stableName}\``);
+  }
+  if (childModules.length > 0) {
+    dependencies.push(`Child modules: ${childModules.map((name) => `\`${name}\``).join(', ')}`);
+  }
+  if (dependencies.length === 0) {
+    dependencies.push('No explicit in-repo module dependency inferred from aggregation.');
+  }
+
+  return dependencies;
+};
+
+const renderGeneratedModuleMap = ({ projectDir, modules }) => {
+  const lines = [
+    '## Generated Module Map',
+    '',
+    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos:docs-refresh` when host command wiring is available.',
+    '',
+    '## Modules',
+    '',
+  ];
+
+  for (const module of modules) {
+    const displayName = module.artifactId || module.stableName;
+    lines.push(`- \`${displayName}\` — path \`${module.relativeDir}/\` — ${formatModuleSummary(module)}`);
+  }
+
+  return lines.join('\n');
+};
+
+const renderGeneratedModuleCodemap = ({ projectDir, module, modules }) => {
+  const entryCandidates = detectModuleEntryCandidates({ projectDir, module });
+  const dependencies = detectInRepoModuleDependencies({ modules, module });
+  const displayName = module.artifactId || module.stableName;
+  const lines = [
+    '## Generated Module Overview',
+    '',
+    '> This section is maintained by `praxis-devos docs refresh` as a compatibility path. Prefer `/devos:docs-refresh` when host command wiring is available.',
+    '',
+    '## Module Identity',
+    '',
+    `- Name: \`${displayName}\``,
+    `- Relative path: \`${module.relativeDir}/\``,
+    `- pom.xml: \`${path.posix.join(module.relativeDir, 'pom.xml')}\``,
+    '',
+    '## Purpose',
+    '',
+    `- ${formatModuleSummary(module)}`,
+    '',
+    '## Key Entry Points Or Public Interfaces',
+    '',
+    ...(entryCandidates.length > 0
+      ? entryCandidates.map((entry) => `- \`${entry}${entry.endsWith('.md') ? '' : '/'}\``)
+      : ['- No obvious entry points detected yet.']),
+    '',
+    '## Important In-Repo Dependencies',
+    '',
+    ...dependencies.map((entry) => `- ${entry}`),
+  ];
+
+  return lines.join('\n');
+};
+
+const allowedDocsWriteTargets = ({ projectDir }) => {
+  const discoveredModules = discoverMavenModules(projectDir);
+  const targets = [
+    ...DOCS_ALLOWED_TARGET_BASE,
+    ...discoveredModules.modules.map((module) => moduleCodemapRelativePath(module.stableName)),
+  ];
+  return [...new Set(targets)];
+};
+
+export const buildDocsSubagentRequest = ({ projectDir, mode }) => {
+  if (!['init', 'refresh'].includes(mode)) {
+    throw new Error(`Unsupported docs subagent mode: ${mode}`);
+  }
+
+  const paths = projectPaths(projectDir);
+  const surfacesContent = readFile(paths.surfacesPath) || '';
+  const parsed = parseSurfacesYaml(surfacesContent);
+  const primarySurface = parsed.primarySurface || '';
+  const surface = parsed.surfaces.find((entry) => entry.id === primarySurface) || parsed.surfaces[0] || null;
+  const discoveredModules = discoverMavenModules(projectDir);
+
+  return {
+    schemaVersion: 1,
+    mode,
+    canonicalSurfacesPath: 'contracts/surfaces.yaml',
+    allowedTargets: allowedDocsWriteTargets({ projectDir }),
+    readPaths: collectPreferredReadPaths({
+      projectDir,
+      primarySurfaceLocation: surface?.location || '',
+    }),
+    context: {
+      primarySurface,
+      primarySurfaceKind: surface?.kind || '',
+      primarySurfaceLocation: surface?.location || '',
+      mavenMultiModule: discoveredModules.isMultiModule,
+      discoveredModules: discoveredModules.modules.map((module) => ({
+        artifactId: module.artifactId,
+        stableName: module.stableName,
+        relativeDir: module.relativeDir,
+      })),
+    },
+  };
+};
+
+export const validateDocsGenerationResult = ({ projectDir, result }) => {
+  const findings = [];
+  const allowedTargets = allowedDocsWriteTargets({ projectDir });
+  const discoveredModules = discoverMavenModules(projectDir);
+  const allowedModuleNames = new Set(discoveredModules.modules.map((module) => module.stableName));
+
+  if (!result || typeof result !== 'object') {
+    return {
+      status: 'invalid',
+      findings: ['Docs generation result must be an object'],
+      allowedTargets,
+    };
+  }
+
+  if (result.schemaVersion !== 1) {
+    findings.push('schemaVersion is required and must equal 1');
+  }
+
+  if (!['init', 'refresh'].includes(result.mode)) {
+    findings.push('mode is required and must be either init or refresh');
+  }
+
+  if (typeof result.surfacesYaml !== 'string' || !result.surfacesYaml.trim()) {
+    findings.push('surfacesYaml is required and must be non-empty');
+  }
+
+  if (!Array.isArray(result.codemaps)) {
+    findings.push('codemaps must be an array');
+  } else {
+    const seenPaths = new Set();
+    for (const [index, codemap] of result.codemaps.entries()) {
+      const pathValue = typeof codemap?.path === 'string' ? codemap.path.trim() : '';
+      const contentValue = typeof codemap?.content === 'string' ? codemap.content.trim() : '';
+      const actionValue = codemap?.action;
+
+      if (!pathValue) {
+        findings.push(`codemaps[${index}].path is required and must be non-empty`);
+      } else {
+        if (seenPaths.has(pathValue)) {
+          findings.push(`Duplicate codemap path detected: ${pathValue}`);
+        }
+        seenPaths.add(pathValue);
+
+        if (!allowedTargets.includes(pathValue)) {
+          findings.push(`Path is outside the allowed target set: ${pathValue}`);
+        }
+
+        if (pathValue === 'docs/surfaces.yaml') {
+          findings.push('docs/surfaces.yaml is not a valid write target');
+        }
+
+        const modulePathMatch = pathValue.match(/^docs\/codemaps\/modules\/(.+)\.md$/);
+        if (modulePathMatch && !allowedModuleNames.has(modulePathMatch[1])) {
+          findings.push(`Module codemap path does not match a discovered module: ${pathValue}`);
+        }
+      }
+
+      if (!contentValue) {
+        findings.push(`codemaps[${index}].content is required and must be non-empty`);
+      }
+
+      if (actionValue !== 'upsert') {
+        findings.push(`codemaps[${index}].action must equal "upsert"`);
+      }
+    }
+  }
+
+  return {
+    status: findings.length === 0 ? 'valid' : 'invalid',
+    findings,
+    allowedTargets,
+  };
+};
+
+const hasPlaceholderText = (content) => DOCS_PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(content));
+
+const ensureDocsLiteTemplate = () => {
+  if (!fs.existsSync(DOCS_LITE_TEMPLATE_ROOT)) {
+    throw new Error(`Docs-lite template root is missing: ${DOCS_LITE_TEMPLATE_ROOT}`);
+  }
+};
+
+export const ensureDocsLiteSkeleton = ({ projectDir, log = () => {} }) => {
+  ensureDocsLiteTemplate();
+
+  const created = [];
+  for (const relativePath of DOCS_LITE_TEMPLATE_FILES) {
+    const srcPath = path.join(DOCS_LITE_TEMPLATE_ROOT, relativePath);
+    const dstPath = path.join(projectDir, relativePath);
+    if (!fs.existsSync(dstPath)) {
+      copyFile(srcPath, dstPath);
+      created.push(relativePath);
+      log(`✓ Seeded ${relativePath}`);
+    }
+  }
+
+  if (created.length === 0) {
+    log('⊘ docs-lite skeleton already present');
+  }
+
+  return created;
+};
+
+export const initDocsLite = ({ projectDir }) => {
+  const logs = [];
+  const log = (msg) => logs.push(msg);
+  ensureDocsLiteSkeleton({ projectDir, log });
+  const refreshLogs = refreshDocsLite({ projectDir });
+  if (refreshLogs) {
+    logs.push(refreshLogs);
+  }
+  logs.push('✓ Initialized docs-lite compatibility skeleton');
+  return logs.join('\n');
+};
+
+export const refreshDocsLite = ({ projectDir }) => {
+  const logs = [];
+  const log = (msg) => logs.push(msg);
+  ensureDocsLiteSkeleton({ projectDir, log });
+
+  const paths = projectPaths(projectDir);
+  const status = upsertManagedBlockInPlace(
+    paths.codemapOverviewPath,
+    CODEMAP_MANAGED_START,
+    CODEMAP_MANAGED_END,
+    renderGeneratedProjectOverview({ projectDir }),
+    codemapFallbackContent('Project Overview'),
+  );
+
+  log(`✓ Refreshed docs-lite codemap (${status})`);
+
+  const discoveredModules = discoverMavenModules(projectDir);
+  if (discoveredModules.isMultiModule) {
+    const moduleMapStatus = upsertManagedBlockInPlace(
+      paths.codemapModuleMapPath,
+      CODEMAP_MANAGED_START,
+      CODEMAP_MANAGED_END,
+      renderGeneratedModuleMap({ projectDir, modules: discoveredModules.modules }),
+      codemapFallbackContent('Module Map'),
+    );
+    log(`✓ Refreshed docs-lite module map (${moduleMapStatus})`);
+
+    for (const module of discoveredModules.modules) {
+      const modulePath = moduleCodemapPath({ projectDir, moduleName: module.stableName });
+      const moduleStatus = upsertManagedBlockInPlace(
+        modulePath,
+        CODEMAP_MANAGED_START,
+        CODEMAP_MANAGED_END,
+        renderGeneratedModuleCodemap({ projectDir, module, modules: discoveredModules.modules }),
+        codemapFallbackContent(`Module ${module.stableName}`),
+      );
+      log(`✓ Refreshed docs-lite module codemap (${module.stableName}: ${moduleStatus})`);
+    }
+  }
+
+  return logs.join('\n');
+};
+
+export const checkDocsLite = ({ projectDir }) => {
+  const paths = projectPaths(projectDir);
+  const findings = [];
+  const lines = [
+    'Docs check',
+    `project: ${projectDir}`,
+  ];
+
+  const codemapExists = fs.existsSync(paths.codemapOverviewPath);
+  lines.push(`- docs/codemaps/project-overview.md: ${codemapExists ? 'ok' : 'missing'}`);
+  if (!codemapExists) {
+    findings.push('Missing docs/codemaps/project-overview.md');
+  }
+
+  const surfacesExists = fs.existsSync(paths.surfacesPath);
+  lines.push(`- contracts/surfaces.yaml: ${surfacesExists ? 'ok' : 'missing'}`);
+  if (!surfacesExists) {
+    findings.push('Missing contracts/surfaces.yaml');
+  }
+
+  const nonCanonicalSurfacesExists = fs.existsSync(paths.nonCanonicalSurfacesPath);
+  lines.push(`- docs/surfaces.yaml: ${nonCanonicalSurfacesExists ? 'conflict' : 'absent'}`);
+  if (nonCanonicalSurfacesExists) {
+    findings.push('Conflict: docs/surfaces.yaml exists but contracts/surfaces.yaml is the canonical path');
+  }
+
+  if (codemapExists) {
+    const codemapContent = fs.readFileSync(paths.codemapOverviewPath, 'utf8');
+    if (!codemapContent.trim()) {
+      findings.push('docs/codemaps/project-overview.md is blank');
+    } else if (hasPlaceholderText(codemapContent)) {
+      findings.push('Placeholder text remains in docs/codemaps/project-overview.md');
+    }
+  }
+
+  if (surfacesExists) {
+    const surfacesContent = fs.readFileSync(paths.surfacesPath, 'utf8');
+    if (!surfacesContent.trim()) {
+      findings.push('contracts/surfaces.yaml is blank');
+    } else if (hasPlaceholderText(surfacesContent)) {
+      findings.push('Placeholder text remains in contracts/surfaces.yaml');
+    }
+
+    const parsed = parseSurfacesYaml(surfacesContent);
+    if (!parsed.primarySurface) {
+      findings.push('Missing primary_surface in contracts/surfaces.yaml');
+    }
+
+    if (parsed.primarySurface && !parsed.surfaces.some((surface) => surface.id === parsed.primarySurface)) {
+      findings.push(`primary_surface "${parsed.primarySurface}" not found in surfaces list`);
+    }
+
+    parsed.surfaces.forEach((surface, index) => {
+      for (const field of ['id', 'kind', 'location']) {
+        if (!surface[field]) {
+          findings.push(`Surface #${index + 1} is missing ${field}`);
+        }
+      }
+    });
+  }
+
+  const discoveredModules = discoverMavenModules(projectDir);
+  if (discoveredModules.isMultiModule) {
+    const moduleMapExists = fs.existsSync(paths.codemapModuleMapPath);
+    lines.push(`- docs/codemaps/module-map.md: ${moduleMapExists ? 'ok' : 'missing'}`);
+    if (!moduleMapExists) {
+      findings.push('Missing docs/codemaps/module-map.md for detected Maven multi-module project');
+    } else {
+      const moduleMapContent = fs.readFileSync(paths.codemapModuleMapPath, 'utf8');
+      if (!moduleMapContent.trim()) {
+        findings.push('docs/codemaps/module-map.md is blank');
+      } else if (hasPlaceholderText(moduleMapContent)) {
+        findings.push('Placeholder text remains in docs/codemaps/module-map.md');
+      }
+    }
+
+    const seenModuleNames = new Set();
+    for (const module of discoveredModules.modules) {
+      if (seenModuleNames.has(module.stableName)) {
+        findings.push(`Duplicate module codemap name detected: ${module.stableName}`);
+        continue;
+      }
+      seenModuleNames.add(module.stableName);
+
+      const modulePath = moduleCodemapPath({ projectDir, moduleName: module.stableName });
+      const relativeModulePath = formatRelativePath(projectDir, modulePath);
+      if (!fs.existsSync(modulePath)) {
+        findings.push(`Missing ${relativeModulePath}`);
+        continue;
+      }
+
+      const moduleContent = fs.readFileSync(modulePath, 'utf8');
+      if (!moduleContent.trim()) {
+        findings.push(`${relativeModulePath} is blank`);
+      } else if (hasPlaceholderText(moduleContent)) {
+        findings.push(`Placeholder text remains in ${relativeModulePath}`);
+      }
+    }
+  }
+
+  lines.push(`status: ${findings.length === 0 ? 'pass' : 'needs-attention'}`);
+  if (findings.length === 0) {
+    lines.push('findings: none');
+  } else {
+    lines.push('findings:');
+    for (const finding of findings) {
+      lines.push(`- ${finding}`);
+    }
+  }
+
+  return lines.join('\n');
+};
 
 const ensureOpenSpecLayout = ({ projectDir, log }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
@@ -620,6 +1389,11 @@ export const syncProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   const log = (msg) => logs.push(msg);
 
   const selectedAgents = uniqueAgents(agents);
+  ensureDocsLiteSkeleton({ projectDir, log });
+  const refreshLogs = refreshDocsLite({ projectDir });
+  if (refreshLogs) {
+    logs.push(refreshLogs);
+  }
 
   for (const agent of selectedAgents) {
     syncAgent({ projectDir, agent, log });
@@ -1065,7 +1839,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   const logs = [];
   const current = resolveOpenSpecRuntime(projectDir);
 
-  if (current.status === 'ok') {
+  if (current.status === 'ok' && current.source === 'global') {
     logs.push(`== openspec ==`);
     logs.push(`⊘ OpenSpec already available (${current.source})`);
     logs.push(`- ${current.detail}`);
@@ -1077,7 +1851,7 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const npmCommand = resolveCommandForExecution('npm');
-  const installResult = runFile(npmCommand, ['install', '-D', OPENSPEC_PACKAGE], {
+  const installResult = runFile(npmCommand, ['install', '-g', OPENSPEC_PACKAGE], {
     cwd: projectDir,
   });
   if (!installResult.ok) {
@@ -1085,12 +1859,12 @@ const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   const next = resolveOpenSpecRuntime(projectDir);
-  if (next.status !== 'ok') {
-    throw new Error(`OpenSpec install completed but runtime is still unavailable: ${next.detail}`);
+  if (next.status !== 'ok' || next.source !== 'global') {
+    throw new Error(`OpenSpec install completed but global runtime is still unavailable: ${next.detail}`);
   }
 
   logs.push('== openspec ==');
-  logs.push(`✓ Installed OpenSpec locally with npm (${OPENSPEC_PACKAGE})`);
+  logs.push(`✓ Installed OpenSpec globally with npm (user-level command) (${OPENSPEC_PACKAGE})`);
   logs.push(`- ${next.detail}`);
   return logs.join('\n');
 };
@@ -1409,7 +2183,7 @@ export const bootstrapProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
 
 export const bootstrapOpenSpec = ({ projectDir }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
-  if (runtime.status === 'ok') {
+  if (runtime.status === 'ok' || runtime.status === 'warning') {
     return [
       '== openspec ==',
       `OpenSpec already available (${runtime.source})`,
@@ -1422,14 +2196,14 @@ export const bootstrapOpenSpec = ({ projectDir }) => {
   return [
     '== openspec ==',
     'OpenSpec is a hard dependency of Praxis DevOS.',
-    'Preferred install (project-local):',
-    `- npm install -D ${OPENSPEC_PACKAGE}`,
-    'Then run OpenSpec directly:',
-    '  ./node_modules/.bin/openspec list --specs',
-    'Fallback install (global):',
+    'Preferred install (user-global):',
     `- npm install -g ${OPENSPEC_PACKAGE}`,
     '- Then run:',
     '  openspec list --specs',
+    'Project-local fallback (if global is blocked by policy):',
+    `- npm install -D ${OPENSPEC_PACKAGE}`,
+    '- Then run OpenSpec directly:',
+    '  ./node_modules/.bin/openspec list --specs',
     `Reference: ${OPENSPEC_INSTALL_DOC}`,
   ].join('\n');
 };
@@ -1464,7 +2238,7 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
       results.push({
         name: `projection:${agent}`,
         status: 'ok',
-        detail: `All ${expected.length} OpenSpec skills projected`,
+        detail: `All ${expected.length} bundled Praxis skills projected`,
       });
     } else {
       results.push({
@@ -1482,7 +2256,11 @@ export const doctorProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = 
 
   lines.push('');
   lines.push('Recommended next step:');
-  lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  if (selectedAgents.length === 1) {
+    lines.push(`- npx praxis-devos setup --agent ${selectedAgents[0]}`);
+  } else {
+    lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
+  }
   lines.push('');
   lines.push('Advanced repair command:');
   lines.push(`- npx praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);
@@ -2029,6 +2807,7 @@ Commands:
   setup          Bootstrap dependencies, initialize framework files
   init           Initialize the framework skeleton in the current project
   sync           Refresh agent adapters and managed blocks
+  docs           Compatibility/fallback init, refresh, or check for codemap/surfaces artifacts
   migrate        Sync adapters (legacy .praxis migration is no longer needed)
   instrumentation Enable, disable, or inspect projected monitoring overlays
   status         Show current project initialization and dependency state
@@ -2101,6 +2880,29 @@ export const runCli = (argv) => {
       agents,
       strict: parsed.strict,
     });
+  }
+
+  if (parsed.command === 'docs') {
+    const action = parsed.positional[0] || 'check';
+    if (action === 'init') {
+      return initDocsLite({
+        projectDir: parsed.projectDir,
+      });
+    }
+
+    if (action === 'refresh') {
+      return refreshDocsLite({
+        projectDir: parsed.projectDir,
+      });
+    }
+
+    if (action === 'check') {
+      return checkDocsLite({
+        projectDir: parsed.projectDir,
+      });
+    }
+
+    throw new Error(`Unknown docs subcommand: ${action}`);
   }
 
   if (parsed.command === 'validate-session') {

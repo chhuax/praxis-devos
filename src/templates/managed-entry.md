@@ -7,6 +7,16 @@
 - Use `/opsx:apply` only for small, local implementation work with low ambiguity and no proposal need.
 - Reviews and audit-style requests should follow the review flow.
 
+## Project Reading Order
+
+- On first entry, read `docs/codemaps/` before scanning the whole repository.
+- Read `contracts/surfaces.yaml` to find the primary external surface and its source location.
+- When the primary external surface changes, update `contracts/surfaces.yaml` first.
+- When host command wiring exists, prefer `/devos:docs-init` and `/devos:docs-refresh` so a normal sub-agent can run `devos-docs`.
+- Treat `praxis-devos docs init|refresh|check` as the compatibility / fallback path rather than the primary AI-first entrypoint.
+- Derived docs work may be delegated to a docs sub-agent, but the docs sub-agent should only modify `docs/codemaps/**`.
+- The main agent remains responsible for updating `contracts/surfaces.yaml` and running `docs check` before completion.
+
 ## OpenSpec + Superpowers Contract
 
 - Inside OpenSpec, `opsx-explore`, `opsx-propose`, `opsx-apply`, and `opsx-archive` are the only visible workflow layer.
