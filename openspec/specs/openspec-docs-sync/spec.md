@@ -1,7 +1,7 @@
 # openspec-docs-sync Specification
 
 ## Purpose
-TBD - created by archiving change add-openspec-docs-context-routing. Update Purpose after archive.
+Define how OpenSpec workflows consume docs context packs and perform deterministic, change-aware docs refresh assessment during propose, apply, and archive flows so AI-assisted work uses project documentation intentionally and refreshes only the current lightweight docs artifacts when needed. This capability does not expand the docs contract beyond the existing docs sync scope and does not require automatic generation of other documentation families such as `reference`, `guides`, or `runbooks`.
 ## Requirements
 ### Requirement: OpenSpec workflows SHALL support docs context pack consumption
 
@@ -77,4 +77,3 @@ The system SHALL keep OpenSpec-linked docs sync focused on the lightweight docs 
 #### Scenario: OpenSpec linkage does not expand to other docs families
 - **WHEN** this capability is implemented
 - **THEN** it does not require automatic generation of `reference`, `guides`, or `runbooks`
-

@@ -1,7 +1,7 @@
 # docs-context-routing Specification
 
 ## Purpose
-TBD - created by archiving change add-openspec-docs-context-routing. Update Purpose after archive.
+Define how a docs context pack selects the canonical project documentation artifacts for AI tasks, including a stable default read set, module-aware codemap routing for multi-module projects, and deterministic routing metadata, while remaining within existing docs validation and writeback boundaries.
 ## Requirements
 ### Requirement: Docs context pack SHALL define a stable default read set
 
@@ -63,4 +63,3 @@ The system SHALL keep docs consumption aligned with existing canonical path and 
 - **WHEN** a docs context pack is used by `devos-docs` or a host command wrapper
 - **THEN** it does not change the existing docs allowed target set
 - **AND** it does not imply write access outside `docs/surfaces.yaml` and `docs/codemaps/**`
-
