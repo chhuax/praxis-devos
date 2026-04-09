@@ -1262,6 +1262,32 @@ surfaces:
   assert.deepEqual(noOpAssessment.reasons, []);
 });
 
+test('buildDocsContextPack and refresh assessment ignore change inputs outside the repository root', () => {
+  const projectDir = makeTempProject();
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-outside-'));
+  const outsideArtifact = path.join(outsideDir, 'proposal.md');
+  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'docs', 'surfaces.yaml'), 'primary_surface: public-sdk\n', 'utf8');
+  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
+  fs.writeFileSync(outsideArtifact, 'external surface\n', 'utf8');
+
+  const contextPack = buildDocsContextPack({
+    projectDir,
+    changedPaths: ['../../outside/file.ts'],
+    changeArtifactPaths: [outsideArtifact],
+  });
+  const assessment = assessDocsRefreshNeed({
+    projectDir,
+    changedPaths: ['../../outside/file.ts'],
+    changeArtifactPaths: [outsideArtifact],
+  });
+
+  assert.deepEqual(contextPack.changedPaths, []);
+  assert.deepEqual(contextPack.changeArtifactPaths, []);
+  assert.equal(assessment.needed, false);
+  assert.deepEqual(assessment.reasons, []);
+});
+
 test('buildOpenSpecDocsStageContext applies docs routing and refresh assessment at the correct stages', () => {
   const projectDir = makeTempProject();
   const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-auth');

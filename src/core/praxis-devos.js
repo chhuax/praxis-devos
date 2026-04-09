@@ -1024,14 +1024,16 @@ const normalizeRepoRelativePath = ({ projectDir, filePath }) => {
   }
 
   const trimmed = filePath.trim();
-  const absoluteCandidate = path.isAbsolute(trimmed)
-    ? trimmed
-    : path.resolve(projectDir, trimmed);
+  const absoluteCandidate = path.resolve(projectDir, trimmed);
   const relative = path.relative(projectDir, absoluteCandidate);
-  const normalized = (path.isAbsolute(trimmed) ? relative : trimmed)
+  const normalized = relative
     .split(path.sep).join('/')
     .replace(/^\.\//, '')
     .replace(/^\/+/, '');
+
+  if (!normalized || normalized === '.' || normalized.startsWith('../') || normalized === '..') {
+    return '';
+  }
 
   return normalized;
 };
@@ -1068,9 +1070,15 @@ const findModuleFromChangedPaths = ({ modules, changedPaths }) => {
   let bestMatch = null;
 
   for (const changedPath of changedPaths || []) {
-    const matched = modules
-      .filter((module) => pathMatchesCandidate(changedPath, module.relativeDir))
-      .sort((a, b) => b.relativeDir.length - a.relativeDir.length)[0];
+    let matched = null;
+    for (const module of modules || []) {
+      if (
+        pathMatchesCandidate(changedPath, module.relativeDir)
+        && (!matched || module.relativeDir.length > matched.relativeDir.length)
+      ) {
+        matched = module;
+      }
+    }
 
     if (matched) {
       if (!bestMatch || matched.relativeDir.length > bestMatch.module.relativeDir.length) {
@@ -1096,13 +1104,14 @@ const findModuleFromChangeArtifacts = ({ projectDir, modules, changeArtifactPath
     if (!content) {
       continue;
     }
+    const lowerContent = content.toLowerCase();
 
     for (const module of modules) {
       const candidates = moduleHintCandidates(module)
         .filter((value) => value.length >= 3)
         .sort((a, b) => b.length - a.length);
 
-      if (candidates.some((candidate) => content.toLowerCase().includes(candidate))) {
+      if (candidates.some((candidate) => lowerContent.includes(candidate))) {
         return {
           module,
           reason: `change-artifact:${artifactPath}`,
