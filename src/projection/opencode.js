@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
+import { copyBundleDirectory, ensureDir } from './bundles.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -10,14 +11,11 @@ import {
 import { resolveUserHomeDir } from '../support/home.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// OpenCode currently shares ~/.claude/skills/ as its native user-level skill surface.
 const openCodeSkillsDir = () => path.join(resolveUserHomeDir(), '.claude', 'skills');
 const openCodeCommandsDir = () => path.join(resolveUserHomeDir(), '.config', 'opencode', 'commands');
-const commandTemplateRoot = () => path.resolve(__dirname, '../templates/opencode-commands');
+const commandAssetRoot = () => path.resolve(__dirname, '../../assets/commands');
 const commandNames = ['devos-docs-init', 'devos-docs-refresh'];
-
-const ensureDir = (dirPath) => {
-  fs.mkdirSync(dirPath, { recursive: true });
-};
 
 /**
  * Project bundled Praxis skills to ~/.claude/skills/ as shared skill directories with SKILL.md.
@@ -27,9 +25,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(openCodeSkillsDir());
   const results = [];
 
-  for (const { name, sourcePath } of skillSources) {
+  for (const { name, sourceDir } of skillSources) {
     const targetDir = path.join(openCodeSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
+    const sourceSkillPath = path.join(sourceDir, 'SKILL.md');
     ensureDir(targetDir);
     if (!canSafelyOverwrite({
       assetPath: targetPath,
@@ -44,11 +43,19 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       continue;
     }
 
-    const content = fs.readFileSync(sourcePath, 'utf8');
-    const marker = buildMarker({ source: path.relative(process.cwd(), sourcePath), version });
-    const projected = injectMarker(content, marker);
+    copyBundleDirectory({
+      sourceDir,
+      targetDir,
+      transformFile: ({ sourcePath }) => {
+        if (sourcePath !== sourceSkillPath) {
+          return null;
+        }
 
-    fs.writeFileSync(targetPath, projected, 'utf8');
+        const content = fs.readFileSync(sourceSkillPath, 'utf8');
+        const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
+        return injectMarker(content, marker);
+      },
+    });
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -56,7 +63,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       version,
       agent: 'opencode',
       extra: {
-        sourcePath: path.relative(process.cwd(), sourcePath),
+        sourceDir: path.relative(process.cwd(), sourceDir),
       },
     });
     results.push({ name, targetPath, status: 'projected' });
@@ -71,7 +78,7 @@ export const projectCommands = ({ projectDir, version, log }) => {
   const results = [];
 
   for (const name of commandNames) {
-    const templatePath = path.join(commandTemplateRoot(), `${name}.md`);
+    const templatePath = path.join(commandAssetRoot(), `${name}.md`);
     const targetPath = path.join(openCodeCommandsDir(), `${name}.md`);
     if (!canSafelyOverwrite({
       assetPath: targetPath,

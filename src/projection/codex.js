@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
+import { copyBundleDirectory, ensureDir } from './bundles.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -10,10 +11,6 @@ import { resolveUserHomeDir } from '../support/home.js';
 
 const codexSkillsDir = () => path.join(resolveUserHomeDir(), '.codex', 'skills');
 
-const ensureDir = (dirPath) => {
-  fs.mkdirSync(dirPath, { recursive: true });
-};
-
 /**
  * Project bundled Praxis skills to ~/.codex/skills/ as directories with SKILL.md.
  * Codex discovers these as native skills.
@@ -22,9 +19,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(codexSkillsDir());
   const results = [];
 
-  for (const { name, sourcePath } of skillSources) {
+  for (const { name, sourceDir } of skillSources) {
     const targetDir = path.join(codexSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
+    const sourceSkillPath = path.join(sourceDir, 'SKILL.md');
     ensureDir(targetDir);
     if (!canSafelyOverwrite({
       assetPath: targetPath,
@@ -39,11 +37,19 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       continue;
     }
 
-    const content = fs.readFileSync(sourcePath, 'utf8');
-    const marker = buildMarker({ source: path.relative(process.cwd(), sourcePath), version });
-    const projected = injectMarker(content, marker);
+    copyBundleDirectory({
+      sourceDir,
+      targetDir,
+      transformFile: ({ sourcePath }) => {
+        if (sourcePath !== sourceSkillPath) {
+          return null;
+        }
 
-    fs.writeFileSync(targetPath, projected, 'utf8');
+        const content = fs.readFileSync(sourceSkillPath, 'utf8');
+        const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
+        return injectMarker(content, marker);
+      },
+    });
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -51,7 +57,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       version,
       agent: 'codex',
       extra: {
-        sourcePath: path.relative(process.cwd(), sourcePath),
+        sourceDir: path.relative(process.cwd(), sourceDir),
       },
     });
     results.push({ name, targetPath, status: 'projected' });

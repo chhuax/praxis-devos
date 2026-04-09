@@ -114,11 +114,16 @@ src/monitoring/
 src/templates/
   managed-entry.md             # 注入用户项目 AGENTS.md 的托管规则
 
-assets/openspec-skills/
+assets/skills/
   opsx-propose/SKILL.md
   opsx-explore/SKILL.md
   opsx-apply/SKILL.md
   opsx-archive/SKILL.md        # 内置 OpenSpec skill 资产
+  devos-docs/SKILL.md          # docs skill 资产
+
+assets/commands/
+  devos-docs-init.md
+  devos-docs-refresh.md        # 共享 host command 资产
 
 test/
   praxis-devos.test.js         # 主测试文件
@@ -147,9 +152,9 @@ test/
 先看：
 
 - [src/templates/managed-entry.md](/Users/huaxin/Documents/workspace/praxis-devos/src/templates/managed-entry.md)
-- [assets/openspec-skills/opsx-propose/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/openspec-skills/opsx-propose/SKILL.md)
-- [assets/openspec-skills/opsx-apply/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/openspec-skills/opsx-apply/SKILL.md)
-- [assets/openspec-skills/opsx-archive/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/openspec-skills/opsx-archive/SKILL.md)
+- [assets/skills/opsx-propose/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-propose/SKILL.md)
+- [assets/skills/opsx-apply/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-apply/SKILL.md)
+- [assets/skills/opsx-archive/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-archive/SKILL.md)
 
 ### 改 capability evidence、monitoring overlay 或 validate-change
 
@@ -164,6 +169,6 @@ test/
 
 - 单一主入口是 [src/core/praxis-devos.js](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
 - `setup` 和 `sync` 最终都会回到 agent adapter sync 和 AGENTS managed block 注入
-- OpenSpec skill 的正式源资产在 `assets/openspec-skills/`
+- OpenSpec skill 与 docs skill 的正式源资产都在 `assets/skills/`
 - 投影后的技能文件通过 marker 判断是否可被 Praxis 覆盖
 - 监控证据不写进仓库，写进用户 home 下的 Praxis state 目录

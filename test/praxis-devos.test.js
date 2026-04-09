@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { injectMarker } from '../src/projection/markers.js';
+import { collectBundledSkillSources } from '../src/projection/index.js';
 import {
   getCapabilityEvidencePath,
   readCapabilityEvidence,
@@ -436,6 +437,10 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.equal(manifest.assets[opencodeInitPath]?.type, 'command');
   assert.equal(manifest.assets[opencodeRefreshPath]?.type, 'command');
   assert.equal(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.type, 'skill');
+  assert.match(
+    manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.sourceDir || '',
+    /assets\/skills\/devos-docs$/,
+  );
 
   assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
   assert.match(logs.join('\n'), /OpenCode: projected docs command devos-docs-refresh/);
@@ -534,7 +539,7 @@ test('syncProject restores missing docs-lite files', () => {
 
 test('injectMarker preserves YAML frontmatter at the top of projected skills', () => {
   const content = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-propose', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'SKILL.md'),
     'utf8',
   );
 
@@ -545,19 +550,19 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
 
 test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance without promoting a second visible workflow', () => {
   const propose = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-propose', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'SKILL.md'),
     'utf8',
   );
   const apply = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-apply', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-apply', 'SKILL.md'),
     'utf8',
   );
   const archive = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-archive', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-archive', 'SKILL.md'),
     'utf8',
   );
   const explore = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'openspec-skills', 'opsx-explore', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-explore', 'SKILL.md'),
     'utf8',
   );
 
@@ -596,7 +601,7 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
 
 test('devos-docs bundled skill defines mode-based AI-first docs generation guidance', () => {
   const docsSkill = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'devos-skills', 'devos-docs', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-docs', 'SKILL.md'),
     'utf8',
   );
 
@@ -605,6 +610,65 @@ test('devos-docs bundled skill defines mode-based AI-first docs generation guida
   assert.match(docsSkill, /mode=refresh/);
   assert.match(docsSkill, /contracts\/surfaces\.yaml/);
   assert.match(docsSkill, /docs\/codemaps\/project-overview\.md/);
+});
+
+test('collectBundledSkillSources discovers unified skill bundles by sourceDir', () => {
+  const skillSources = collectBundledSkillSources();
+  const propose = skillSources.find((entry) => entry.name === 'opsx-propose');
+  const docs = skillSources.find((entry) => entry.name === 'devos-docs');
+
+  assert.ok(propose);
+  assert.ok(docs);
+  assert.equal('sourcePath' in propose, false);
+  assert.match(propose.sourceDir, /assets\/skills\/opsx-propose$/);
+  assert.match(docs.sourceDir, /assets\/skills\/devos-docs$/);
+});
+
+test('projectNativeSkills projects supporting files that live alongside SKILL.md', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bundle-home-'));
+  const sourceDir = path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'references');
+  const sourcePath = path.join(sourceDir, 'bundle-proof.txt');
+  const targetPath = path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'references', 'bundle-proof.txt');
+
+  fs.mkdirSync(sourceDir, { recursive: true });
+  fs.writeFileSync(sourcePath, 'bundle-supporting-file\n', 'utf8');
+
+  try {
+    withEnv('HOME', fakeHome, () => {
+      projectNativeSkills({
+        projectDir: makeTempProject(),
+        agents: ['codex'],
+        log: () => {},
+      });
+    });
+
+    assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+  }
+});
+
+test('projectNativeSkills projects host commands from the shared command asset root', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-command-source-home-'));
+  const sharedInit = fs.readFileSync(path.join(PRAXIS_ROOT, 'assets', 'commands', 'devos-docs-init.md'), 'utf8');
+  const sharedRefresh = fs.readFileSync(path.join(PRAXIS_ROOT, 'assets', 'commands', 'devos-docs-refresh.md'), 'utf8');
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir: makeTempProject(),
+      agents: ['claude', 'opencode'],
+      log: () => {},
+    });
+  });
+
+  assert.equal(
+    fs.readFileSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md'), 'utf8'),
+    sharedInit,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md'), 'utf8'),
+    sharedRefresh,
+  );
 });
 
 test('projectNativeSkills writes agent-native skills under the resolved user home with valid frontmatter', () => {
