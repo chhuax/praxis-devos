@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-09
+
+### Added
+- `devos-docs` AI-first docs skill plus shared host command assets for `/devos-docs-init` and `/devos-docs-refresh`
+- a lightweight docs contract centered on `docs/surfaces.yaml` and `docs/codemaps/**`, including docs-lite templates and refresh/check flows
+- OpenSpec capability specs for `docs-context-routing` and `openspec-docs-sync`
+
+### Changed
+- unified bundled asset layout under `assets/skills/<skill>/` and `assets/commands/` so projected skills and host commands share one source structure
+- moved the canonical docs surface contract under `docs/surfaces.yaml` and aligned routing, validation, and generated codemap guidance around that path
+- OpenSpec apply/archive docs handling now uses deterministic docs context packing and refresh assessment instead of ad hoc repository scanning
+
+### Fixed
+- shared managed host commands now refresh safely across projects without overwriting user-owned same-name commands
+- docs context path handling now ignores change inputs outside the repository root
+- codemap links and bundle fixtures are aligned with the current docs contract and bundled asset structure
+
 ## [0.4.9] - 2026-04-08
 
 ### Changed
