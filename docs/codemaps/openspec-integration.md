@@ -13,10 +13,10 @@
 `praxis-devos` 的 OpenSpec 集成由两部分组成：
 
 1. **用户项目根目录的托管规则**
-   - 通过 [src/templates/managed-entry.md](/Users/huaxin/Documents/workspace/praxis-devos/src/templates/managed-entry.md) 注入到用户项目 `AGENTS.md`
+   - 通过 [src/templates/managed-entry.md](../../src/templates/managed-entry.md) 注入到用户项目 `AGENTS.md`
 
 2. **投影到 agent 原生目录的 `opsx-*` skills**
-   - 来源于 [assets/skills/](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills)
+   - 来源于 [assets/skills/](../../assets/skills)
 
 这两部分一起决定“AI 在用户项目里如何进入 OpenSpec flow”。
 
@@ -24,18 +24,18 @@
 
 相关函数在：
 
-- [renderManagedEntryTemplate](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-- [renderManagedBlock](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-- [upsertManagedBlock](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-- [syncCodexAdapter](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-- [syncClaudeAdapter](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-- [syncOpenCodeAdapter](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
+- `renderManagedEntryTemplate` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+- `renderManagedBlock` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+- `upsertManagedBlock` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+- `syncCodexAdapter` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+- `syncClaudeAdapter` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+- `syncOpenCodeAdapter` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
 
 ## OpenSpec flow 规则源
 
 最关键的规则文案在：
 
-- [src/templates/managed-entry.md](/Users/huaxin/Documents/workspace/praxis-devos/src/templates/managed-entry.md)
+- [src/templates/managed-entry.md](../../src/templates/managed-entry.md)
 
 这里定义：
 
@@ -49,22 +49,22 @@
 
 ### `opsx-propose`
 
-- [assets/skills/opsx-propose/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-propose/SKILL.md)
+- [assets/skills/opsx-propose/SKILL.md](../../assets/skills/opsx-propose/SKILL.md)
 - 负责提案与工件生成
 
 ### `opsx-explore`
 
-- [assets/skills/opsx-explore/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-explore/SKILL.md)
+- [assets/skills/opsx-explore/SKILL.md](../../assets/skills/opsx-explore/SKILL.md)
 - 负责探索和澄清
 
 ### `opsx-apply`
 
-- [assets/skills/opsx-apply/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-apply/SKILL.md)
+- [assets/skills/opsx-apply/SKILL.md](../../assets/skills/opsx-apply/SKILL.md)
 - 负责任务实施
 
 ### `opsx-archive`
 
-- [assets/skills/opsx-archive/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-archive/SKILL.md)
+- [assets/skills/opsx-archive/SKILL.md](../../assets/skills/opsx-archive/SKILL.md)
 - 负责归档与收尾校验
 
 ## 改 OpenSpec 集成时的路由
@@ -73,8 +73,8 @@
 
 先看：
 
-- [src/templates/managed-entry.md](/Users/huaxin/Documents/workspace/praxis-devos/src/templates/managed-entry.md)
-- [upsertManagedBlock](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
+- [src/templates/managed-entry.md](../../src/templates/managed-entry.md)
+- `upsertManagedBlock` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
 
 ### 改 `opsx-*` 的行为
 
@@ -87,7 +87,7 @@
 
 先看：
 
-- [analyzeSessionTranscript](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
+- `analyzeSessionTranscript` in [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
 - `SESSION_EVENT_RULES`
 
 ## 关键事实

@@ -626,26 +626,17 @@ test('collectBundledSkillSources discovers unified skill bundles by sourceDir', 
 
 test('projectNativeSkills projects supporting files that live alongside SKILL.md', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bundle-home-'));
-  const sourceDir = path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'references');
-  const sourcePath = path.join(sourceDir, 'bundle-proof.txt');
   const targetPath = path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'references', 'bundle-proof.txt');
 
-  fs.mkdirSync(sourceDir, { recursive: true });
-  fs.writeFileSync(sourcePath, 'bundle-supporting-file\n', 'utf8');
-
-  try {
-    withEnv('HOME', fakeHome, () => {
-      projectNativeSkills({
-        projectDir: makeTempProject(),
-        agents: ['codex'],
-        log: () => {},
-      });
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir: makeTempProject(),
+      agents: ['codex'],
+      log: () => {},
     });
+  });
 
-    assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
-  } finally {
-    fs.rmSync(sourcePath, { force: true });
-  }
+  assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
 });
 
 test('projectNativeSkills projects host commands from the shared command asset root', () => {

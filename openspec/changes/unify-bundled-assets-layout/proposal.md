@@ -24,5 +24,5 @@
 - 影响 `src/projection/index.js` 的 bundled asset discovery 逻辑
 - 影响 Claude/OpenCode/Codex 的 skill 投放实现
 - 影响 Claude/OpenCode command 模板读取路径
-- 影响 managed asset manifest 中记录的 sourcePath 元数据
+- 影响 managed asset manifest 中记录的 sourceDir 元数据
 - 影响相关测试和少量资产路径文档

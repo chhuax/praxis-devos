@@ -81,12 +81,12 @@ Add project-specific notes here. Praxis refresh preserves this section.
 
 按优先级建议阅读顺序：
 
-1. [AGENTS.md](/Users/huaxin/Documents/workspace/praxis-devos/AGENTS.md)
-2. [src/core/praxis-devos.js](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-3. [src/templates/managed-entry.md](/Users/huaxin/Documents/workspace/praxis-devos/src/templates/managed-entry.md)
-4. [src/projection/index.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/index.js)
-5. [src/monitoring/index.js](/Users/huaxin/Documents/workspace/praxis-devos/src/monitoring/index.js)
-6. [test/praxis-devos.test.js](/Users/huaxin/Documents/workspace/praxis-devos/test/praxis-devos.test.js)
+1. [AGENTS.md](../../AGENTS.md)
+2. [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+3. [src/templates/managed-entry.md](../../src/templates/managed-entry.md)
+4. [src/projection/index.js](../../src/projection/index.js)
+5. [src/monitoring/index.js](../../src/monitoring/index.js)
+6. [test/praxis-devos.test.js](../../test/praxis-devos.test.js)
 
 ## 仓库结构速览
 
@@ -135,39 +135,39 @@ test/
 
 先看：
 
-- [src/core/praxis-devos.js](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
-- [test/praxis-devos.test.js](/Users/huaxin/Documents/workspace/praxis-devos/test/praxis-devos.test.js)
+- [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
+- [test/praxis-devos.test.js](../../test/praxis-devos.test.js)
 
 ### 改投影逻辑或用户 home 下的技能分发
 
 先看：
 
-- [src/projection/index.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/index.js)
-- [src/projection/codex.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/codex.js)
-- [src/projection/claude.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/claude.js)
-- [src/projection/opencode.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/opencode.js)
+- [src/projection/index.js](../../src/projection/index.js)
+- [src/projection/codex.js](../../src/projection/codex.js)
+- [src/projection/claude.js](../../src/projection/claude.js)
+- [src/projection/opencode.js](../../src/projection/opencode.js)
 
 ### 改 OpenSpec flow 规则或用户项目注入文案
 
 先看：
 
-- [src/templates/managed-entry.md](/Users/huaxin/Documents/workspace/praxis-devos/src/templates/managed-entry.md)
-- [assets/skills/opsx-propose/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-propose/SKILL.md)
-- [assets/skills/opsx-apply/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-apply/SKILL.md)
-- [assets/skills/opsx-archive/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-archive/SKILL.md)
+- [src/templates/managed-entry.md](../../src/templates/managed-entry.md)
+- [assets/skills/opsx-propose/SKILL.md](../../assets/skills/opsx-propose/SKILL.md)
+- [assets/skills/opsx-apply/SKILL.md](../../assets/skills/opsx-apply/SKILL.md)
+- [assets/skills/opsx-archive/SKILL.md](../../assets/skills/opsx-archive/SKILL.md)
 
 ### 改 capability evidence、monitoring overlay 或 validate-change
 
 先看：
 
-- [src/monitoring/state-store.js](/Users/huaxin/Documents/workspace/praxis-devos/src/monitoring/state-store.js)
-- [src/monitoring/commands.js](/Users/huaxin/Documents/workspace/praxis-devos/src/monitoring/commands.js)
-- [src/monitoring/overlay.js](/Users/huaxin/Documents/workspace/praxis-devos/src/monitoring/overlay.js)
-- [src/core/capability-policy.js](/Users/huaxin/Documents/workspace/praxis-devos/src/core/capability-policy.js)
+- [src/monitoring/state-store.js](../../src/monitoring/state-store.js)
+- [src/monitoring/commands.js](../../src/monitoring/commands.js)
+- [src/monitoring/overlay.js](../../src/monitoring/overlay.js)
+- [src/core/capability-policy.js](../../src/core/capability-policy.js)
 
 ## 关键事实
 
-- 单一主入口是 [src/core/praxis-devos.js](/Users/huaxin/Documents/workspace/praxis-devos/src/core/praxis-devos.js)
+- 单一主入口是 [src/core/praxis-devos.js](../../src/core/praxis-devos.js)
 - `setup` 和 `sync` 最终都会回到 agent adapter sync 和 AGENTS managed block 注入
 - OpenSpec skill 与 docs skill 的正式源资产都在 `assets/skills/`
 - 投影后的技能文件通过 marker 判断是否可被 Praxis 覆盖

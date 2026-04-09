@@ -13,13 +13,13 @@
 
 正式 skill 资产在：
 
-- [assets/skills/opsx-propose/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-propose/SKILL.md)
-- [assets/skills/opsx-explore/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-explore/SKILL.md)
-- [assets/skills/opsx-apply/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-apply/SKILL.md)
-- [assets/skills/opsx-archive/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/opsx-archive/SKILL.md)
-- [assets/skills/devos-docs/SKILL.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/skills/devos-docs/SKILL.md)
-- [assets/commands/devos-docs-init.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/commands/devos-docs-init.md)
-- [assets/commands/devos-docs-refresh.md](/Users/huaxin/Documents/workspace/praxis-devos/assets/commands/devos-docs-refresh.md)
+- [assets/skills/opsx-propose/SKILL.md](../../assets/skills/opsx-propose/SKILL.md)
+- [assets/skills/opsx-explore/SKILL.md](../../assets/skills/opsx-explore/SKILL.md)
+- [assets/skills/opsx-apply/SKILL.md](../../assets/skills/opsx-apply/SKILL.md)
+- [assets/skills/opsx-archive/SKILL.md](../../assets/skills/opsx-archive/SKILL.md)
+- [assets/skills/devos-docs/SKILL.md](../../assets/skills/devos-docs/SKILL.md)
+- [assets/commands/devos-docs-init.md](../../assets/commands/devos-docs-init.md)
+- [assets/commands/devos-docs-refresh.md](../../assets/commands/devos-docs-refresh.md)
 
 ## 投影流转
 
@@ -39,7 +39,7 @@ projectToAgent({ agent, version, log })
 
 ### 总分发
 
-- [src/projection/index.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/index.js)
+- [src/projection/index.js](../../src/projection/index.js)
 
 职责：
 
@@ -49,7 +49,7 @@ projectToAgent({ agent, version, log })
 
 ### Codex 投影
 
-- [src/projection/codex.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/codex.js)
+- [src/projection/codex.js](../../src/projection/codex.js)
 
 目标目录：
 
@@ -57,7 +57,7 @@ projectToAgent({ agent, version, log })
 
 ### Claude 投影
 
-- [src/projection/claude.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/claude.js)
+- [src/projection/claude.js](../../src/projection/claude.js)
 
 目标目录：
 
@@ -65,7 +65,7 @@ projectToAgent({ agent, version, log })
 
 ### OpenCode 投影
 
-- [src/projection/opencode.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/opencode.js)
+- [src/projection/opencode.js](../../src/projection/opencode.js)
 
 特点：
 
@@ -75,7 +75,7 @@ projectToAgent({ agent, version, log })
 
 ### Marker 规则
 
-- [src/projection/markers.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/markers.js)
+- [src/projection/markers.js](../../src/projection/markers.js)
 
 职责：
 
@@ -90,19 +90,19 @@ projectToAgent({ agent, version, log })
 先看：
 
 - 各 adapter 文件
-- [resolveUserHomeDir](/Users/huaxin/Documents/workspace/praxis-devos/src/support/home.js)
+- [resolveUserHomeDir](../../src/support/home.js)
 
 ### 改哪些 skill 会被投影
 
 先看：
 
-- [src/projection/index.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/index.js)
+- [src/projection/index.js](../../src/projection/index.js)
 
 ### 改 marker / 覆盖策略
 
 先看：
 
-- [src/projection/markers.js](/Users/huaxin/Documents/workspace/praxis-devos/src/projection/markers.js)
+- [src/projection/markers.js](../../src/projection/markers.js)
 
 ## 关键事实
 
