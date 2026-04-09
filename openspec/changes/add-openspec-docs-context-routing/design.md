@@ -4,6 +4,7 @@
 
 - `devos-docs` 可以生成或刷新 `docs/surfaces.yaml` 与 `docs/codemaps/**`
 - Claude / OpenCode 已经有用户级 docs command adapter，可以触发 `devos-docs`
+- bundled 资产布局已经统一到 `assets/skills/<skill-name>/...` 与 `assets/commands/*.md`
 
 缺口也很明确：
 
@@ -146,6 +147,62 @@ OpenSpec 联动和宿主 command 是主路径，但：
 
 避免出现“OpenSpec / host command 一套逻辑，CLI fallback 又是另一套逻辑”的分叉。
 
+### 7. 实现落点必须对齐统一后的 bundled assets 布局
+
+本 change 形成于 `unify-bundled-assets-layout` 之前，但实现时必须以当前仓库结构为准：
+
+- `devos-docs` skill 的变更落在 `assets/skills/devos-docs/`
+- OpenSpec apply / archive 的 docs 消费 guidance 落在 `assets/skills/opsx-apply/` 与 `assets/skills/opsx-archive/`
+- Claude / OpenCode 的 docs command 文案落在共享的 `assets/commands/*.md`
+- 项目内托管提示仍落在 `src/templates/managed-entry.md`
+
+因此本次实现不应再依赖已经移除的旧路径：
+
+- `assets/openspec-skills/`
+- `assets/devos-skills/`
+- `src/templates/claude-commands/`
+- `src/templates/opencode-commands/`
+
+备选方案：
+
+- 继续沿用提案形成时的旧资产路径
+- 不采用。当前仓库已经统一资产布局，继续引用旧路径只会让实现和测试再次分叉。
+
+补充说明：
+
+- 当前 `assets/skills/devos-docs/`、`assets/skills/opsx-apply/`、`assets/skills/opsx-archive/` 目录内实际都只有 `SKILL.md`
+- 因此本 change 主要调整的是 skill 文案、helper 和 routing contract，而不是引入新的 supporting files
+
+### 8. docs refresh assessment 结果只作为运行时判断，不新增 change artifact
+
+本次实现中，docs refresh assessment 的结果只作为 OpenSpec 流程中的运行时判断存在：
+
+- `apply` 阶段在实现前后计算是否需要 refresh
+- `archive` 阶段在归档前再次计算是否需要 refresh
+- assessment 结果可进入日志、提示和测试断言
+- 不新增 `openspec/changes/<change>/docs-refresh.json` 之类的持久化状态文件
+
+备选方案：
+
+- 将 assessment 结果写入新的 change artifact
+- 不采用。本次目标是定义消费协议和联动 gate，不扩展新的持久化状态面。
+
+### 9. command 模板只暴露稳定读取顺序，不要求回显本次实际 pack 内容
+
+本次实现中，Claude / OpenCode 的 command 模板应明确说明 docs routing 的稳定顺序：
+
+- 始终优先读取 `docs/surfaces.yaml`
+- 始终优先读取 `docs/codemaps/project-overview.md`
+- 多模块时再考虑 `module-map.md`
+- 定位到模块时才加入 `modules/<artifactId>.md`
+
+但模板不要求在用户界面中回显“本次实际读了哪些 docs artifact”。实际 pack 内容和 routing metadata 作为仓库侧 helper / skill contract 的输出，由实现和测试消费即可。
+
+备选方案：
+
+- 在 command 模板中显式打印本次 pack 明细
+- 不采用。这会把薄包装 command 变成运行时输出协议，超出当前 change 的范围。
+
 ## Risks / Trade-offs
 
 - [Risk] docs routing 规则过粗，导致上下文仍然不准
@@ -165,7 +222,7 @@ OpenSpec 联动和宿主 command 是主路径，但：
 本次变更不涉及路径迁移。迁移重点是调用关系：
 
 1. 先在仓库内新增 docs context pack builder 与 refresh assessment helper
-2. 再让 OpenSpec 相关 guidance / host command 模板引用这些 contract
+2. 再让 `assets/skills/opsx-apply/`、`assets/skills/opsx-archive/`、`assets/skills/devos-docs/` 和 `assets/commands/*.md` 引用这些 contract
 3. 保持现有 `devos-docs`、`docs check`、CLI fallback 均可工作
 4. 若后续宿主集成层需要更强自动注入，再在该层消费已经稳定的 context pack contract
 
@@ -173,8 +230,3 @@ OpenSpec 联动和宿主 command 是主路径，但：
 
 - 若 OpenSpec 联动出现问题，可回退到仅保留 docs 生成与手动 refresh
 - 因为文档 writeback 仍由既有 validator 约束，所以不会影响已有 canonical path 和 writeback 边界
-
-## Open Questions
-
-- OpenSpec 阶段中，docs refresh assessment 是否需要显式写入 change artifact，还是只作为运行时判断存在
-- Claude / OpenCode 的 command 包装是否需要在模板中显式暴露“本次读取了哪些 docs artifact”这一提示

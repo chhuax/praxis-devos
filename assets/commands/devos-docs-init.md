@@ -22,6 +22,11 @@ Run this command when:
 ## Implementation
 
 - Invoke the `devos-docs` skill with `mode=init`
+- Use the stable docs routing order:
+  - `docs/surfaces.yaml`
+  - `docs/codemaps/project-overview.md`
+  - `docs/codemaps/module-map.md` only for multi-module projects
+  - `docs/codemaps/modules/<artifactId>.md` only when module routing is deterministic
 - Canonical paths:
   - `docs/surfaces.yaml`
   - `docs/codemaps/**`

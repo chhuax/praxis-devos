@@ -20,7 +20,7 @@ Praxis 现在已经能为项目生成 `docs/surfaces.yaml` 和 `docs/codemaps/**
 
 ## Impact
 
-- 影响 `devos-docs` skill 的输入 contract 和宿主 command/skill 的调用方式。
+- 影响 `assets/skills/devos-docs/` 中 `devos-docs` skill 的输入 contract，以及 `assets/skills/opsx-apply/`、`assets/skills/opsx-archive/` 的 OpenSpec 流程 guidance。
 - 影响 `src/core/praxis-devos.js` 中 docs compatibility path 与 handoff/validation 逻辑。
-- 影响 OpenSpec managed guidance、host docs command adapters，以及后续宿主集成层的 context packing 行为。
+- 影响 `src/templates/managed-entry.md`、`assets/commands/*.md` 等可投影资产，以及后续宿主集成层的 context packing 行为。
 - 影响测试策略，需要新增 docs context routing、OpenSpec refresh 时机和非破坏性 refresh 的覆盖。
