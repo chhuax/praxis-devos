@@ -1018,7 +1018,302 @@ const allowedDocsWriteTargets = ({ projectDir }) => {
   return [...new Set(targets)];
 };
 
-export const buildDocsSubagentRequest = ({ projectDir, mode }) => {
+const normalizeRepoRelativePath = ({ projectDir, filePath }) => {
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    return '';
+  }
+
+  const trimmed = filePath.trim();
+  const absoluteCandidate = path.isAbsolute(trimmed)
+    ? trimmed
+    : path.resolve(projectDir, trimmed);
+  const relative = path.relative(projectDir, absoluteCandidate);
+  const normalized = (path.isAbsolute(trimmed) ? relative : trimmed)
+    .split(path.sep).join('/')
+    .replace(/^\.\//, '')
+    .replace(/^\/+/, '');
+
+  return normalized;
+};
+
+const pathMatchesCandidate = (changedPath, candidatePath) => changedPath === candidatePath
+  || changedPath.startsWith(`${candidatePath.replace(/\/+$/, '')}/`);
+
+const moduleHintCandidates = (module) => [
+  module.stableName,
+  module.artifactId,
+  module.relativeDir,
+  path.posix.basename(module.relativeDir),
+]
+  .filter(Boolean)
+  .map((value) => value.toLowerCase());
+
+const findModuleFromHints = ({ modules, targetModuleHints }) => {
+  const hints = [...new Set((targetModuleHints || [])
+    .flatMap((value) => String(value || '').split(','))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean))];
+
+  for (const hint of hints) {
+    const matched = modules.find((module) => moduleHintCandidates(module).includes(hint));
+    if (matched) {
+      return { module: matched, reason: `target-hint:${hint}`, route: 'module-routing' };
+    }
+  }
+
+  return null;
+};
+
+const findModuleFromChangedPaths = ({ modules, changedPaths }) => {
+  let bestMatch = null;
+
+  for (const changedPath of changedPaths || []) {
+    const matched = modules
+      .filter((module) => pathMatchesCandidate(changedPath, module.relativeDir))
+      .sort((a, b) => b.relativeDir.length - a.relativeDir.length)[0];
+
+    if (matched) {
+      if (!bestMatch || matched.relativeDir.length > bestMatch.module.relativeDir.length) {
+        bestMatch = {
+          module: matched,
+          reason: `changed-path:${changedPath}`,
+          route: 'module-routing',
+        };
+      }
+    }
+  }
+
+  return bestMatch;
+};
+
+const findModuleFromChangeArtifacts = ({ projectDir, modules, changeArtifactPaths }) => {
+  const artifactPaths = [...new Set((changeArtifactPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+
+  for (const artifactPath of artifactPaths) {
+    const content = readFile(path.join(projectDir, artifactPath));
+    if (!content) {
+      continue;
+    }
+
+    for (const module of modules) {
+      const candidates = moduleHintCandidates(module)
+        .filter((value) => value.length >= 3)
+        .sort((a, b) => b.length - a.length);
+
+      if (candidates.some((candidate) => content.toLowerCase().includes(candidate))) {
+        return {
+          module,
+          reason: `change-artifact:${artifactPath}`,
+          route: 'change-aware',
+        };
+      }
+    }
+  }
+
+  return null;
+};
+
+const detectTargetModule = ({
+  projectDir,
+  modules,
+  changedPaths = [],
+  targetModuleHints = [],
+  changeArtifactPaths = [],
+}) => findModuleFromHints({ modules, targetModuleHints })
+  || findModuleFromChangedPaths({ modules, changedPaths })
+  || findModuleFromChangeArtifacts({ projectDir, modules, changeArtifactPaths });
+
+export const buildDocsContextPack = ({
+  projectDir,
+  changedPaths = [],
+  targetModuleHints = [],
+  changeArtifactPaths = [],
+}) => {
+  const normalizedChangedPaths = [...new Set((changedPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+  const normalizedArtifactPaths = [...new Set((changeArtifactPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+  const discoveredModules = discoverMavenModules(projectDir);
+  const routingMetadata = [];
+  const seenPaths = new Set();
+
+  const addRoute = (pathValue, route, reason) => {
+    if (!pathValue || seenPaths.has(pathValue)) {
+      return;
+    }
+    seenPaths.add(pathValue);
+    routingMetadata.push({
+      path: pathValue,
+      route,
+      reason,
+    });
+  };
+
+  addRoute('docs/surfaces.yaml', 'default', 'canonical-surface');
+  addRoute('docs/codemaps/project-overview.md', 'default', 'project-overview');
+
+  let targetModule = null;
+  if (discoveredModules.isMultiModule) {
+    addRoute('docs/codemaps/module-map.md', 'module-routing', 'multi-module-project');
+    targetModule = detectTargetModule({
+      projectDir,
+      modules: discoveredModules.modules,
+      changedPaths: normalizedChangedPaths,
+      targetModuleHints,
+      changeArtifactPaths: normalizedArtifactPaths,
+    });
+    if (targetModule) {
+      addRoute(
+        moduleCodemapRelativePath(targetModule.module.stableName),
+        targetModule.route,
+        targetModule.reason,
+      );
+    }
+  }
+
+  return {
+    schemaVersion: 1,
+    canonicalSurfacesPath: 'docs/surfaces.yaml',
+    selectedPaths: routingMetadata.map((entry) => entry.path),
+    routingMetadata,
+    multiModule: discoveredModules.isMultiModule,
+    targetModule: targetModule?.module?.stableName || null,
+    changedPaths: normalizedChangedPaths,
+    changeArtifactPaths: normalizedArtifactPaths,
+  };
+};
+
+const collectExistingDocsArtifacts = ({ projectDir }) => allowedDocsWriteTargets({ projectDir })
+  .filter((relativePath) => fs.existsSync(path.join(projectDir, relativePath)));
+
+const docsImpactFromChangeArtifacts = ({ projectDir, changeArtifactPaths }) => {
+  const normalizedArtifactPaths = [...new Set((changeArtifactPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+  const rules = [
+    { label: 'external surface', patterns: [/external surface/i, /primary surface/i] },
+    { label: 'module topology', patterns: [/module topology/i, /module structure/i] },
+    { label: 'project map', patterns: [/project map/i, /codemap/i] },
+  ];
+
+  const reasons = [];
+  for (const artifactPath of normalizedArtifactPaths) {
+    const content = readFile(path.join(projectDir, artifactPath));
+    if (!content) {
+      continue;
+    }
+
+    for (const rule of rules) {
+      if (rule.patterns.some((pattern) => pattern.test(content))) {
+        reasons.push(`change artifacts declare docs impact: ${rule.label} (${artifactPath})`);
+      }
+    }
+  }
+
+  return [...new Set(reasons)];
+};
+
+export const assessDocsRefreshNeed = ({
+  projectDir,
+  changedPaths = [],
+  changeArtifactPaths = [],
+}) => {
+  const paths = projectPaths(projectDir);
+  const surfacesContent = readFile(paths.surfacesPath) || '';
+  const parsed = parseSurfacesYaml(surfacesContent);
+  const primarySurface = parsed.surfaces.find((entry) => entry.id === parsed.primarySurface) || parsed.surfaces[0] || null;
+  const normalizedChangedPaths = [...new Set((changedPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+  const reasons = [];
+  const discoveredModules = discoverMavenModules(projectDir);
+  const topologyInputs = [
+    fs.existsSync(paths.rootPomPath) ? 'pom.xml' : null,
+    ...discoveredModules.modules.map((module) => path.posix.join(module.relativeDir, 'pom.xml')),
+  ].filter(Boolean);
+  const entryCandidates = collectEntryCandidates({
+    projectDir,
+    primarySurfaceLocation: primarySurface?.location || '',
+  });
+
+  if (normalizedChangedPaths.some((entry) => entry === 'docs/surfaces.yaml')) {
+    reasons.push('changed paths hit docs/surfaces.yaml');
+  }
+
+  if (primarySurface?.location && normalizedChangedPaths.some((entry) => pathMatchesCandidate(entry, primarySurface.location))) {
+    reasons.push(`changed paths hit primary surface location: ${primarySurface.location}`);
+  }
+
+  if (normalizedChangedPaths.some((entry) => topologyInputs.some((candidate) => pathMatchesCandidate(entry, candidate)))) {
+    reasons.push('changed paths hit module topology input');
+  }
+
+  if (normalizedChangedPaths.some((entry) => entryCandidates.some((candidate) => pathMatchesCandidate(entry, candidate)))) {
+    reasons.push('changed paths hit entry candidate');
+  }
+
+  reasons.push(...docsImpactFromChangeArtifacts({
+    projectDir,
+    changeArtifactPaths,
+  }));
+
+  return {
+    needed: reasons.length > 0,
+    reasons: [...new Set(reasons)],
+  };
+};
+
+export const buildOpenSpecDocsStageContext = ({
+  projectDir,
+  stage,
+  changeId = '',
+  changeArtifactPaths = [],
+  changedPaths = [],
+  targetModuleHints = [],
+}) => {
+  const normalizedArtifactPaths = [...new Set((changeArtifactPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+  const normalizedChangedPaths = [...new Set((changedPaths || [])
+    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
+    .filter(Boolean))];
+  const buildContextPack = ['propose', 'apply'].includes(stage);
+  const runRefreshAssessment = ['apply', 'archive'].includes(stage);
+
+  return {
+    stage,
+    changeId,
+    docsContextPack: buildContextPack
+      ? buildDocsContextPack({
+        projectDir,
+        changedPaths: normalizedChangedPaths,
+        targetModuleHints,
+        changeArtifactPaths: normalizedArtifactPaths,
+      })
+      : null,
+    refreshAssessment: runRefreshAssessment
+      ? assessDocsRefreshNeed({
+        projectDir,
+        changedPaths: normalizedChangedPaths,
+        changeArtifactPaths: normalizedArtifactPaths,
+      })
+      : null,
+    shouldRunRefreshAssessment: runRefreshAssessment,
+  };
+};
+
+export const buildDocsSubagentRequest = ({
+  projectDir,
+  mode,
+  changeId = '',
+  changeArtifactPaths = [],
+  changedPaths = [],
+  targetModuleHints = [],
+}) => {
   if (!['init', 'refresh'].includes(mode)) {
     throw new Error(`Unsupported docs subagent mode: ${mode}`);
   }
@@ -1029,16 +1324,37 @@ export const buildDocsSubagentRequest = ({ projectDir, mode }) => {
   const primarySurface = parsed.primarySurface || '';
   const surface = parsed.surfaces.find((entry) => entry.id === primarySurface) || parsed.surfaces[0] || null;
   const discoveredModules = discoverMavenModules(projectDir);
+  const docsContextPack = buildDocsContextPack({
+    projectDir,
+    changedPaths,
+    targetModuleHints,
+    changeArtifactPaths,
+  });
+  const normalizedChangedPaths = docsContextPack.changedPaths;
+  const normalizedArtifactPaths = docsContextPack.changeArtifactPaths;
 
   return {
     schemaVersion: 1,
     mode,
     canonicalSurfacesPath: 'docs/surfaces.yaml',
     allowedTargets: allowedDocsWriteTargets({ projectDir }),
-    readPaths: collectPreferredReadPaths({
+    readPaths: [...new Set([
+      ...docsContextPack.selectedPaths,
+      ...collectPreferredReadPaths({
       projectDir,
       primarySurfaceLocation: surface?.location || '',
     }),
+    ])],
+    docsContextPack,
+    refreshContext: mode === 'refresh'
+      ? {
+        changeId,
+        changeArtifactPaths: normalizedArtifactPaths,
+        changedPaths: normalizedChangedPaths,
+        targetModuleHints: [...new Set((targetModuleHints || []).map((entry) => String(entry || '').trim()).filter(Boolean))],
+        existingDocsArtifacts: collectExistingDocsArtifacts({ projectDir }),
+      }
+      : null,
     context: {
       primarySurface,
       primarySurfaceKind: surface?.kind || '',

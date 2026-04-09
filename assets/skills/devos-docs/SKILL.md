@@ -17,6 +17,22 @@ The caller must provide:
 - `mode=init` or `mode=refresh`
 - repository context sufficient to identify the primary external surface
 - existing docs artifacts when running in `mode=refresh`
+- a docs context pack when docs consumption is routed intentionally
+
+For deterministic routing, the docs context pack should follow this order:
+
+1. `docs/surfaces.yaml`
+2. `docs/codemaps/project-overview.md`
+3. `docs/codemaps/module-map.md` when the project is multi-module
+4. `docs/codemaps/modules/<artifactId>.md` only when module routing can be determined
+
+When `mode=refresh` is invoked from an OpenSpec-linked flow, the caller should also provide a change-aware refresh context containing:
+
+- `changeId`
+- relevant OpenSpec artifact paths
+- changed paths
+- optional target module hints
+- existing docs artifacts
 
 ## Required Outputs
 

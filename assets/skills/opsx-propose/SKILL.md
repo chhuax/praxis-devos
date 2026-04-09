@@ -45,6 +45,11 @@ Internal capabilities must not:
 Stage hooks:
 
 - If the request is still vague or there are many open questions, invoke `brainstorming` internally to narrow scope, compare options, and clarify constraints.
+- If project docs already exist, read the docs context pack before broad repository scanning:
+  - always `docs/surfaces.yaml`
+  - always `docs/codemaps/project-overview.md`
+  - `docs/codemaps/module-map.md` only for multi-module projects
+  - `docs/codemaps/modules/<artifactId>.md` only when module routing is deterministic
 - If the request is clear enough, return to the native proposal flow and generate the required change artifacts.
 - Design decisions, task breakdowns, and scope changes must be written back into the current change instead of creating a parallel document set.
 - If the initial request still has critical ambiguity, invoke `brainstorming` internally before proceeding.

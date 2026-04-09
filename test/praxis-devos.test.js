@@ -13,9 +13,12 @@ import {
 } from '../src/monitoring/state-store.js';
 
 import {
+  assessDocsRefreshNeed,
   PRAXIS_ROOT,
   analyzeSessionTranscript,
   bootstrapOpenSpec,
+  buildDocsContextPack,
+  buildOpenSpecDocsStageContext,
   bootstrapProject,
   buildDocsSubagentRequest,
   createChangeScaffold,
@@ -427,8 +430,10 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   const opencodeRefresh = fs.readFileSync(opencodeRefreshPath, 'utf8');
   assert.match(claudeInit, /^# devos-docs-init/m);
   assert.match(claudeInit, /mode=init/i);
+  assert.match(claudeInit, /stable docs routing order/i);
   assert.match(opencodeRefresh, /^# devos-docs-refresh/m);
   assert.match(opencodeRefresh, /mode=refresh/i);
+  assert.match(opencodeRefresh, /change-aware refresh context/i);
 
   const manifest = readJson(manifestPath);
   assert.equal(manifest.version, 1);
@@ -575,11 +580,16 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(archive, /## PRAXIS_DEVOS_OVERLAY/);
   assert.match(explore, /## PRAXIS_DEVOS_OVERLAY/);
   assert.match(propose, /invoke `brainstorming` internally/);
+  assert.match(propose, /read the docs context pack before broad repository scanning/);
+  assert.match(propose, /always `docs\/surfaces\.yaml`/);
   assert.match(propose, /do not announce `Using brainstorming`/);
   assert.match(propose, /Embedded capability contract:/);
   assert.match(propose, /mode: embedded/);
   assert.match(propose, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(apply, /invoke `writing-plans` internally/);
+  assert.match(apply, /build a docs context pack when project docs exist/);
+  assert.match(apply, /deterministic docs refresh assessment/);
+  assert.match(apply, /invoke `devos-docs` in `mode=refresh`/);
   assert.match(apply, /invoke `systematic-debugging` internally/);
   assert.match(apply, /invoke `subagent-driven-development` internally/);
   assert.match(apply, /invoke `verification-before-completion` internally/);
@@ -588,6 +598,8 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.doesNotMatch(apply, /record-capability/);
   assert.match(apply, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(archive, /invoke `verification-before-completion` internally/);
+  assert.match(archive, /Before archive, run a deterministic docs refresh assessment/);
+  assert.match(archive, /ensure `devos-docs` refresh has run or the workflow explicitly records why refresh is waived/);
   assert.match(archive, /Embedded capability contract:/);
   assert.match(archive, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(explore, /invoke `brainstorming` internally/);
@@ -608,6 +620,8 @@ test('devos-docs bundled skill defines mode-based AI-first docs generation guida
   assert.match(docsSkill, /^---\nname: devos-docs\n/m);
   assert.match(docsSkill, /mode=init/);
   assert.match(docsSkill, /mode=refresh/);
+  assert.match(docsSkill, /docs context pack/);
+  assert.match(docsSkill, /change-aware refresh context/);
   assert.match(docsSkill, /contracts\/surfaces\.yaml/);
   assert.match(docsSkill, /docs\/codemaps\/project-overview\.md/);
 });
@@ -1042,8 +1056,10 @@ surfaces:
 test('buildDocsSubagentRequest packages deterministic init and refresh context for host integration', () => {
   const projectDir = makeTempProject();
   fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, 'docs'), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, 'openspec', 'changes', 'add-auth'), { recursive: true });
   fs.writeFileSync(path.join(projectDir, 'src', 'index.ts'), 'export const ok = true;\n', 'utf8');
+  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
   fs.writeFileSync(
     path.join(projectDir, 'docs', 'surfaces.yaml'),
     `primary_surface: public-sdk
@@ -1055,9 +1071,21 @@ surfaces:
 `,
     'utf8',
   );
+  fs.writeFileSync(
+    path.join(projectDir, 'openspec', 'changes', 'add-auth', 'proposal.md'),
+    'Update the external surface for auth.\n',
+    'utf8',
+  );
 
   const initRequest = buildDocsSubagentRequest({ projectDir, mode: 'init' });
-  const refreshRequest = buildDocsSubagentRequest({ projectDir, mode: 'refresh' });
+  const refreshRequest = buildDocsSubagentRequest({
+    projectDir,
+    mode: 'refresh',
+    changeId: 'add-auth',
+    changeArtifactPaths: [path.join(projectDir, 'openspec', 'changes', 'add-auth', 'proposal.md')],
+    changedPaths: ['src/index.ts'],
+    targetModuleHints: ['public-sdk'],
+  });
 
   assert.equal(initRequest.schemaVersion, 1);
   assert.equal(initRequest.mode, 'init');
@@ -1073,7 +1101,210 @@ surfaces:
   );
   assert.equal(initRequest.context.primarySurface, 'public-sdk');
   assert.equal(initRequest.context.primarySurfaceLocation, 'src/index.ts');
+  assert.deepEqual(initRequest.docsContextPack.selectedPaths, [
+    'docs/surfaces.yaml',
+    'docs/codemaps/project-overview.md',
+  ]);
+  assert.equal(refreshRequest.refreshContext.changeId, 'add-auth');
+  assert.deepEqual(refreshRequest.refreshContext.changedPaths, ['src/index.ts']);
+  assert.deepEqual(
+    refreshRequest.refreshContext.changeArtifactPaths,
+    ['openspec/changes/add-auth/proposal.md'],
+  );
+  assert.deepEqual(refreshRequest.refreshContext.targetModuleHints, ['public-sdk']);
   assert.match(initRequest.readPaths.join('\n'), /docs\/surfaces\.yaml/);
+});
+
+test('buildDocsContextPack selects the default docs read set for non-module tasks', () => {
+  const projectDir = makeTempProject();
+  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'docs', 'surfaces.yaml'), 'primary_surface: public-sdk\n', 'utf8');
+  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
+
+  const pack = buildDocsContextPack({ projectDir });
+
+  assert.deepEqual(pack.selectedPaths, [
+    'docs/surfaces.yaml',
+    'docs/codemaps/project-overview.md',
+  ]);
+  assert.equal(pack.multiModule, false);
+  assert.equal(pack.targetModule, null);
+  assert.deepEqual(
+    pack.routingMetadata.map((entry) => [entry.path, entry.route, entry.reason]),
+    [
+      ['docs/surfaces.yaml', 'default', 'canonical-surface'],
+      ['docs/codemaps/project-overview.md', 'default', 'project-overview'],
+    ],
+  );
+});
+
+test('buildDocsContextPack routes multi-module docs to a targeted module only', () => {
+  const projectDir = makeTempProject();
+  const platformPomDir = path.join(projectDir, 'platform');
+  const servicePomDir = path.join(platformPomDir, 'service-a');
+  const sdkPomDir = path.join(projectDir, 'sdk');
+  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps', 'modules'), { recursive: true });
+  fs.mkdirSync(servicePomDir, { recursive: true });
+  fs.mkdirSync(sdkPomDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, 'pom.xml'),
+    `<project>
+  <modules>
+    <module>platform</module>
+    <module>sdk</module>
+  </modules>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(platformPomDir, 'pom.xml'),
+    `<project>
+  <artifactId>platform</artifactId>
+  <modules>
+    <module>service-a</module>
+  </modules>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(path.join(servicePomDir, 'pom.xml'), '<project><artifactId>service-a</artifactId></project>', 'utf8');
+  fs.writeFileSync(path.join(sdkPomDir, 'pom.xml'), '<project><artifactId>sdk</artifactId></project>', 'utf8');
+
+  const targetedPack = buildDocsContextPack({
+    projectDir,
+    changedPaths: ['platform/service-a/src/main/java/App.java'],
+  });
+  const fallbackPack = buildDocsContextPack({
+    projectDir,
+    changedPaths: ['README.md'],
+  });
+
+  assert.deepEqual(targetedPack.selectedPaths, [
+    'docs/surfaces.yaml',
+    'docs/codemaps/project-overview.md',
+    'docs/codemaps/module-map.md',
+    'docs/codemaps/modules/service-a.md',
+  ]);
+  assert.equal(targetedPack.targetModule, 'service-a');
+  assert.match(
+    targetedPack.routingMetadata.find((entry) => entry.path === 'docs/codemaps/modules/service-a.md').reason,
+    /changed-path:/,
+  );
+
+  assert.deepEqual(fallbackPack.selectedPaths, [
+    'docs/surfaces.yaml',
+    'docs/codemaps/project-overview.md',
+    'docs/codemaps/module-map.md',
+  ]);
+  assert.equal(fallbackPack.targetModule, null);
+  assert.ok(!fallbackPack.selectedPaths.some((entry) => entry.startsWith('docs/codemaps/modules/')));
+});
+
+test('assessDocsRefreshNeed uses deterministic signals for surface, topology, and no-op changes', () => {
+  const projectDir = makeTempProject();
+  const moduleDir = path.join(projectDir, 'platform', 'service-a');
+  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-auth');
+  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
+  fs.mkdirSync(moduleDir, { recursive: true });
+  fs.mkdirSync(changeDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(projectDir, 'docs', 'surfaces.yaml'),
+    `primary_surface: public-sdk
+
+surfaces:
+  - id: public-sdk
+    kind: sdk
+    location: src/index.ts
+`,
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectDir, 'pom.xml'),
+    `<project>
+  <modules>
+    <module>platform/service-a</module>
+  </modules>
+</project>
+`,
+    'utf8',
+  );
+  fs.writeFileSync(path.join(moduleDir, 'pom.xml'), '<project><artifactId>service-a</artifactId></project>', 'utf8');
+  fs.writeFileSync(path.join(changeDir, 'proposal.md'), 'This change updates the external surface and project map.\n', 'utf8');
+
+  const surfaceAssessment = assessDocsRefreshNeed({
+    projectDir,
+    changedPaths: ['src/index.ts'],
+  });
+  const topologyAssessment = assessDocsRefreshNeed({
+    projectDir,
+    changedPaths: ['platform/service-a/pom.xml'],
+  });
+  const artifactAssessment = assessDocsRefreshNeed({
+    projectDir,
+    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
+  });
+  const noOpAssessment = assessDocsRefreshNeed({
+    projectDir,
+    changedPaths: ['test/app.test.js'],
+  });
+
+  assert.equal(surfaceAssessment.needed, true);
+  assert.match(surfaceAssessment.reasons.join('\n'), /primary surface location/i);
+
+  assert.equal(topologyAssessment.needed, true);
+  assert.match(topologyAssessment.reasons.join('\n'), /module topology input/i);
+
+  assert.equal(artifactAssessment.needed, true);
+  assert.match(artifactAssessment.reasons.join('\n'), /change artifacts declare docs impact/i);
+
+  assert.equal(noOpAssessment.needed, false);
+  assert.deepEqual(noOpAssessment.reasons, []);
+});
+
+test('buildOpenSpecDocsStageContext applies docs routing and refresh assessment at the correct stages', () => {
+  const projectDir = makeTempProject();
+  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-auth');
+  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
+  fs.mkdirSync(changeDir, { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'docs', 'surfaces.yaml'), 'primary_surface: public-sdk\n', 'utf8');
+  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
+  fs.writeFileSync(path.join(changeDir, 'proposal.md'), 'Update project map for auth.\n', 'utf8');
+
+  const proposeStage = buildOpenSpecDocsStageContext({
+    projectDir,
+    stage: 'propose',
+    changeId: 'add-auth',
+    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
+  });
+  const applyStage = buildOpenSpecDocsStageContext({
+    projectDir,
+    stage: 'apply',
+    changeId: 'add-auth',
+    changedPaths: ['docs/surfaces.yaml'],
+    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
+  });
+  const archiveStage = buildOpenSpecDocsStageContext({
+    projectDir,
+    stage: 'archive',
+    changeId: 'add-auth',
+    changedPaths: ['docs/surfaces.yaml'],
+    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
+  });
+
+  assert.deepEqual(proposeStage.docsContextPack.selectedPaths, [
+    'docs/surfaces.yaml',
+    'docs/codemaps/project-overview.md',
+  ]);
+  assert.equal(proposeStage.refreshAssessment, null);
+
+  assert.ok(applyStage.docsContextPack);
+  assert.equal(applyStage.refreshAssessment.needed, true);
+  assert.equal(applyStage.shouldRunRefreshAssessment, true);
+
+  assert.equal(archiveStage.docsContextPack, null);
+  assert.equal(archiveStage.refreshAssessment.needed, true);
+  assert.equal(archiveStage.shouldRunRefreshAssessment, true);
 });
 
 test('validateDocsGenerationResult rejects invalid docs AI output contracts before writeback', () => {

@@ -23,6 +23,16 @@ Run this command when:
 ## Implementation
 
 - Invoke the `devos-docs` skill with `mode=refresh`
+- Use the stable docs routing order:
+  - `docs/surfaces.yaml`
+  - `docs/codemaps/project-overview.md`
+  - `docs/codemaps/module-map.md` only for multi-module projects
+  - `docs/codemaps/modules/<artifactId>.md` only when module routing is deterministic
+- When available, pass change-aware refresh context:
+  - active `changeId`
+  - relevant OpenSpec artifact paths
+  - changed paths
+  - optional target module hints
 - Canonical paths:
   - `docs/surfaces.yaml`
   - `docs/codemaps/**`
