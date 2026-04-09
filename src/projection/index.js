@@ -6,16 +6,7 @@ import * as codex from './codex.js';
 import * as opencode from './opencode.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BUNDLED_SKILL_GROUPS = [
-  {
-    rootDir: path.resolve(__dirname, '../../assets/openspec-skills'),
-    names: ['opsx-propose', 'opsx-explore', 'opsx-apply', 'opsx-archive'],
-  },
-  {
-    rootDir: path.resolve(__dirname, '../../assets/devos-skills'),
-    names: ['devos-docs'],
-  },
-];
+const bundledSkillsRoot = () => path.resolve(__dirname, '../../assets/skills');
 
 const adapters = { claude, codex, opencode };
 
@@ -23,10 +14,16 @@ const adapters = { claude, codex, opencode };
  * Collect bundled skill sources from bundled assets.
  */
 export const collectBundledSkillSources = () =>
-  BUNDLED_SKILL_GROUPS.flatMap(({ rootDir, names }) => names.map((name) => ({
-    name,
-    sourcePath: path.join(rootDir, name, 'SKILL.md'),
-  }))).filter(({ sourcePath }) => fs.existsSync(sourcePath));
+  (fs.existsSync(bundledSkillsRoot())
+    ? fs.readdirSync(bundledSkillsRoot(), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({
+        name: entry.name,
+        sourceDir: path.join(bundledSkillsRoot(), entry.name),
+      }))
+      .filter(({ sourceDir }) => fs.existsSync(path.join(sourceDir, 'SKILL.md')))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    : []);
 
 /**
  * Project bundled Praxis user-level assets to a specific agent's native directories.
@@ -70,4 +67,4 @@ export const detectForAgent = (agent) => {
 /**
  * Get the list of expected bundled skill names.
  */
-export const expectedSkillNames = () => BUNDLED_SKILL_GROUPS.flatMap(({ names }) => names);
+export const expectedSkillNames = () => collectBundledSkillSources().map(({ name }) => name);

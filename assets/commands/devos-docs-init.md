@@ -4,7 +4,7 @@ Initialize project documentation using the `devos-docs` skill.
 
 ## What this does
 
-- Generates `contracts/surfaces.yaml`
+- Generates `docs/surfaces.yaml`
 - Generates `docs/codemaps/project-overview.md`
 - Uses deterministic validation before writeback
 
@@ -23,7 +23,7 @@ Run this command when:
 
 - Invoke the `devos-docs` skill with `mode=init`
 - Canonical paths:
-  - `contracts/surfaces.yaml`
+  - `docs/surfaces.yaml`
   - `docs/codemaps/**`
 - Validation:
   - results must pass the existing docs contract before writeback

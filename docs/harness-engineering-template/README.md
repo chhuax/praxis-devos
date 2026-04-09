@@ -2,6 +2,8 @@
 
 这是一套面向 AI 协作开发的最小项目文档模板。
 
+> **Phase reminder**: The practical Phase 1 rollout is limited to `docs/codemaps/` and `docs/surfaces.yaml`; the `reference`, `guides`, `runbooks`, and related directories shown here are future-stage governance targets for when the project is ready to expand beyond the lightweight contract.
+
 目标：
 
 - `AGENTS.md` 只做导航，不做百科
@@ -27,4 +29,3 @@ harness-engineering-template/
 ├── docs/
 └── openspec/
 ```
-

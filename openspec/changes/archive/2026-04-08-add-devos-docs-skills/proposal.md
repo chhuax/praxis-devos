@@ -1,6 +1,6 @@
 ## 背景
 
-Praxis 已经有一版 Phase 1 的 docs-lite 实现，当前路径是 `contracts/surfaces.yaml` + `docs/codemaps/`，并且仓库里已经存在 `praxis-devos docs init|refresh|check` 这组兼容命令。下一步问题不是推翻这套实现，而是把它演进成 AI-first 的 Phase 2：由宿主 agent command 驱动普通子 agent，执行单一的 `devos-docs` skill，同时不打破现有 Phase 1 的路径和测试基线。
+Praxis 已经有一版 Phase 1 的 docs-lite 实现，当前路径是 `docs/surfaces.yaml` + `docs/codemaps/`，并且仓库里已经存在 `praxis-devos docs init|refresh|check` 这组兼容命令。下一步问题不是推翻这套实现，而是把它演进成 AI-first 的 Phase 2：由宿主 agent command 驱动普通子 agent，执行单一的 `devos-docs` skill，同时不打破现有 Phase 1 的路径和测试基线。
 
 ## 变更内容
 
@@ -13,12 +13,12 @@ Praxis 已经有一版 Phase 1 的 docs-lite 实现，当前路径是 `contracts
 - 定义 docs 子 agent 的输入上下文和输出 contract，约束可写目标文件集合。
 - 保留 `praxis-devos docs init|refresh|check` 作为 compatibility / fallback path，而不是本阶段立即移除。
 - 将多 Maven 模块项目的 codemap 产物收敛为固定集合：
-  - `contracts/surfaces.yaml`
+  - `docs/surfaces.yaml`
   - `docs/codemaps/project-overview.md`
   - `docs/codemaps/module-map.md`
   - `docs/codemaps/modules/<artifactId>.md`
 - 保留 `docs check` 作为机械验收，不负责生成正文。
-- 本阶段不迁移 `contracts/surfaces.yaml` 到 `docs/surfaces.yaml`；如果未来需要迁移，单独出 migration change。
+- 本阶段直接以 `docs/surfaces.yaml` 作为 canonical path，不再保留 `contracts/surfaces.yaml` 作为事实源入口。
 
 ## 能力影响
 

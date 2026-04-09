@@ -131,7 +131,7 @@ command 不负责：
 - 明确调用 `devos-docs`
 - 明确 `mode=init` 或 `mode=refresh`
 - 指向当前 canonical docs contract：
-  - `contracts/surfaces.yaml`
+  - `docs/surfaces.yaml`
   - `docs/codemaps/**`
 - 提醒生成结果必须遵守现有 writeback / validation contract
 
@@ -259,7 +259,7 @@ Initialize project documentation using the `devos-docs` skill.
 
 ## What this does
 
-- Generates `contracts/surfaces.yaml`
+- Generates `docs/surfaces.yaml`
 - Generates `docs/codemaps/project-overview.md`
 - Uses deterministic validation before writeback
 
@@ -278,7 +278,7 @@ Run this command when:
 
 - 调用 `devos-docs` skill，并传入 `mode=init`
 - Canonical paths:
-  - `contracts/surfaces.yaml`
+  - `docs/surfaces.yaml`
   - `docs/codemaps/**`
 - Validation:
   - results must pass the existing docs contract before writeback
@@ -296,7 +296,7 @@ Refresh existing project documentation using the `devos-docs` skill.
 
 ## What this does
 
-- Updates `contracts/surfaces.yaml` when the external surface changes
+- Updates `docs/surfaces.yaml` when the external surface changes
 - Updates `docs/codemaps/project-overview.md` to match the current structure
 - Preserves existing docs artifacts where possible
 
@@ -316,7 +316,7 @@ Run this command when:
 
 - 调用 `devos-docs` skill，并传入 `mode=refresh`
 - Canonical paths:
-  - `contracts/surfaces.yaml`
+  - `docs/surfaces.yaml`
   - `docs/codemaps/**`
 - Validation:
   - results must pass the existing docs contract before writeback
@@ -354,7 +354,7 @@ compatibility path 还必须满足同一个协议边界：
 
 本次 change 不重新设计 Maven 多模块 docs contract，但 command adapter 触发 `devos-docs` 时，仍然必须兼容现有多模块行为：
 
-- `contracts/surfaces.yaml`
+- `docs/surfaces.yaml`
 - `docs/codemaps/project-overview.md`
 - 多模块时额外包括：
   - `docs/codemaps/module-map.md`
