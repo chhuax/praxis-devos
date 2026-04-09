@@ -1,8 +1,8 @@
 ## MODIFIED Requirements
 
-### Requirement: host command adapter 必须与现有 docs contract 保持一致
+### Requirement: host command adapters SHALL remain consistent with the existing docs contract
 
-系统必须确保新增加的宿主 command adapter 不会引入另一套 docs 协议。
+The system SHALL ensure that host command adapters do not introduce a second docs contract.
 
 #### Scenario: command 模板引用 canonical docs path
 - **当** Claude 或 OpenCode command 模板被安装
