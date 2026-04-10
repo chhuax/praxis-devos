@@ -50,6 +50,7 @@ Stage hooks:
   - always `docs/codemaps/project-overview.md`
   - `docs/codemaps/module-map.md` only for multi-module projects
   - `docs/codemaps/modules/<artifactId>.md` only when module routing is deterministic
+- When proposal or design artifacts are generated, include a short `Docs Impact` section whenever docs may need refresh. This section is machine-readable refresh intent for later apply/archive stages.
 - If the request is clear enough, return to the native proposal flow and generate the required change artifacts.
 - Design decisions, task breakdowns, and scope changes must be written back into the current change instead of creating a parallel document set.
 - If the initial request still has critical ambiguity, invoke `brainstorming` internally before proceeding.
@@ -137,6 +138,13 @@ After completing all artifacts, summarize:
 - Follow the schema for what each artifact should contain
 - Read dependency artifacts before creating new ones
 - Use `template` as the structure for the output file
+- When the artifact format allows a freeform section, prefer adding:
+  - `## Docs Impact`
+  - `- surfaces: yes/no`
+  - `- project-overview: yes/no`
+  - `- module-map: yes/no`
+  - `- modules: <module names or none>`
+  - `- notes: <brief reason>`
 - **IMPORTANT**: `context` and `rules` are constraints for you, not content for the file
   - Do not copy `<context>`, `<rules>`, or `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
