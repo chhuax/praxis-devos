@@ -45,9 +45,10 @@ Stage hooks:
   - always read `docs/codemaps/project-overview.md`
   - include `docs/codemaps/module-map.md` only for multi-module projects
   - include `docs/codemaps/modules/<artifactId>.md` only when change-aware routing can identify the target module
+- Read Docs Impact intent from change artifacts when present and treat it as the primary signal for docs refresh routing, with changed paths only as a fallback signal.
 - If you hit a bug, failed test, regression, exception, or blocker, invoke `systematic-debugging` internally before deciding on a fix.
 - If multiple subtasks can advance independently, invoke `subagent-driven-development` internally for parallel execution while keeping all outputs under the same change.
-- Before completion or handoff, run a deterministic docs refresh assessment using changed paths and change artifacts. If refresh is needed, invoke `devos-docs` in `mode=refresh` with change-aware context or explicitly record why refresh is deferred.
+- Before completion or handoff, run a deterministic docs refresh assessment using changed paths, change artifacts, and Docs Impact intent. If refresh is needed, invoke `devos-docs` in `mode=refresh` with change-aware context and any target-module hints from Docs Impact, or explicitly record why refresh is deferred.
 - Before saying work is complete, fixed, or passing, invoke `verification-before-completion` internally and use real verification evidence in the status update.
 
 ---
