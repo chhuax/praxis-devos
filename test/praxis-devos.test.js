@@ -18,7 +18,6 @@ import {
   analyzeSessionTranscript,
   bootstrapOpenSpec,
   buildDocsContextPack,
-  buildOpenSpecDocsStageContext,
   bootstrapProject,
   buildDocsSubagentRequest,
   createChangeScaffold,
@@ -597,6 +596,9 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(propose, /read the docs context pack before broad repository scanning/);
   assert.match(propose, /always `docs\/surfaces\.yaml`/);
   assert.match(propose, /Docs Impact/i);
+  assert.match(propose, /change-blackbox/i);
+  assert.match(propose, /project-api-sync/i);
+  assert.match(propose, /docs-delivery section/i);
   assert.match(propose, /machine-readable refresh intent/i);
   assert.match(propose, /`openspec\/config\.yaml`/);
   assert.match(propose, /artifact language policy/i);
@@ -608,6 +610,8 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(apply, /invoke `writing-plans` internally/);
   assert.match(apply, /build a docs context pack when project docs exist/);
   assert.match(apply, /Read Docs Impact intent from change artifacts/i);
+  assert.match(apply, /devos-change-docs/);
+  assert.match(apply, /Sidecar subagents may draft/i);
   assert.match(apply, /primary signal for docs refresh routing/i);
   assert.match(apply, /deterministic docs refresh assessment/);
   assert.match(apply, /invoke `devos-docs` in `mode=refresh`/);
@@ -620,6 +624,7 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(apply, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(archive, /invoke `verification-before-completion` internally/);
   assert.match(archive, /If Docs Impact indicates refresh/i);
+  assert.match(archive, /docs\/reference\/api\.md/);
   assert.match(archive, /waived with an explicit reason/i);
   assert.match(archive, /Before archive, run a deterministic docs refresh assessment/);
   assert.match(archive, /ensure `devos-docs` refresh has run or the workflow explicitly records why refresh is waived/);
@@ -659,16 +664,36 @@ test('devos-docs bundled skill defines mode-based AI-first docs generation guida
   assert.match(docsSkill, /Repository Interrogation Order/);
 });
 
+test('devos-change-docs bundled skill defines mode-based change docs generation guidance', () => {
+  const docsSkill = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-change-docs', 'SKILL.md'),
+    'utf8',
+  );
+
+  assert.match(docsSkill, /^---\nname: devos-change-docs\n/m);
+  assert.match(docsSkill, /mode=change-blackbox/);
+  assert.match(docsSkill, /mode=change-api/);
+  assert.match(docsSkill, /mode=project-api-sync/);
+  assert.match(docsSkill, /structured result/i);
+  assert.match(docsSkill, /openspec\/changes\/<change>\/blackbox-test\.md/);
+  assert.match(docsSkill, /openspec\/changes\/<change>\/api-doc\.md/);
+  assert.match(docsSkill, /docs\/reference\/api\.md/);
+  assert.match(docsSkill, /managed section/i);
+});
+
 test('collectBundledSkillSources discovers unified skill bundles by sourceDir', () => {
   const skillSources = collectBundledSkillSources();
   const propose = skillSources.find((entry) => entry.name === 'opsx-propose');
   const docs = skillSources.find((entry) => entry.name === 'devos-docs');
+  const changeDocs = skillSources.find((entry) => entry.name === 'devos-change-docs');
 
   assert.ok(propose);
   assert.ok(docs);
+  assert.ok(changeDocs);
   assert.equal('sourcePath' in propose, false);
   assert.match(propose.sourceDir, /assets\/skills\/opsx-propose$/);
   assert.match(docs.sourceDir, /assets\/skills\/devos-docs$/);
+  assert.match(changeDocs.sourceDir, /assets\/skills\/devos-change-docs$/);
 });
 
 test('projectNativeSkills projects supporting files that live alongside SKILL.md', () => {
@@ -953,6 +978,7 @@ test('runCli docs init seeds the docs-lite skeleton without OpenSpec runtime', (
   assert.match(codemap, /Primary surface: `public-interface`/);
   assert.match(codemap, /Surface location: `src\/index\.ts`/);
   assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')));
+  assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'reference', 'api.md')), false);
 });
 
 test('runCli docs check reports missing primary_surface and missing fields', () => {
@@ -1465,51 +1491,6 @@ test('buildDocsContextPack and refresh assessment ignore change inputs outside t
   assert.deepEqual(assessment.reasons, []);
 });
 
-test('buildOpenSpecDocsStageContext applies docs routing and refresh assessment at the correct stages', () => {
-  const projectDir = makeTempProject();
-  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-auth');
-  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
-  fs.mkdirSync(changeDir, { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'docs', 'surfaces.yaml'), 'primary_surface: public-sdk\n', 'utf8');
-  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
-  fs.writeFileSync(path.join(changeDir, 'proposal.md'), 'Update project map for auth.\n', 'utf8');
-
-  const proposeStage = buildOpenSpecDocsStageContext({
-    projectDir,
-    stage: 'propose',
-    changeId: 'add-auth',
-    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
-  });
-  const applyStage = buildOpenSpecDocsStageContext({
-    projectDir,
-    stage: 'apply',
-    changeId: 'add-auth',
-    changedPaths: ['docs/surfaces.yaml'],
-    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
-  });
-  const archiveStage = buildOpenSpecDocsStageContext({
-    projectDir,
-    stage: 'archive',
-    changeId: 'add-auth',
-    changedPaths: ['docs/surfaces.yaml'],
-    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
-  });
-
-  assert.deepEqual(proposeStage.docsContextPack.selectedPaths, [
-    'docs/surfaces.yaml',
-    'docs/codemaps/project-overview.md',
-  ]);
-  assert.equal(proposeStage.refreshAssessment, null);
-
-  assert.ok(applyStage.docsContextPack);
-  assert.equal(applyStage.refreshAssessment.needed, true);
-  assert.equal(applyStage.shouldRunRefreshAssessment, true);
-
-  assert.equal(archiveStage.docsContextPack, null);
-  assert.equal(archiveStage.refreshAssessment.needed, true);
-  assert.equal(archiveStage.shouldRunRefreshAssessment, true);
-});
-
 test('validateDocsGenerationResult rejects invalid docs AI output contracts before writeback', () => {
   const projectDir = makeTempProject();
   fs.mkdirSync(path.join(projectDir, 'docs'), { recursive: true });
@@ -1932,14 +1913,13 @@ test('setupProject prefers Windows executable extension over extensionless opens
 test('selectCapabilities chooses stage-appropriate embedded capabilities from signals', () => {
   const selection = selectCapabilities({
     stage: 'apply',
-    signals: ['multi_step', 'behavior_change', 'completion_claim'],
+    signals: ['multi_step', 'code_task', 'completion_claim'],
   });
 
   assert.deepEqual(
     selection.selected.map((entry) => entry.id),
     ['writing-plans', 'test-driven-development', 'verification-before-completion'],
   );
-  assert.ok(selection.skipped.some((entry) => entry.id === 'using-git-worktrees'));
   assert.ok(selection.skipped.some((entry) => entry.id === 'finishing-a-development-branch'));
 });
 
@@ -1955,7 +1935,7 @@ test('validateChangeEvidence reports missing capability evidence and passes once
     changeId,
     stages: {
       apply: {
-        signals: ['multi_step', 'behavior_change', 'completion_claim'],
+        signals: ['multi_step', 'code_task', 'completion_claim'],
         capabilities: {
           'writing-plans': {
             selected: true,
@@ -1967,7 +1947,7 @@ test('validateChangeEvidence reports missing capability evidence and passes once
           },
           'test-driven-development': {
             selected: true,
-            reasons: ['behavior_change'],
+            reasons: ['code_task'],
             evidence: {
               failing_test: 'selector should choose TDD',
             },
@@ -2001,7 +1981,7 @@ test('validateChangeEvidence reports missing capability evidence and passes once
     ...incompleteEvidence,
     stages: {
       apply: {
-        signals: ['multi_step', 'behavior_change', 'completion_claim'],
+        signals: ['multi_step', 'code_task', 'completion_claim'],
         capabilities: {
           'writing-plans': {
             selected: true,
@@ -2014,7 +1994,7 @@ test('validateChangeEvidence reports missing capability evidence and passes once
           },
           'test-driven-development': {
             selected: true,
-            reasons: ['behavior_change'],
+            reasons: ['code_task'],
             evidence: {
               failing_test: 'selector should choose TDD',
               passing_test: 'selector should choose TDD',
@@ -2055,7 +2035,7 @@ test('capability evidence runtime APIs persist selection and merge stage evidenc
       projectDir,
       changeId,
       stage: 'apply',
-      signals: ['multi_step', 'behavior_change'],
+      signals: ['multi_step', 'code_task'],
     });
 
     assert.deepEqual(
@@ -2093,7 +2073,7 @@ test('capability evidence runtime APIs persist selection and merge stage evidenc
     });
 
     const persisted = readCapabilityEvidence({ projectDir, changeId }).value;
-    assert.deepEqual(persisted.stages.apply.signals, ['multi_step', 'behavior_change']);
+    assert.deepEqual(persisted.stages.apply.signals, ['multi_step', 'code_task']);
     assert.deepEqual(
       Object.keys(persisted.stages.apply.capabilities).sort(),
       ['test-driven-development', 'writing-plans'],
