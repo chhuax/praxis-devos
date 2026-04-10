@@ -44,6 +44,7 @@ Internal capabilities must not:
 
 Stage hooks:
 
+- At propose entry, check the current branch. If on main or master, suggest invoking `using-git-worktrees` to create an isolated workspace before generating any artifacts. Do not block if the user declines, but note that all change artifacts will be written to the current branch.
 - If the request is still vague or there are many open questions, invoke `brainstorming` internally to narrow scope, compare options, and clarify constraints.
 - If project docs already exist, read the docs context pack before broad repository scanning:
   - always `docs/surfaces.yaml`
@@ -52,10 +53,16 @@ Stage hooks:
   - `docs/codemaps/modules/<artifactId>.md` only when module routing is deterministic
 - When generating or revising OpenSpec artifacts, honor the project artifact language policy from `openspec/config.yaml` when present.
 - When proposal or design artifacts are generated, include a short `Docs Impact` section whenever docs may need refresh. This section is machine-readable refresh intent for later apply/archive stages.
+- When change-local docs are part of the expected delivery, add an explicit docs-delivery section to `tasks.md` after the main implementation tasks.
+- Default change-local docs task injection:
+  - always add `openspec/changes/<change>/blackbox-test.md`
+  - if the change affects API behavior, add `openspec/changes/<change>/api-doc.md`
+  - if the change affects API behavior, add a stable sync task for `docs/reference/api.md`
 - If the request is clear enough, return to the native proposal flow and generate the required change artifacts.
 - Design decisions, task breakdowns, and scope changes must be written back into the current change instead of creating a parallel document set.
 - If the initial request still has critical ambiguity, invoke `brainstorming` internally before proceeding.
 - If an artifact requires extra user input because of scope disagreement, solution disagreement, or missing context, invoke `brainstorming` internally, capture the result in the current change artifacts, and then continue.
+- After all artifacts are generated, invoke `requesting-code-review` internally to review the proposal artifacts (proposal.md, design.md, tasks.md). Critical or Important issues must be resolved before the user proceeds to apply.
 
 ---
 
@@ -144,6 +151,9 @@ After completing all artifacts, summarize:
 - Keep code identifiers, commands, paths, capability names, and other technical tokens in their original form
 - When the artifact format allows a freeform section, prefer adding:
   - `## Docs Impact`
+  - `- change-blackbox: yes/no`
+  - `- change-api: yes/no`
+  - `- project-api-sync: yes/no`
   - `- surfaces: yes/no`
   - `- project-overview: yes/no`
   - `- module-map: yes/no`
