@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-10
+
+### Added
+- Improved AI-first docs routing within OpenSpec capability specs and codemap skill guidance
+
+### Fixed
+- Codemap skill heading structure for better documentation navigation
+- Release-only test coverage handling to improve CI reliability
+
 ## [0.5.0] - 2026-04-09
 
 ### Added
