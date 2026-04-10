@@ -41,7 +41,7 @@ Stage hooks:
 
 - Before executing a pending task, if the task description is high-level or ambiguous, invoke `writing-plans` internally to expand it into concrete steps with exact file paths, code, and verification commands. Keep the expansion in context only — do not write it back to `tasks.md`. Execute immediately after expansion.
 - When implementing any task that involves writing code, follow `test-driven-development` internally: write a failing test first, verify it fails, write minimal code to pass, verify it passes. Do not write production code before a failing test exists.
-- When executing a task, invoke `subagent-driven-development` internally when needed for context isolation or parallel execution. If subagent capability is not available, fall back to `executing-plans` instead. When subagent-driven-development is invoked: dispatch a fresh implementer subagent, then a spec-reviewer subagent, then a code-quality-reviewer subagent. Do not mark the task complete until both review stages pass. Keep all outputs under the current change.
+- When executing a task, invoke `subagent-driven-development` internally when needed for context isolation or parallel execution. If subagent capability is not available, fall back to `executing-plans` instead. When invoked: dispatch a fresh implementer subagent, then a spec-reviewer subagent, then a code-quality-reviewer subagent. Do not mark the task complete until both review stages pass. Keep all outputs under the current change.
 - Before implementation, build a docs context pack when project docs exist:
   - always read `docs/surfaces.yaml`
   - always read `docs/codemaps/project-overview.md`
@@ -57,7 +57,6 @@ Stage hooks:
 - Sidecar subagents may draft the `devos-change-docs` structured result, but final validation and writeback remain with the main flow.
 - Before completion, do an AI self-check on change-doc coverage. If the implementation now clearly introduces API behavior changes but `tasks.md` or `Docs Impact` still do not declare the related API doc obligations, pause and update the change artifacts instead of silently finishing apply.
 - If you hit a bug, failed test, regression, exception, or blocker, invoke `systematic-debugging` internally before deciding on a fix.
-- When executing a task, invoke `subagent-driven-development` internally when needed for context isolation or parallel execution. When invoked: dispatch a fresh implementer subagent, then a spec-reviewer subagent, then a code-quality-reviewer subagent. Do not mark the task complete until both review stages pass. Keep all outputs under the current change.
 - After all tasks are complete, invoke `requesting-code-review` internally to review the full code diff for this change (from the commit before apply started to HEAD). Critical or Important issues must be resolved before proceeding to archive.
 - Before completion or handoff, run a deterministic docs refresh assessment using changed paths, change artifacts, and Docs Impact intent. If refresh is needed, invoke `devos-docs` in `mode=refresh` with change-aware context and any target-module hints from Docs Impact, or explicitly record why refresh is deferred.
 - Before completion or handoff, ensure change-doc obligations from `Docs Impact` have either been fulfilled or explicitly deferred with a reason in the current change artifacts.
