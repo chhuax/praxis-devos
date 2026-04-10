@@ -40,6 +40,7 @@ Internal capabilities must not:
 Stage hooks:
 
 - Before saying a change is ready to archive, invoke `verification-before-completion` internally and confirm artifacts, tasks, and validation evidence are sufficient.
+- If Docs Impact indicates refresh, require evidence that refresh ran or that it was waived with an explicit reason in the current change artifacts.
 - Before archive, run a deterministic docs refresh assessment using changed paths and change artifacts. If refresh is required, ensure `devos-docs` refresh has run or the workflow explicitly records why refresh is waived.
 - If delta specs still need syncing, provide the sync assessment first and let the user decide whether to sync before archive.
 - Task-completion checks are part of the same internal verification pass before archive.

@@ -1,5 +1,10 @@
 schema: spec-driven
 
+context: |
+  OpenSpec artifact language: zh-CN.
+  Proposal, design, tasks, and spec artifacts must be written in Simplified Chinese by default.
+  Keep code identifiers, commands, paths, capability names, and other technical tokens in their original form.
+
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.

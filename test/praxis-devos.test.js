@@ -37,6 +37,13 @@ import {
   validateChangeEvidence,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
+import {
+  RELEASE_STATE_FILE,
+  readVerifiedReleaseState,
+  runPublishRelease,
+  runVerifyRelease,
+  writeVerifiedReleaseState,
+} from '../scripts/release/lib.mjs';
 
 const makeTempProject = () => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-test-'));
 
@@ -377,16 +384,17 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /Do not re-announce `Using \[skill\]` or `superpowers:/);
   assert.match(agentsMd, /finish clarification and option comparison inside the current OpenSpec stage before implementation/);
   assert.match(agentsMd, /keep all parallel work, subtasks, outputs, and status under the current change/);
-  assert.match(agentsMd, /docs\/codemaps\//);
   assert.match(agentsMd, /docs\/surfaces\.yaml/);
-  assert.match(agentsMd, /\/devos-docs-init/);
-  assert.match(agentsMd, /\/devos-docs-refresh/);
+  assert.match(agentsMd, /On first entry, read `docs\/surfaces\.yaml` first\./);
+  assert.match(agentsMd, /Read `docs\/codemaps\/project-overview\.md` if needed\./);
+  assert.match(agentsMd, /Read other `docs\/codemaps\/\*\*` artifacts on demand rather than by default\./);
   assert.doesNotMatch(agentsMd, /\/devos:docs-init/);
   assert.doesNotMatch(agentsMd, /\/devos:docs-refresh/);
-  assert.match(agentsMd, /docs sub-agent/i);
   assert.match(agentsMd, /OpenSpec \+ Superpowers Contract/);
   assert.match(agentsMd, /Stage Gates/);
   assert.match(agentsMd, /Capability execution is judged by evidence/);
+  assert.doesNotMatch(agentsMd, /\/devos-docs-init/);
+  assert.doesNotMatch(agentsMd, /\/devos-docs-refresh/);
   assert.doesNotMatch(agentsMd, /[\u4e00-\u9fff]/u);
   assert.doesNotMatch(agentsMd, /praxis-devos openspec/);
   assert.doesNotMatch(agentsMd, /显式加载 `superpowers:brainstorming`/);
@@ -582,12 +590,19 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(propose, /invoke `brainstorming` internally/);
   assert.match(propose, /read the docs context pack before broad repository scanning/);
   assert.match(propose, /always `docs\/surfaces\.yaml`/);
+  assert.match(propose, /Docs Impact/i);
+  assert.match(propose, /machine-readable refresh intent/i);
+  assert.match(propose, /`openspec\/config\.yaml`/);
+  assert.match(propose, /artifact language policy/i);
+  assert.match(propose, /dominant language already present in that change/i);
   assert.match(propose, /do not announce `Using brainstorming`/);
   assert.match(propose, /Embedded capability contract:/);
   assert.match(propose, /mode: embedded/);
   assert.match(propose, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(apply, /invoke `writing-plans` internally/);
   assert.match(apply, /build a docs context pack when project docs exist/);
+  assert.match(apply, /Read Docs Impact intent from change artifacts/i);
+  assert.match(apply, /primary signal for docs refresh routing/i);
   assert.match(apply, /deterministic docs refresh assessment/);
   assert.match(apply, /invoke `devos-docs` in `mode=refresh`/);
   assert.match(apply, /invoke `systematic-debugging` internally/);
@@ -598,11 +613,16 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.doesNotMatch(apply, /record-capability/);
   assert.match(apply, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(archive, /invoke `verification-before-completion` internally/);
+  assert.match(archive, /If Docs Impact indicates refresh/i);
+  assert.match(archive, /waived with an explicit reason/i);
   assert.match(archive, /Before archive, run a deterministic docs refresh assessment/);
   assert.match(archive, /ensure `devos-docs` refresh has run or the workflow explicitly records why refresh is waived/);
   assert.match(archive, /Embedded capability contract:/);
   assert.match(archive, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
   assert.match(explore, /invoke `brainstorming` internally/);
+  assert.match(explore, /`openspec\/config\.yaml`/);
+  assert.match(explore, /dominant language already present in that change/i);
+  assert.match(explore, /do not switch languages mid-change/i);
   assert.match(explore, /mode: embedded/);
   assert.match(explore, /pass the current flow type, current stage goal, current artifact locations, and current output constraints/);
   assert.doesNotMatch(propose, /[\u4e00-\u9fff]/u);
@@ -624,6 +644,13 @@ test('devos-docs bundled skill defines mode-based AI-first docs generation guida
   assert.match(docsSkill, /change-aware refresh context/);
   assert.match(docsSkill, /contracts\/surfaces\.yaml/);
   assert.match(docsSkill, /docs\/codemaps\/project-overview\.md/);
+  assert.match(docsSkill, /Write for AI readers first/);
+  assert.match(docsSkill, /problem-routing guidance/i);
+  assert.match(docsSkill, /critical runtime or request flows/i);
+  assert.match(docsSkill, /What part of the system probably owns this change\?/);
+  assert.match(docsSkill, /Codemap Composition Strategy/);
+  assert.match(docsSkill, /not just a welcome page/i);
+  assert.match(docsSkill, /Repository Interrogation Order/);
 });
 
 test('collectBundledSkillSources discovers unified skill bundles by sourceDir', () => {
@@ -651,6 +678,142 @@ test('projectNativeSkills projects supporting files that live alongside SKILL.md
   });
 
   assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
+});
+
+test('maintainer release skill documents the repo-local verify and publish workflow', () => {
+  const skill = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'skills', 'maintainer-release', 'SKILL.md'),
+    'utf8',
+  );
+
+  assert.match(skill, /^---\nname: maintainer-release\n/m);
+  assert.match(skill, /verify mode/i);
+  assert.match(skill, /publish mode/i);
+  assert.match(skill, /release-order/i);
+  assert.match(skill, /tag-order/i);
+  assert.match(skill, /scripts\/release\/verify\.mjs/);
+  assert.match(skill, /scripts\/release\/publish\.mjs/);
+});
+
+test('runVerifyRelease runs tests, pack, default smoke checks, and records release state', () => {
+  const projectDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(projectDir, 'package.json'),
+    JSON.stringify({ name: 'praxis-devos', version: '0.4.9' }, null, 2),
+    'utf8',
+  );
+  const calls = [];
+  const fakeExec = (command, args) => {
+    calls.push([command, args]);
+    if (command === 'git' && args[0] === 'status') {
+      return '';
+    }
+    if (command === 'npm' && args[0] === 'pack') {
+      return JSON.stringify([{ filename: 'praxis-devos-0.4.9.tgz' }]);
+    }
+    return '';
+  };
+
+  const result = runVerifyRelease({
+    cwd: projectDir,
+    execFileSyncImpl: fakeExec,
+    nowIso: '2026-04-09T12:00:00.000Z',
+  });
+
+  assert.equal(result.version, '0.4.9');
+  assert.equal(result.tarballFile, 'praxis-devos-0.4.9.tgz');
+  assert.equal(result.ready, true);
+  assert.equal(result.workspaceClean, true);
+  assert.deepEqual(
+    calls,
+    [
+      ['git', ['status', '--short']],
+      ['node', ['--test']],
+      ['npm', ['pack', '--json']],
+      ['node', ['test/install-smoke-cli.mjs', '--package', './praxis-devos-0.4.9.tgz', '--scenario', 'opencode']],
+      ['node', ['test/install-smoke-cli.mjs', '--package', './praxis-devos-0.4.9.tgz', '--scenario', 'claude']],
+    ],
+  );
+
+  const persisted = readVerifiedReleaseState({ cwd: projectDir });
+  assert.equal(persisted.tarballFile, 'praxis-devos-0.4.9.tgz');
+  assert.equal(persisted.generatedAt, '2026-04-09T12:00:00.000Z');
+  assert.ok(fs.existsSync(path.join(projectDir, RELEASE_STATE_FILE)));
+});
+
+test('runPublishRelease refuses to run without explicit confirmation or a verified candidate', () => {
+  const projectDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(projectDir, 'package.json'),
+    JSON.stringify({ name: 'praxis-devos', version: '0.4.9' }, null, 2),
+    'utf8',
+  );
+  const calls = [];
+  const fakeExec = (command, args) => {
+    calls.push([command, args]);
+    return '';
+  };
+
+  const missingConfirmation = runPublishRelease({
+    cwd: projectDir,
+    execFileSyncImpl: fakeExec,
+  });
+  assert.equal(missingConfirmation.ok, false);
+  assert.match(missingConfirmation.summary, /release-order/i);
+  assert.match(missingConfirmation.summary, /tag-order/i);
+
+  const missingVerify = runPublishRelease({
+    cwd: projectDir,
+    releaseOrder: 'publish-first',
+    tagOrder: 'after-publish',
+    execFileSyncImpl: fakeExec,
+  });
+  assert.equal(missingVerify.ok, false);
+  assert.match(missingVerify.summary, /run verify mode first/i);
+  assert.deepEqual(calls, []);
+});
+
+test('runPublishRelease publishes the verified tarball and tags in declared order', () => {
+  const projectDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(projectDir, 'package.json'),
+    JSON.stringify({ name: 'praxis-devos', version: '0.4.9' }, null, 2),
+    'utf8',
+  );
+  writeVerifiedReleaseState({
+    cwd: projectDir,
+    state: {
+      version: '0.4.9',
+      tarballFile: 'praxis-devos-0.4.9.tgz',
+      tarballPath: path.join(projectDir, 'praxis-devos-0.4.9.tgz'),
+      generatedAt: '2026-04-09T12:00:00.000Z',
+      checks: ['node --test', 'npm pack --json', 'smoke:opencode', 'smoke:claude'],
+      ready: true,
+    },
+  });
+
+  const calls = [];
+  const fakeExec = (command, args) => {
+    calls.push([command, args]);
+    return '';
+  };
+
+  const result = runPublishRelease({
+    cwd: projectDir,
+    releaseOrder: 'publish-first',
+    tagOrder: 'after-publish',
+    execFileSyncImpl: fakeExec,
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    calls,
+    [
+      ['npm', ['publish', path.join(projectDir, 'praxis-devos-0.4.9.tgz')]],
+      ['git', ['tag', 'v0.4.9']],
+      ['git', ['push', 'origin', 'v0.4.9']],
+    ],
+  );
 });
 
 test('projectNativeSkills projects host commands from the shared command asset root', () => {
