@@ -9,17 +9,9 @@
 
 ## Project Reading Order
 
-- On first entry, read docs in this order before scanning the whole repository:
-  1. `docs/surfaces.yaml`
-  2. `docs/codemaps/project-overview.md`
-  3. `docs/codemaps/module-map.md` only for multi-module projects
-  4. `docs/codemaps/modules/<artifactId>.md` only when the active task or change can be routed to a specific module
-- When the primary external surface changes, update `docs/surfaces.yaml` first.
-- In Claude Code and OpenCode, prefer `/devos-docs-init` and `/devos-docs-refresh` when host command wiring exists so a normal sub-agent can run `devos-docs`.
-- In Codex, use `devos-docs` through the projected skill contract and the same docs reading order because project-level docs commands are not wired here yet.
-- Treat `praxis-devos docs init|refresh|check` as the compatibility / fallback path rather than the primary AI-first entrypoint.
-- Derived docs work may be delegated to a docs sub-agent, but the docs sub-agent should only modify `docs/codemaps/**`.
-- The main agent remains responsible for updating `docs/surfaces.yaml` and running `docs check` before completion.
+- On first entry, read `docs/surfaces.yaml` first.
+- Read `docs/codemaps/project-overview.md` if needed.
+- Read other `docs/codemaps/**` artifacts on demand rather than by default.
 
 ## OpenSpec + Superpowers Contract
 

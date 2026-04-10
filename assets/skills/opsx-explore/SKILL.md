@@ -43,6 +43,8 @@ Stage hooks:
 
 - If scope is unclear, open questions remain, or multiple approaches need comparison, invoke `brainstorming` internally to clarify constraints and compare options.
 - If the discussion becomes concrete enough to capture, write conclusions back to the current change artifacts such as `proposal.md`, `design.md`, `tasks.md`, or a relevant spec.
+- When writing back to change artifacts, honor the project artifact language policy from `openspec/config.yaml` when present.
+- If `openspec/config.yaml` does not declare an artifact language policy, continue in the dominant language already present in that change and do not switch languages mid-change unless the user explicitly requests it.
 - If the user is still exploring, stay in `explore` and do not force a transition to proposal or implementation.
 - After `openspec list --json`, if the main issue is still ambiguity, disagreement, or missing constraints, invoke `brainstorming` internally and continue exploring inside the same visible flow.
 
@@ -138,6 +140,7 @@ If the user mentions a change or you detect one is relevant:
    - `openspec/changes/<name>/design.md`
    - `openspec/changes/<name>/tasks.md`
    - etc.
+   - If you later update those artifacts, keep them in the project-configured language from `openspec/config.yaml`, or in the dominant language already present in that change when no config is provided
 
 2. **Reference them naturally in conversation**
    - "Your design mentions using Redis, but we just realized SQLite fits better..."
