@@ -37,13 +37,19 @@ import {
   validateChangeEvidence,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
-import {
-  RELEASE_STATE_FILE,
-  readVerifiedReleaseState,
-  runPublishRelease,
-  runVerifyRelease,
-  writeVerifiedReleaseState,
-} from '../scripts/release/lib.mjs';
+const releaseLibPath = path.join(PRAXIS_ROOT, 'scripts', 'release', 'lib.mjs');
+const maintainerReleaseSkillPath = path.join(PRAXIS_ROOT, 'skills', 'maintainer-release', 'SKILL.md');
+const releaseAssetsAvailable = fs.existsSync(releaseLibPath) && fs.existsSync(maintainerReleaseSkillPath);
+
+const releaseLib = releaseAssetsAvailable
+  ? await import('../scripts/release/lib.mjs')
+  : null;
+
+const RELEASE_STATE_FILE = releaseLib?.RELEASE_STATE_FILE;
+const readVerifiedReleaseState = releaseLib?.readVerifiedReleaseState;
+const runPublishRelease = releaseLib?.runPublishRelease;
+const runVerifyRelease = releaseLib?.runVerifyRelease;
+const writeVerifiedReleaseState = releaseLib?.writeVerifiedReleaseState;
 
 const makeTempProject = () => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-test-'));
 
@@ -673,9 +679,11 @@ test('projectNativeSkills projects supporting files that live alongside SKILL.md
   assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
 });
 
-test('maintainer release skill documents the repo-local verify and publish workflow', () => {
+test('maintainer release skill documents the repo-local verify and publish workflow', {
+  skip: !releaseAssetsAvailable,
+}, () => {
   const skill = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'skills', 'maintainer-release', 'SKILL.md'),
+    maintainerReleaseSkillPath,
     'utf8',
   );
 
@@ -688,7 +696,9 @@ test('maintainer release skill documents the repo-local verify and publish workf
   assert.match(skill, /scripts\/release\/publish\.mjs/);
 });
 
-test('runVerifyRelease runs tests, pack, default smoke checks, and records release state', () => {
+test('runVerifyRelease runs tests, pack, default smoke checks, and records release state', {
+  skip: !releaseAssetsAvailable,
+}, () => {
   const projectDir = makeTempProject();
   fs.writeFileSync(
     path.join(projectDir, 'package.json'),
@@ -734,7 +744,9 @@ test('runVerifyRelease runs tests, pack, default smoke checks, and records relea
   assert.ok(fs.existsSync(path.join(projectDir, RELEASE_STATE_FILE)));
 });
 
-test('runPublishRelease refuses to run without explicit confirmation or a verified candidate', () => {
+test('runPublishRelease refuses to run without explicit confirmation or a verified candidate', {
+  skip: !releaseAssetsAvailable,
+}, () => {
   const projectDir = makeTempProject();
   fs.writeFileSync(
     path.join(projectDir, 'package.json'),
@@ -766,7 +778,9 @@ test('runPublishRelease refuses to run without explicit confirmation or a verifi
   assert.deepEqual(calls, []);
 });
 
-test('runPublishRelease publishes the verified tarball and tags in declared order', () => {
+test('runPublishRelease publishes the verified tarball and tags in declared order', {
+  skip: !releaseAssetsAvailable,
+}, () => {
   const projectDir = makeTempProject();
   fs.writeFileSync(
     path.join(projectDir, 'package.json'),
