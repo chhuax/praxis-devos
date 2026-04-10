@@ -37,6 +37,19 @@ import {
   validateChangeEvidence,
   validateSessionTranscript,
 } from '../src/core/praxis-devos.js';
+const releaseLibPath = path.join(PRAXIS_ROOT, 'scripts', 'release', 'lib.mjs');
+const maintainerReleaseSkillPath = path.join(PRAXIS_ROOT, 'skills', 'maintainer-release', 'SKILL.md');
+const releaseAssetsAvailable = fs.existsSync(releaseLibPath) && fs.existsSync(maintainerReleaseSkillPath);
+
+const releaseLib = releaseAssetsAvailable
+  ? await import('../scripts/release/lib.mjs')
+  : null;
+
+const RELEASE_STATE_FILE = releaseLib?.RELEASE_STATE_FILE;
+const readVerifiedReleaseState = releaseLib?.readVerifiedReleaseState;
+const runPublishRelease = releaseLib?.runPublishRelease;
+const runVerifyRelease = releaseLib?.runVerifyRelease;
+const writeVerifiedReleaseState = releaseLib?.writeVerifiedReleaseState;
 
 const makeTempProject = () => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-test-'));
 
@@ -671,6 +684,150 @@ test('projectNativeSkills projects supporting files that live alongside SKILL.md
   });
 
   assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
+});
+
+test('maintainer release skill documents the repo-local verify and publish workflow', {
+  skip: !releaseAssetsAvailable,
+}, () => {
+  const skill = fs.readFileSync(
+    maintainerReleaseSkillPath,
+    'utf8',
+  );
+
+  assert.match(skill, /^---\nname: maintainer-release\n/m);
+  assert.match(skill, /verify mode/i);
+  assert.match(skill, /publish mode/i);
+  assert.match(skill, /release-order/i);
+  assert.match(skill, /tag-order/i);
+  assert.match(skill, /scripts\/release\/verify\.mjs/);
+  assert.match(skill, /scripts\/release\/publish\.mjs/);
+});
+
+test('runVerifyRelease runs tests, pack, default smoke checks, and records release state', {
+  skip: !releaseAssetsAvailable,
+}, () => {
+  const projectDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(projectDir, 'package.json'),
+    JSON.stringify({ name: 'praxis-devos', version: '0.4.9' }, null, 2),
+    'utf8',
+  );
+  const calls = [];
+  const fakeExec = (command, args) => {
+    calls.push([command, args]);
+    if (command === 'git' && args[0] === 'status') {
+      return '';
+    }
+    if (command === 'npm' && args[0] === 'pack') {
+      return JSON.stringify([{ filename: 'praxis-devos-0.4.9.tgz' }]);
+    }
+    return '';
+  };
+
+  const result = runVerifyRelease({
+    cwd: projectDir,
+    execFileSyncImpl: fakeExec,
+    nowIso: '2026-04-09T12:00:00.000Z',
+  });
+
+  assert.equal(result.version, '0.4.9');
+  assert.equal(result.tarballFile, 'praxis-devos-0.4.9.tgz');
+  assert.equal(result.ready, true);
+  assert.equal(result.workspaceClean, true);
+  assert.deepEqual(
+    calls,
+    [
+      ['git', ['status', '--short']],
+      ['node', ['--test']],
+      ['npm', ['pack', '--json']],
+      ['node', ['test/install-smoke-cli.mjs', '--package', './praxis-devos-0.4.9.tgz', '--scenario', 'opencode']],
+      ['node', ['test/install-smoke-cli.mjs', '--package', './praxis-devos-0.4.9.tgz', '--scenario', 'claude']],
+    ],
+  );
+
+  const persisted = readVerifiedReleaseState({ cwd: projectDir });
+  assert.equal(persisted.tarballFile, 'praxis-devos-0.4.9.tgz');
+  assert.equal(persisted.generatedAt, '2026-04-09T12:00:00.000Z');
+  assert.ok(fs.existsSync(path.join(projectDir, RELEASE_STATE_FILE)));
+});
+
+test('runPublishRelease refuses to run without explicit confirmation or a verified candidate', {
+  skip: !releaseAssetsAvailable,
+}, () => {
+  const projectDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(projectDir, 'package.json'),
+    JSON.stringify({ name: 'praxis-devos', version: '0.4.9' }, null, 2),
+    'utf8',
+  );
+  const calls = [];
+  const fakeExec = (command, args) => {
+    calls.push([command, args]);
+    return '';
+  };
+
+  const missingConfirmation = runPublishRelease({
+    cwd: projectDir,
+    execFileSyncImpl: fakeExec,
+  });
+  assert.equal(missingConfirmation.ok, false);
+  assert.match(missingConfirmation.summary, /release-order/i);
+  assert.match(missingConfirmation.summary, /tag-order/i);
+
+  const missingVerify = runPublishRelease({
+    cwd: projectDir,
+    releaseOrder: 'publish-first',
+    tagOrder: 'after-publish',
+    execFileSyncImpl: fakeExec,
+  });
+  assert.equal(missingVerify.ok, false);
+  assert.match(missingVerify.summary, /run verify mode first/i);
+  assert.deepEqual(calls, []);
+});
+
+test('runPublishRelease publishes the verified tarball and tags in declared order', {
+  skip: !releaseAssetsAvailable,
+}, () => {
+  const projectDir = makeTempProject();
+  fs.writeFileSync(
+    path.join(projectDir, 'package.json'),
+    JSON.stringify({ name: 'praxis-devos', version: '0.4.9' }, null, 2),
+    'utf8',
+  );
+  writeVerifiedReleaseState({
+    cwd: projectDir,
+    state: {
+      version: '0.4.9',
+      tarballFile: 'praxis-devos-0.4.9.tgz',
+      tarballPath: path.join(projectDir, 'praxis-devos-0.4.9.tgz'),
+      generatedAt: '2026-04-09T12:00:00.000Z',
+      checks: ['node --test', 'npm pack --json', 'smoke:opencode', 'smoke:claude'],
+      ready: true,
+    },
+  });
+
+  const calls = [];
+  const fakeExec = (command, args) => {
+    calls.push([command, args]);
+    return '';
+  };
+
+  const result = runPublishRelease({
+    cwd: projectDir,
+    releaseOrder: 'publish-first',
+    tagOrder: 'after-publish',
+    execFileSyncImpl: fakeExec,
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    calls,
+    [
+      ['npm', ['publish', path.join(projectDir, 'praxis-devos-0.4.9.tgz')]],
+      ['git', ['tag', 'v0.4.9']],
+      ['git', ['push', 'origin', 'v0.4.9']],
+    ],
+  );
 });
 
 test('projectNativeSkills projects host commands from the shared command asset root', () => {

@@ -115,7 +115,7 @@ Rules:
 
 ## Minimum Codemap Content
 
-## Codemap Composition Strategy
+### Codemap Composition Strategy
 
 The allowed write-target set is intentionally narrow. Therefore each codemap should carry more semantic weight than a simple filename suggests.
 
