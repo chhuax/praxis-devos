@@ -297,6 +297,13 @@ Additional requirements for multi-module projects:
 - Controller-to-module mapping: for each module that exposes HTTP endpoints, the owning module of each controller or route handler is confirmed
 - Dependency direction: inter-module dependency relationships confirmed from manifest declarations
 
+For `mode=refresh`:
+
+- Existing docs artifacts: current `surfaces.yaml` and all codemap files have been read
+- Changed scope: the set of files or modules that changed since the last generation is identified
+- Module topology for affected modules: every module touched by the change has been scanned with the same rigour as `mode=init`
+- Surface validity: if URL namespace owners or integration points are being updated, the controller-to-module mapping for affected modules is confirmed
+
 ### Exploration failure handling
 
 - If a scan command is Cancelled or errored, the information that command was responsible for is treated as **missing**
@@ -347,7 +354,7 @@ Assembly steps:
 
 - `schemaVersion` is present and equals `1`
 - `mode` is present and is either `init` or `refresh`
-- `surfacesYaml` is non-empty
+- `surfacesYaml` is non-empty and is valid YAML containing at least a `primary_surface` key
 - `codemaps` is an array
 - each codemap entry has non-empty `path`, non-empty `content`, and `action=upsert`
 - duplicate codemap paths are invalid
@@ -359,16 +366,20 @@ Assembly steps:
 When any validation check fails:
 
 1. **All-or-nothing**: if any single entry fails validation, nothing is written
-2. Return a structured error:
+2. Return a structured error that still includes `schemaVersion` and `mode` for traceability:
 
 ```json
 {
+  "schemaVersion": 1,
+  "mode": "init",
   "status": "validation-failed",
   "errors": [
     { "path": "docs/codemaps/modules/foo.md", "reason": "path outside allowed target set" }
   ]
 }
 ```
+
+The result contract therefore has two variants: a success variant (as defined in Required Outputs) and this error variant. Callers must check for the `status` field to distinguish them.
 
 3. Return control to the user with the error — do not automatically retry
 4. Report the failure reason to the user

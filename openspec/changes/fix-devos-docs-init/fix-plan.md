@@ -28,6 +28,13 @@
 
 修复按"先堵根因、再补机制、最后增强"排序。每批内各修改互不依赖，可并行。
 
+## 生效范围说明
+
+本 PR（第一批）的改动全部在技能定义（SKILL.md）和命令定义（commands/*.md）层面，属于**协议声明**。当前架构下 `/devos-docs-init` 是纯 AI 驱动的技能调用，AI agent 通过读取这些定义来决定行为。
+
+- **已生效**：AI agent 在执行 `/devos-docs-init` 或 `/devos-docs-refresh` 时会读取更新后的技能定义，从而受到新增协议的约束
+- **未生效（后续增强）**：目前没有确定性代码（JS validator、hook）来强制执行这些协议。如果 AI agent 选择忽略协议，没有硬性拦截。将合约验证从"AI 自律"升级为"确定性代码保障"（如 `src/core/docs-contract-validator.js`）是后续计划
+
 ---
 
 ## 第一批：堵根因（#65 #66 #68）
@@ -40,7 +47,7 @@
 
 **在 `## Repository Interrogation Order` 之前插入整节**:
 
-```markdown
+````markdown
 ## Agent Collaboration
 
 当主 agent 使用子 agent（Explore 或其他类型）进行仓库探索时，必须遵守以下协议。
@@ -57,7 +64,7 @@
 
 ### 标准探索返回结构
 
-子 agent 应返回以下结构化信息（作为文本，非文件）：
+子 agent 应返回以下结构化信息（作为文本，非文件）。示例使用 Maven/Java 字段名，非 Java 项目应适配为对应的拓扑约定：
 
 ```yaml
 module_topology:
@@ -95,7 +102,7 @@ dependency_graph:
 2. 只有当子 agent 的返回存在**可列举的事实错误**时，才可以针对性补充扫描
 3. 补充扫描必须基于子 agent 的结果做增量，禁止从零重建
 4. 如果主 agent 判断子 agent 结果不可用，必须在输出中列出具体原因（缺哪些字段、哪些事实有误），不得使用模糊理由
-```
+````
 
 ### 修改 2：技能定义增加强制合约验证步骤
 
@@ -103,7 +110,7 @@ dependency_graph:
 
 **将现有的 `## Validation Expectations` 节替换为**:
 
-```markdown
+````markdown
 ## Validation Contract
 
 ### 合约组装（写回前必须执行）
@@ -122,7 +129,7 @@ dependency_graph:
 
 - `schemaVersion` 存在且等于 `1`
 - `mode` 存在且为 `init` 或 `refresh`
-- `surfacesYaml` 非空
+- `surfacesYaml` 非空且为合法 YAML，至少包含 `primary_surface` key
 - `codemaps` 是数组
 - 每个 codemap 条目有非空 `path`、非空 `content`、`action=upsert`
 - 无重复 codemap path
@@ -134,10 +141,12 @@ dependency_graph:
 验证失败时：
 
 1. **All-or-nothing**: 任何一个条目验证失败，全部不写回
-2. 返回结构化错误：
+2. 返回包含 `schemaVersion` 和 `mode` 的结构化错误（便于追溯）：
 
 ```json
 {
+  "schemaVersion": 1,
+  "mode": "init",
   "status": "validation-failed",
   "errors": [
     { "path": "docs/codemaps/modules/foo.md", "reason": "path outside allowed target set" }
@@ -145,9 +154,11 @@ dependency_graph:
 }
 ```
 
-3. 终止流程，不自动重试
+合约因此存在两种变体：成功变体（如 Required Outputs 所定义）和错误变体。调用方通过检查 `status` 字段区分。
+
+3. 将错误返回给用户，不自动重试
 4. 向用户报告失败原因
-```
+````
 
 ### 修改 3：命令定义增加子 agent 使用说明
 
@@ -155,12 +166,12 @@ dependency_graph:
 
 **将 `## Implementation` 节替换为**:
 
-```markdown
+````markdown
 ## Implementation
 
 - 调用 `devos-docs` 技能，传入 `mode=init`
 - 如果使用子 agent 进行仓库探索，必须遵守 `devos-docs` 技能的 Agent Collaboration 节
-- 子 agent 的 prompt 必须明确要求返回标准探索返回结构，禁止写入外部文件
+- 子 agent 的 prompt 必须明确要求返回标准探索返回结构（适配项目语言/构建系统），禁止写入外部文件
 - 主 agent 必须使用子 agent 的返回结果，不得丢弃后从零重建
 - 使用稳定的文档路由顺序:
   - `docs/surfaces.yaml`
@@ -169,11 +180,15 @@ dependency_graph:
   - `docs/codemaps/modules/<artifactId>.md` 仅当模块路由可确定时
 - 写回前必须完成合约组装与验证（见 devos-docs 技能 Validation Contract 节）
 - 验证通过后一次性写入，禁止边探索边多次落盘
-```
+````
 
 ---
 
 ## 第二批：补机制（#62 #67 #64）
+
+### 命名约定
+
+语言偏好字段统一使用 `artifact_language`（snake_case），与 YAML 文件风格一致。在 JSON 合约中同样使用 `artifact_language`，不使用 camelCase。
 
 ### 修改 4：技能定义增加 Language Policy 节
 
@@ -181,7 +196,7 @@ dependency_graph:
 
 **在 `## AI-First Quality Bar` 之后插入**:
 
-```markdown
+````markdown
 ## Language Policy
 
 尊重当前项目的 artifact language policy。
@@ -200,15 +215,13 @@ dependency_graph:
 - 文件路径
 - 技术术语专有名词（如 artifactId、Tekton、fabric8）
 - YAML/JSON 字段名
-```
+````
 
 **同时修改 `## Input` 节，在 caller must provide 列表中追加**:
 
-```markdown
-- `artifact_language` 语言偏好（如 `zh-CN`），未提供时默认 `en`
-```
+    - `artifact_language` 语言偏好（如 `zh-CN`），未提供时默认 `en`
 
-### 修改 5：surfaces.yaml schema 增加语言字段
+### 修改 5：surfaces.yaml schema 和 JSON 合约增加语言字段
 
 **文件**: `assets/skills/devos-docs/SKILL.md`
 
@@ -218,7 +231,7 @@ dependency_graph:
 {
   "schemaVersion": 1,
   "mode": "init",
-  "artifactLanguage": "zh-CN",
+  "artifact_language": "zh-CN",
   "surfacesYaml": "...",
   "codemaps": [...]
 }
@@ -226,9 +239,7 @@ dependency_graph:
 
 **同时在 Validation Contract 的检查项中追加**:
 
-```markdown
-- `artifactLanguage` 存在时，必须是已支持的语言代码
-```
+    - `artifact_language` 存在时，必须是已支持的语言代码
 
 ### 修改 6：命令定义增加语言传递
 
@@ -236,44 +247,14 @@ dependency_graph:
 
 **在 Implementation 节追加**:
 
-```markdown
-- 检测当前项目的语言偏好：
-  - 优先读取已有 `surfaces.yaml` 中的 `artifact_language` 字段
-  - 其次检查项目中 `AGENTS.md` / `README.md` 的主要语言
-  - 将检测到的语言偏好传入 `devos-docs` 技能的 `artifact_language` 参数
-```
+    - 检测当前项目的语言偏好：
+      - 优先读取已有 `surfaces.yaml` 中的 `artifact_language` 字段
+      - 其次检查项目中 `AGENTS.md` / `README.md` 的主要语言
+      - 将检测到的语言偏好传入 `devos-docs` 技能的 `artifact_language` 参数
 
 ### 修改 7：增加证据完整性检查点
 
-**文件**: `assets/skills/devos-docs/SKILL.md`
-
-**在 `## Agent Collaboration` 之后、`## Repository Interrogation Order` 之前插入**:
-
-```markdown
-## Evidence Completeness
-
-在宣称"证据充分"并进入合约组装阶段之前，必须通过以下检查点。
-
-### 必须信息（缺失任一项不得进入写回）
-
-对于 `mode=init`：
-
-- [ ] 模块拓扑：所有 `<modules>` 声明的模块均已扫描，artifactId 和 path 已确认
-- [ ] 包根列表：每个模块的 `src/main/java` 下的实际顶级包已确认（非推断）
-- [ ] 主入口：主应用的 Spring Boot entry point 已定位
-
-对于多模块项目额外要求：
-
-- [ ] controller → module 映射：至少对每个暴露 HTTP 端点的模块，已确认其 controller 所在模块
-- [ ] 依赖方向：模块间依赖关系已从 pom.xml 的 `<dependencies>` 确认
-
-### 探索失败处理
-
-- 如果某个扫描命令被 Cancelled 或 errored，该命令对应的信息视为**缺失**
-- 不得对同一命令做相同参数的重试——要么换一种方式获取，要么接受缺失
-- 对缺失信息对应的 codemap 内容，必须标注为低置信度或跳过该部分
-- 禁止用推断填补缺失信息后将推断结果写成事实性描述
-```
+已在第一批中提前完成（Agent Collaboration 节和 Evidence Completeness 节）。
 
 ---
 
@@ -285,7 +266,7 @@ dependency_graph:
 
 **在 `## Maven Multi-Module Rules` 之后插入**:
 
-```markdown
+````markdown
 ## Large Project Strategy
 
 当目标项目的模块数量超过 5 个时，启用分批生成策略。
@@ -309,7 +290,7 @@ dependency_graph:
 - 避免上下文窗口压力导致跨模块信息污染（#58）
 - 每批模块的推断质量一致，不因排列顺序而退化
 - 减少单次执行的 token 消耗
-```
+````
 
 ---
 
@@ -320,12 +301,12 @@ dependency_graph:
 | 1 | `assets/skills/devos-docs/SKILL.md` | 新增 Agent Collaboration 节 | #65 #66 |
 | 1 | `assets/skills/devos-docs/SKILL.md` | 替换 Validation Expectations → Validation Contract | #68 #64 |
 | 1 | `assets/commands/devos-docs-init.md` | 替换 Implementation 节 | #65 #66 #60 |
+| 1 | `assets/commands/devos-docs-refresh.md` | 同步 Implementation 节协议约束 | #65 #66 #60 |
 | 2 | `assets/skills/devos-docs/SKILL.md` | 新增 Language Policy 节 | #62 |
-| 2 | `assets/skills/devos-docs/SKILL.md` | Input 节追加 artifact_language | #62 |
-| 2 | `assets/skills/devos-docs/SKILL.md` | Required Outputs JSON 追加 artifactLanguage | #62 |
+| 2 | `assets/skills/devos-docs/SKILL.md` | Input 节追加 `artifact_language` | #62 |
+| 2 | `assets/skills/devos-docs/SKILL.md` | Required Outputs JSON 追加 `artifact_language` | #62 |
 | 2 | `assets/commands/devos-docs-init.md` | Implementation 追加语言检测 | #62 |
 | 2 | `assets/commands/devos-docs-refresh.md` | Implementation 追加语言检测 | #62 |
-| 2 | `assets/skills/devos-docs/SKILL.md` | 新增 Evidence Completeness 节 | #67 #61 |
 | 3 | `assets/skills/devos-docs/SKILL.md` | 新增 Large Project Strategy 节 | #63 |
 
 ## 不需要改 JS 代码

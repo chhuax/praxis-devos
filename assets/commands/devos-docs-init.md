@@ -22,7 +22,7 @@ Run this command when:
 ## Implementation
 
 - Invoke the `devos-docs` skill with `mode=init`
-- If using a sub-agent for repository exploration, follow the Agent Collaboration protocol in the `devos-docs` skill — the sub-agent prompt must request the standard exploration return structure and prohibit writing to external files
+- If using a sub-agent for repository exploration, follow the Agent Collaboration protocol in the `devos-docs` skill — the sub-agent prompt must request the standard exploration return structure (adapted for the project's language/build system) and prohibit writing to external files
 - The main agent must consume the sub-agent's return; discarding it and rebuilding from scratch is a protocol violation
 - Use the stable docs routing order:
   - `docs/surfaces.yaml`
