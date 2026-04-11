@@ -1,0 +1,34 @@
+primary_surface: cli
+cli_entrypoint: bin/praxis-devos.js
+npm_package: praxis-devos
+opencode_plugin_entrypoint: opencode-plugin.js
+supported_agents:
+  - opencode
+  - codex
+  - claude
+commands:
+  - setup
+  - init
+  - sync
+  - status
+  - doctor
+  - bootstrap
+bundled_skills:
+  - devos-docs
+  - devos-change-docs
+  - opsx-explore
+  - opsx-propose
+  - opsx-apply
+  - opsx-archive
+bundled_commands:
+  - devos-docs-init
+  - devos-docs-refresh
+projection_targets:
+  claude: ~/.claude/skills/<name>/SKILL.md
+  codex: ~/.codex/skills/<name>/SKILL.md
+  opencode: ~/.config/opencode/config.json (plugin registration)
+external_dependencies:
+  openspec: "@fission-ai/openspec (global npm)"
+  superpowers_claude: "claude plugin install"
+  superpowers_codex: "git clone + symlink at ~/.codex/superpowers"
+  superpowers_opencode: "declared in ~/.config/opencode/config.json"

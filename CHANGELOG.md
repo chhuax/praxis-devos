@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-04-11
+
+### Added
+- DevOS docs reference guides for `devos-docs` command and skill behavior, including summary, index, comprehensive guide, and full reference artifacts
+- checked-in generated docs examples under `docs/surfaces.yaml` and `docs/codemaps/project-overview.md` for AI-first routing reference
+
+### Changed
+- aligned the repository root `AGENTS.md` and `CLAUDE.md` with the current Praxis-managed entry blocks used in downstream projects
+
 ## [0.6.0] - 2026-04-11
 
 ### Added
