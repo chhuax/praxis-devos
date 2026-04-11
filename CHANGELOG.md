@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-11
+
+### Added
+- `devos-change-docs` skill with `change-blackbox`, `change-api`, and `project-api-sync` modes for change-level documentation contracts
+- SuperPowers capability chain integration across OpenSpec `propose`, `apply`, and `archive` stages
+- `opsx-propose` now injects `Docs Impact` field and blackbox/API doc tasks automatically
+- `opsx-apply` supports optional sidecar subagent for drafting change-level documentation
+- `opsx-archive` enforces API sync evidence or explicit waiver for API-impacting changes
+
+### Changed
+- Core harness refactored from monolithic `src/core/praxis-devos.js` into focused runtime and project modules (`src/core/runtime/*`, `src/core/project/*`)
+- Removed legacy `docs` and `migrate` CLI command surfaces
+- `ensureOpenSpecRuntime` now treats project-local installs (`status === 'warning'`) as sufficient, skipping auto global-install and logging a recommendation note instead
+- Removed `src/monitoring/` subsystem (capability evidence and overlay tracking)
+
+### Fixed
+- `uniqueAgents` now throws a clear error when all provided agent names are unsupported, instead of silently returning an empty array
+
 ## [0.5.1] - 2026-04-10
 
 ### Added
