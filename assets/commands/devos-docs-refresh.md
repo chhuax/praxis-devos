@@ -23,6 +23,8 @@ Run this command when:
 ## Implementation
 
 - Invoke the `devos-docs` skill with `mode=refresh`
+- If using a sub-agent for repository exploration, follow the Agent Collaboration protocol in the `devos-docs` skill — the sub-agent prompt must request the standard exploration return structure (adapted for the project's language/build system) and prohibit writing to external files
+- The main agent must consume the sub-agent's return; discarding it and rebuilding from scratch is a protocol violation
 - Use the stable docs routing order:
   - `docs/surfaces.yaml`
   - `docs/codemaps/project-overview.md`
@@ -33,11 +35,11 @@ Run this command when:
   - relevant OpenSpec artifact paths
   - changed paths
   - optional target module hints
+- Before writing any file, complete contract assembly and validation (see Validation Contract in the `devos-docs` skill) — writing files without a validated contract is a protocol violation
+- Write all files in a single pass after validation; writing files incrementally during exploration is prohibited
 - Canonical paths:
   - `docs/surfaces.yaml`
   - `docs/codemaps/**`
-- Validation:
-  - results must pass the existing docs contract before writeback
 - Refresh is non-destructive:
   - do not implicitly delete, rename, or relocate docs artifacts
 
