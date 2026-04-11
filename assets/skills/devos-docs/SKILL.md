@@ -19,10 +19,13 @@ Treat the AI-first skill path as canonical. Do not optimize for non-AI fallback 
 The caller must provide:
 
 - `mode=init` or `mode=refresh`
-- `artifact_language` — language preference for generated content (e.g., `zh-CN`); defaults to `en` when not provided
 - repository context sufficient to identify the primary external surface
 - existing docs artifacts when running in `mode=refresh`
 - a docs context pack when docs consumption is routed intentionally
+
+Optional:
+
+- `artifact_language` — language preference for generated content (e.g., `zh-CN`); defaults to `en` when not provided
 
 For deterministic routing, the docs context pack should follow this order:
 
