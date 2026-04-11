@@ -39,27 +39,18 @@ Internal capabilities must not:
 
 Stage hooks:
 
-- Before executing a pending task, if the task description is high-level or ambiguous, invoke `writing-plans` internally to expand it into concrete steps with exact file paths, code, and verification commands. Keep the expansion in context only — do not write it back to `tasks.md`. Execute immediately after expansion.
-- When implementing any task that involves writing code, follow `test-driven-development` internally: write a failing test first, verify it fails, write minimal code to pass, verify it passes. Do not write production code before a failing test exists.
-- When executing a task, invoke `subagent-driven-development` internally when needed for context isolation or parallel execution. If subagent capability is not available, fall back to `executing-plans` instead. When invoked: dispatch a fresh implementer subagent, then a spec-reviewer subagent, then a code-quality-reviewer subagent. Do not mark the task complete until both review stages pass. Keep all outputs under the current change.
+- If a task is clearly multi-step and needs finer breakdown, invoke `writing-plans` internally to expand it into concrete steps. Keep the expansion in context only — do not write it back to `tasks.md`.
+- When a task involves new logic with testable behavior, prefer `test-driven-development` internally. Tasks that change config, templates, or docs do not require TDD.
 - Before implementation, build a docs context pack when project docs exist:
   - always read `docs/surfaces.yaml`
   - always read `docs/codemaps/project-overview.md`
   - include `docs/codemaps/module-map.md` only for multi-module projects
   - include `docs/codemaps/modules/<artifactId>.md` only when change-aware routing can identify the target module
-- Read Docs Impact intent from change artifacts when present and treat it as the primary signal for docs refresh routing, with changed paths only as a fallback signal.
-- Read `Docs Impact` declarations for `change-blackbox`, `change-api`, and `project-api-sync` when present and treat them as the primary signal for change-doc work.
-- Complete change-local docs tasks after the relevant implementation has stabilized, not before.
-- When change-local docs are required, invoke `devos-change-docs` to produce a structured result for:
-  - `openspec/changes/<change>/blackbox-test.md`
-  - `openspec/changes/<change>/api-doc.md`
-  - `docs/reference/api.md` when stable sync is due
-- Sidecar subagents may draft the `devos-change-docs` structured result, but final validation and writeback remain with the main flow.
-- Before completion, do an AI self-check on change-doc coverage. If the implementation now clearly introduces API behavior changes but `tasks.md` or `Docs Impact` still do not declare the related API doc obligations, pause and update the change artifacts instead of silently finishing apply.
+- Read Docs Impact intent from change artifacts when present and use it as advisory routing context for docs work. `tasks.md` is the authoritative source for which docs tasks to execute.
+- When `tasks.md` explicitly lists docs tasks (blackbox, api-doc, etc.), execute them after the relevant implementation has stabilized. Invoke `devos-change-docs` for declared targets.
 - If you hit a bug, failed test, regression, exception, or blocker, invoke `systematic-debugging` internally before deciding on a fix.
-- After all tasks are complete, invoke `requesting-code-review` internally to review the full code diff for this change (from the commit before apply started to HEAD). Critical or Important issues must be resolved before proceeding to archive.
-- Before completion or handoff, run a deterministic docs refresh assessment using changed paths, change artifacts, and Docs Impact intent. If refresh is needed, invoke `devos-docs` in `mode=refresh` with change-aware context and any target-module hints from Docs Impact, or explicitly record why refresh is deferred.
-- Before completion or handoff, ensure change-doc obligations from `Docs Impact` have either been fulfilled or explicitly deferred with a reason in the current change artifacts.
+- After all tasks are complete, consider running `requesting-code-review` internally on the full diff. Address critical issues before proceeding to archive.
+- Before completion or handoff, if `tasks.md` includes a docs-refresh task, run the docs refresh assessment and invoke `devos-docs` in `mode=refresh`. If no docs-refresh task is listed, skip this step.
 - Before saying work is complete, fixed, or passing, invoke `verification-before-completion` internally and use real verification evidence in the status update.
 - When all tasks are complete and verification passes, suggest the user run `finishing-a-development-branch` to handle merge, PR, or worktree cleanup before proceeding to archive.
 
