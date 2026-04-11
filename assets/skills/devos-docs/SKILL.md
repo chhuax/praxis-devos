@@ -23,6 +23,10 @@ The caller must provide:
 - existing docs artifacts when running in `mode=refresh`
 - a docs context pack when docs consumption is routed intentionally
 
+Optional:
+
+- `artifact_language` — language preference for generated content (e.g., `zh-CN`); defaults to `en` when not provided
+
 For deterministic routing, the docs context pack should follow this order:
 
 1. `docs/surfaces.yaml`
@@ -48,6 +52,7 @@ Minimum contract shape:
 {
   "schemaVersion": 1,
   "mode": "init",
+  "artifact_language": "en",
   "surfacesYaml": "primary_surface: ...",
   "codemaps": [
     {
@@ -336,6 +341,28 @@ If the output cannot answer those questions, it is too thin.
 
 If two candidate outputs have the same factual accuracy, prefer the one that reduces future search work for an implementation agent.
 
+## Language Policy
+
+Honor the `artifact_language` provided by the caller.
+
+When `artifact_language` is set (e.g., `zh-CN`), all generated documentation content — section headings, descriptive text, constraint explanations, and routing guidance — must be written in that language.
+
+When `artifact_language` is not provided, default to `en`.
+
+The first implementation must support heading aliases for at least:
+
+- `zh-CN`
+- `en`
+
+The following must always remain in their original form regardless of language setting:
+
+- Code identifiers (class names, method names, package names)
+- Commands and CLI arguments
+- File paths
+- Technical proper nouns (e.g., artifactId, Tekton, fabric8, Spring Boot, MyBatis)
+- YAML/JSON field names
+- URL paths and patterns
+
 ## Validation Contract
 
 ### Contract assembly (mandatory before any Write)
@@ -360,6 +387,7 @@ Assembly steps:
 - duplicate codemap paths are invalid
 - paths outside the allowed target set are invalid
 - `contracts/surfaces.yaml` is not a valid output target
+- `artifact_language` when present must be a supported language code (`en`, `zh-CN`)
 
 ### Failure handling
 

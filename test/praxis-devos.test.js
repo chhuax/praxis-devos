@@ -559,6 +559,35 @@ test('devos-docs bundled skill declares supported modes', () => {
   assert.match(docsSkill, /mode=refresh/);
 });
 
+test('devos-docs skill contains language policy contract', () => {
+  const docsSkill = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-docs', 'SKILL.md'),
+    'utf8',
+  );
+
+  assert.match(docsSkill, /artifact_language/);
+  assert.match(docsSkill, /^## Language Policy$/m);
+  assert.match(docsSkill, /zh-CN/);
+  assert.match(docsSkill, /`artifact_language`.*defaults to `en`/);
+});
+
+test('devos-docs commands include language detection and artifact_language', () => {
+  const initCmd = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'commands', 'devos-docs-init.md'),
+    'utf8',
+  );
+  const refreshCmd = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'commands', 'devos-docs-refresh.md'),
+    'utf8',
+  );
+
+  for (const cmd of [initCmd, refreshCmd]) {
+    assert.match(cmd, /docs\/surfaces\.yaml/);
+    assert.match(cmd, /artifact_language/);
+    assert.match(cmd, /AGENTS\.md.*README\.md|README\.md.*AGENTS\.md/);
+  }
+});
+
 test('devos-change-docs bundled skill declares supported modes', () => {
   const docsSkill = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-change-docs', 'SKILL.md'),

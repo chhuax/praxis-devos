@@ -22,6 +22,10 @@ Run this command when:
 ## Implementation
 
 - Invoke the `devos-docs` skill with `mode=init`
+- Detect the project's language preference and pass it as `artifact_language`:
+  - First check existing `docs/surfaces.yaml` for an `artifact_language` field
+  - Otherwise infer from the primary language of `AGENTS.md` / `README.md`
+  - Pass the detected value to the `devos-docs` skill; if no preference is found, omit (defaults to `en`)
 - If using a sub-agent for repository exploration, follow the Agent Collaboration protocol in the `devos-docs` skill — the sub-agent prompt must request the standard exploration return structure (adapted for the project's language/build system) and prohibit writing to external files
 - The main agent must consume the sub-agent's return; discarding it and rebuilding from scratch is a protocol violation
 - Use the stable docs routing order:
