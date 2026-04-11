@@ -115,7 +115,7 @@ Rules:
 
 ## Minimum Codemap Content
 
-### Codemap Composition Strategy
+### Composition Strategy
 
 The allowed write-target set is intentionally narrow. Therefore each codemap should carry more semantic weight than a simple filename suggests.
 
@@ -221,6 +221,89 @@ When enough repository context is available, prefer content with these sections:
 - Persistence, async, or background work touchpoints
 - Debugging or modification tips
 
+## Agent Collaboration
+
+When the main agent uses a sub-agent (Explore or other types) for repository exploration, the following protocol is mandatory.
+
+### Sub-agent prompt requirements
+
+The main agent's prompt to the sub-agent must include:
+
+1. An explicit return format requirement — the sub-agent must return results **as a text message**, never write to `/tmp` or other external files
+2. The expected return structure (see "Standard exploration return structure" below)
+3. The target repository path
+
+Vague prompts such as "explore the repository to gather evidence" are prohibited.
+
+### Standard exploration return structure
+
+The sub-agent should return the following structured information as text (not as a file).
+
+The example below uses Maven/Java field names. For non-Java projects, adapt field names to the project's topology conventions (e.g., `package.json` workspaces for Node.js, `go.work` for Go, `Cargo.toml` workspace members for Rust). Fields that are not applicable to the project type should be omitted; an omitted field is not the same as a missing required field.
+
+```yaml
+module_topology:
+  - artifactId: xxx
+    path: relative/path
+    packaging: jar|war|pom
+    parent_artifactId: xxx
+
+package_roots:
+  <module_artifactId>:
+    - com.example.module.package1
+    - com.example.module.package2
+
+controller_map:
+  - controller_class: XxxController
+    module: <module_artifactId>
+    url_prefixes:
+      - /api/v1/xxx
+
+integration_points:
+  - system: kubernetes
+    classes:
+      - com.example.KubeService
+    module: <module_artifactId>
+
+dependency_graph:
+  <module_a>:
+    - <module_b>
+    - <module_c>
+```
+
+### Sub-agent result usage rules
+
+1. The main agent **must evaluate the sub-agent's return first** before any additional exploration — skipping this step is a protocol violation
+2. Supplementary scanning is permitted only when the sub-agent's return contains **enumerable factual errors** — the main agent must list each specific error
+3. Supplementary scanning must build incrementally on the sub-agent's result; starting from scratch is prohibited
+4. If the main agent judges the sub-agent's result unusable, the output must list concrete reasons (which fields are missing, which facts are incorrect); vague justifications such as "didn't gather the raw file content I need" are prohibited
+
+## Evidence Completeness
+
+Before claiming "sufficient evidence" and entering the contract assembly phase, the following checkpoints must pass.
+
+### Required information (missing any one blocks writeback)
+
+The checkpoints below are stated in Maven/Java terms. For other project types, apply analogous checkpoints based on the project's manifest and topology conventions (e.g., `package.json` workspaces, Go modules, Cargo workspace members). The principle is the same: every checkpoint must be satisfied by confirmed source evidence, not inference.
+
+For `mode=init`:
+
+- Module topology: every module declared in `<modules>` (or equivalent workspace manifest) has been scanned; artifactId and path confirmed
+- Package roots: actual top-level packages under each module's source root confirmed from source (not inferred)
+- Main entry point: the primary application entry point located
+
+Additional requirements for multi-module projects:
+
+- Controller-to-module mapping: for each module that exposes HTTP endpoints, the owning module of each controller or route handler is confirmed
+- Dependency direction: inter-module dependency relationships confirmed from manifest declarations
+
+### Exploration failure handling
+
+- If a scan command is Cancelled or errored, the information that command was responsible for is treated as **missing**
+- Retrying the same command with identical parameters is prohibited — either use a different approach or accept the gap
+- Codemap content that depends on missing information must be annotated as low-confidence or omitted entirely
+- Filling information gaps with inference and then writing the inferred content as factual statements is prohibited
+
 ## Repository Interrogation Order
 
 Before generating content, prefer this evidence order:
@@ -246,9 +329,21 @@ If the output cannot answer those questions, it is too thin.
 
 If two candidate outputs have the same factual accuracy, prefer the one that reduces future search work for an implementation agent.
 
-## Validation Expectations
+## Validation Contract
 
-The caller validates the result before writeback. Your result must satisfy:
+### Contract assembly (mandatory before any Write)
+
+Before calling Write on any file, the complete JSON contract must be assembled and output.
+Skipping this step and writing files directly is a protocol violation.
+
+Assembly steps:
+
+1. Assemble all content to be written into the JSON structure defined in the Required Outputs section
+2. Execute each validation check below
+3. Output the validation result (pass/fail with reasons)
+4. Only after all checks pass, execute Write for each file
+
+### Validation checks
 
 - `schemaVersion` is present and equals `1`
 - `mode` is present and is either `init` or `refresh`
@@ -258,6 +353,25 @@ The caller validates the result before writeback. Your result must satisfy:
 - duplicate codemap paths are invalid
 - paths outside the allowed target set are invalid
 - `contracts/surfaces.yaml` is not a valid output target
+
+### Failure handling
+
+When any validation check fails:
+
+1. **All-or-nothing**: if any single entry fails validation, nothing is written
+2. Return a structured error:
+
+```json
+{
+  "status": "validation-failed",
+  "errors": [
+    { "path": "docs/codemaps/modules/foo.md", "reason": "path outside allowed target set" }
+  ]
+}
+```
+
+3. Return control to the user with the error — do not automatically retry
+4. Report the failure reason to the user
 
 ## Compatibility Notes
 
