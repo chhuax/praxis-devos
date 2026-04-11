@@ -36,4 +36,4 @@ Run this command when:
 ## Notes
 
 - This is a thin wrapper. Core logic lives in the `devos-docs` skill.
-- If host commands are unavailable, fall back to `praxis-devos docs init`.
+- No CLI fallback is provided; use the projected host command or invoke the `devos-docs` skill directly.
