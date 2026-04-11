@@ -596,8 +596,13 @@ test('devos-docs skill contains large project batching strategy', () => {
 
   assert.match(docsSkill, /^## Large Project Strategy$/m);
   assert.match(docsSkill, /more than 5 modules/);
+  assert.match(docsSkill, /default to batched mode/);
   assert.match(docsSkill, /at most 3 modules per batch/);
+  assert.match(docsSkill, /context-window budget/);
   assert.match(docsSkill, /isolated sub-agent context/);
+  assert.match(docsSkill, /^### Batching Order$/m);
+  assert.match(docsSkill, /^### Batching Goals$/m);
+  assert.match(docsSkill, /^### Batch Failure Handling$/m);
   assert.match(docsSkill, /^### State Transfer Between Batches$/m);
 });
 
