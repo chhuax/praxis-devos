@@ -65,22 +65,31 @@ export const ensureMainWorktree = ({
     repoRoot: cwd,
     cleanup: () => removeWorktree(worktreePath),
     registerCleanupHooks: () => {
-      const signals = ['SIGINT', 'SIGTERM', 'exit'];
-      const handler = () => {
+      const signals = ['SIGINT', 'SIGTERM'];
+      const handler = (signal) => {
         try {
           removeWorktree(worktreePath);
         } catch {
           logger.warn(`Manual cleanup required for worktree: ${worktreePath}`);
         } finally {
-          for (const signal of signals) {
-            processObject.off?.(signal, handler);
+          for (const s of signals) {
+            processObject.off?.(s, handler);
           }
+          processObject.kill?.(processObject.pid, signal);
         }
       };
 
       for (const signal of signals) {
         processObject.on?.(signal, handler);
       }
+
+      processObject.on?.('exit', () => {
+        try {
+          removeWorktree(worktreePath);
+        } catch {
+          logger.warn(`Manual cleanup required for worktree: ${worktreePath}`);
+        }
+      });
     },
   };
 };

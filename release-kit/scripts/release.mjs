@@ -29,6 +29,19 @@ export const runRelease = ({
     if (!['published', 'completed'].includes(state.status)) {
       throw new Error('Release requires published state or compensation prerequisites');
     }
+    if (state.version !== version) {
+      throw new Error(
+        `Release state version mismatch: expected ${version}, found ${state.version}`,
+      );
+    }
+    if (state.status === 'completed') {
+      return {
+        version,
+        tagName,
+        status: 'completed',
+        completedAt: state.completedAt,
+      };
+    }
   } else {
     runCommand({ command: `npm view ${packageJson.name}@${version} version`, cwd: workDir });
     runCommand({ command: `git rev-parse refs/tags/${tagName}`, cwd: workDir });

@@ -37,16 +37,33 @@ export const runPublish = ({
     );
   }
 
+  if (!verifiedState.tarballPath) {
+    throw new Error('Verified state tarball path is required before publish');
+  }
+
+  const tarballPath = path.isAbsolute(verifiedState.tarballPath)
+    ? verifiedState.tarballPath
+    : path.resolve(repoRoot, verifiedState.tarballPath);
+
+  if (!fs.existsSync(tarballPath)) {
+    throw new Error(`Verified tarball does not exist: ${tarballPath}`);
+  }
+
   const tagName = `v${version}`;
 
-  runCommand({ command: 'npm publish', cwd: workDir });
+  runCommand({ command: `npm publish "${tarballPath}"`, cwd: workDir });
   runCommand({ command: `git tag ${tagName}`, cwd: workDir });
   runCommand({ command: `git push origin ${tagName}`, cwd: workDir });
 
-  return {
+  const publishedState = {
+    ...verifiedState,
     version,
     tagName,
-    publishedTarballPath: verifiedState.tarballPath,
+    publishedTarballPath: tarballPath,
     status: 'published',
   };
+
+  fs.writeFileSync(statePath, `${JSON.stringify(publishedState, null, 2)}\n`);
+
+  return publishedState;
 };

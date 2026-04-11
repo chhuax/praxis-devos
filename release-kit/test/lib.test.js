@@ -134,12 +134,17 @@ test('ensureMainWorktree registers cleanup hooks and reports manual cleanup path
   };
 
   const handlers = new Map();
+  const killed = [];
   const fakeProcess = {
+    pid: 12345,
     on(event, handler) {
       handlers.set(event, handler);
     },
     off(event) {
       handlers.delete(event);
+    },
+    kill(pid, signal) {
+      killed.push({ pid, signal });
     },
   };
 
@@ -162,12 +167,14 @@ test('ensureMainWorktree registers cleanup hooks and reports manual cleanup path
   result.registerCleanupHooks();
   assert.equal(typeof handlers.get('SIGINT'), 'function');
 
-  handlers.get('SIGINT')();
+  handlers.get('SIGINT')('SIGINT');
 
   assert.match(
     messages.join('\n'),
     /Manual cleanup required for worktree: \/repo\/.worktrees\/release-kit-origin-main/,
   );
+
+  assert.deepEqual(killed, [{ pid: 12345, signal: 'SIGINT' }]);
 });
 
 test('loadConfig reads package.json release-kit config with defaults', () => {

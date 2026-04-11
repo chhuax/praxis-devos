@@ -41,6 +41,14 @@ export const runVerify = ({
   const smokeResult = runCommand({ command: config.smokeCommand, cwd: workDir });
   const tarballName = smokeResult.stdout.trim().split(/\r?\n/).pop();
 
+  if (!tarballName) {
+    throw new Error('smoke command did not produce a tarball filename');
+  }
+
+  if (!tarballName.endsWith('.tgz')) {
+    throw new Error(`smoke command produced invalid tarball filename: ${tarballName}`);
+  }
+
   const state = {
     version,
     tarballPath: path.join(workDir, tarballName),
