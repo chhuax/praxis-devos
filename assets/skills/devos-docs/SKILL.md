@@ -118,6 +118,50 @@ Rules:
 - Use each module's own `<artifactId>` as the preferred stable module name
 - If `<artifactId>` is missing, return a stable fallback name derived from the normalized module path relative to repository root
 
+## Large Project Strategy
+
+When the target project contains more than 5 modules (or equivalent workspace members), enable a batched generation strategy to prevent context-window pressure from causing cross-module information pollution. When the total module count cannot be determined before manifest scanning completes, default to batched mode.
+
+### Batching Order
+
+1. **Global phase** (completed in a single pass):
+   - Scan all module manifests (e.g., `pom.xml`, `package.json` workspaces, `Cargo.toml` workspace members) and build the module topology
+   - Generate `docs/surfaces.yaml`
+   - Generate `docs/codemaps/project-overview.md`
+   - Generate `docs/codemaps/module-map.md`
+
+2. **Module phase** (completed in batches):
+   - Process at most 3 modules per batch — this limit keeps each batch within a comfortable context-window budget while still amortizing the global-phase overhead
+   - Each module's codemap generation runs in an **isolated sub-agent context**
+   - The sub-agent receives only: the module's own topology information, the dependency relationships established in the global phase, and the module's own source code
+   - Passing detailed source code from other modules into the current batch's context is prohibited
+
+### Batching Goals
+
+- Prevent cross-module information pollution that degrades codemap accuracy
+- Ensure consistent inference quality per module regardless of processing order
+- Reduce per-execution token consumption
+
+### Batch Failure Handling
+
+If a module batch fails or produces an incomplete codemap:
+
+- The agent must not retry the same batch with identical parameters (consistent with the Exploration failure handling rules in Evidence Completeness)
+- Successfully completed batches are preserved — failure of one batch does not invalidate others
+- The failed module's codemap entry should be omitted from the result contract or annotated as low-confidence
+- The agent must report which modules failed and why, so the user can decide whether to retry with a different approach
+
+### State Transfer Between Batches
+
+The global phase produces a shared context that every module batch consumes:
+
+- Module topology (names, paths, packaging types)
+- Inter-module dependency graph
+- Controller-to-module ownership map (when applicable)
+- Primary external surface summary
+
+Each module batch's output is a standalone codemap entry in the result contract. Module batches do not depend on each other's output.
+
 ## Minimum Codemap Content
 
 ### Composition Strategy
