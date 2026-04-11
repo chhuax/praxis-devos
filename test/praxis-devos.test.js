@@ -588,6 +588,19 @@ test('devos-docs commands include language detection and artifact_language', () 
   }
 });
 
+test('devos-docs skill contains large project batching strategy', () => {
+  const docsSkill = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-docs', 'SKILL.md'),
+    'utf8',
+  );
+
+  assert.match(docsSkill, /^## Large Project Strategy$/m);
+  assert.match(docsSkill, /more than 5 modules/);
+  assert.match(docsSkill, /at most 3 modules per batch/);
+  assert.match(docsSkill, /isolated sub-agent context/);
+  assert.match(docsSkill, /^### State Transfer Between Batches$/m);
+});
+
 test('devos-change-docs bundled skill declares supported modes', () => {
   const docsSkill = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-change-docs', 'SKILL.md'),
