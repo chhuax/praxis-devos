@@ -1,0 +1,30 @@
+[
+  {
+    "name": "publish succeeds then tag fails",
+    "version": "0.6.1",
+    "initialState": {
+      "version": "0.6.1",
+      "tarballPath": "praxis-devos-0.6.1.tgz",
+      "checks": ["package-version", "changelog-entry", "test-command", "smoke-command"],
+      "generatedAt": "2026-04-12T00:00:00.000Z",
+      "status": "ready"
+    },
+    "commands": [
+      { "command": "npm publish", "outcome": "ok" },
+      { "command": "git tag v0.6.1", "outcome": "error", "message": "tag failed" }
+    ]
+  },
+  {
+    "name": "tag exists but GitHub release creation fails once",
+    "version": "0.6.1",
+    "initialState": {
+      "version": "0.6.1",
+      "tagName": "v0.6.1",
+      "status": "published"
+    },
+    "commands": [
+      { "command": "gh release view v0.6.1", "outcome": "error", "message": "release missing" },
+      { "command": "gh release create v0.6.1 --generate-notes", "outcome": "error", "message": "github create failed" }
+    ]
+  }
+]
