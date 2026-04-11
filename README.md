@@ -81,14 +81,30 @@ npx praxis-devos doctor --strict
 
 ## Docs Workflows
 
-Praxis also treats codemaps and API docs as harnessed workflows rather than hardcoded JS generation.
+Praxis treats codemaps and API docs as harnessed workflows rather than hardcoded JS generation. The JS scaffold routes, projects, validates, and constrains these workflows — it does not generate the human-facing document content itself.
 
-- Project-level codemap and surface docs are driven through the docs skill flow under the Praxis harness model.
-- Change-level blackbox docs and change-specific API docs are driven through change-doc skills.
-- Archive-time API reference sync is also a harnessed workflow.
-- The JS scaffold may route, project, validate, or constrain these workflows, but it should not generate the human-facing document content itself.
+### Project-level docs
 
-In other words, Praxis is the thin outer harness for docs workflows too, not just for setup and dependency management.
+Use the `devos-docs` skill (available after `setup`) for project-wide codemap and surface docs:
+
+| Mode | What it produces |
+|---|---|
+| `init` | `docs/surfaces.yaml`, `docs/codemaps/project-overview.md`, and related codemap files |
+| `refresh` | Refreshes existing codemap files based on current codebase state |
+
+Invoke via your agent's skill system, for example `/devos-docs-init` or `/devos-docs-refresh`.
+
+### Change-level docs
+
+Use the `devos-change-docs` skill during an OpenSpec change for change-scoped documentation:
+
+| Mode | What it produces |
+|---|---|
+| `change-blackbox` | `openspec/changes/<change>/blackbox-test.md` — observable behavior from the outside |
+| `change-api` | `openspec/changes/<change>/api-doc.md` — API contract changes for this change |
+| `project-api-sync` | Updates `docs/reference/api.md` with stable API changes after a change lands |
+
+`opsx-propose` injects the relevant doc tasks automatically based on the change type. `opsx-archive` checks for API sync evidence or an explicit waiver before archiving API-impacting changes.
 
 ## How Agent Setup Works
 
