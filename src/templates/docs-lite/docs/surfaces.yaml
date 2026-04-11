@@ -1,7 +1,0 @@
-primary_surface: public-interface
-
-surfaces:
-  - id: public-interface
-    kind: other
-    location: src/index.ts
-    description: Primary external surface for this project.

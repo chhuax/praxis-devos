@@ -6,6 +6,8 @@
 - In those cases, start with `/opsx:propose` or `/opsx:explore` and finish clarification and option comparison inside the current OpenSpec stage before implementation.
 - Use `/opsx:apply` only for small, local implementation work with low ambiguity and no proposal need.
 - Reviews and audit-style requests should follow the review flow.
+- Routing examples — requests that REQUIRE `/opsx:propose`: "帮我加一个 X"、"新增 Y 能力"、"我想做一套 Z workflow"、"add a release kit"、"implement feature X". These introduce new capabilities or cross-cutting concerns and must go through proposal first.
+- Routing examples — requests that can use `/opsx:apply` directly: "修一下这个 bug"、"改一下这段文案"、"update the version number"、"fix the failing test". These are small, scoped fixes with no design ambiguity.
 
 ## Project Reading Order
 
@@ -25,6 +27,6 @@
 
 - Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal flow has been executed through `/opsx:propose` or `/opsx:explore` plus native OpenSpec commands.
 - Proposal Gate: if `open questions` or competing solution directions remain, stay in propose or explore and finish clarification before implementation.
-- Apply Gate: before implementation, check branch safety, use an isolated workspace when needed, and keep any multi-step plan under the approved OpenSpec change.
+- Apply Gate: before implementation, keep any multi-step plan under the approved OpenSpec change.
 - Execution Gate: when bugs, failed tests, exceptions, or regressions appear, perform root-cause analysis first; keep all parallel work, subtasks, outputs, and status under the current change.
 - Completion Gate: before claiming completion, opening a PR, or merging, run full verification and record the actual verification result. Verification is a pre-completion check, not a second completion workflow.
