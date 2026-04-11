@@ -68,7 +68,16 @@ export const uniqueAgents = (agents = []) => {
 
   const values = normalized.length > 0 ? normalized : [...SUPPORTED_AGENTS];
   const deduped = [...new Set(values)];
-  return deduped.filter((agent) => SUPPORTED_AGENTS.includes(agent));
+  const supported = deduped.filter((agent) => SUPPORTED_AGENTS.includes(agent));
+
+  if (normalized.length > 0 && supported.length === 0) {
+    const invalid = deduped.filter((agent) => !SUPPORTED_AGENTS.includes(agent));
+    throw new Error(
+      `Unknown agent(s): ${invalid.join(', ')}. Supported agents: ${SUPPORTED_AGENTS.join(', ')}.`,
+    );
+  }
+
+  return supported;
 };
 
 export const isProjectInitialized = (projectDir) => {

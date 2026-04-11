@@ -12,10 +12,13 @@ export const ensureOpenSpecRuntime = (projectDir) => {
   const logs = [];
   const current = resolveOpenSpecRuntime(projectDir);
 
-  if (isGlobalOpenSpecRuntime(current)) {
+  if (current.status === 'ok' || current.status === 'warning') {
     logs.push('== openspec ==');
     logs.push(`⊘ OpenSpec already available (${current.source})`);
     logs.push(`- ${current.detail}`);
+    if (current.status === 'warning') {
+      logs.push('- Note: project-local install detected; a global install is recommended for consistent CLI access.');
+    }
     return logs.join('\n');
   }
 
