@@ -1,35 +1,42 @@
 # praxis-devos
 
-> OpenSpec governance + SuperPowers execution for OpenCode, Codex, and Claude Code.
+> A lightweight harness that connects OpenSpec governance, SuperPowers skills, and agent-specific adapters inside a user project.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-## What It Does
+## What It Is
 
-`praxis-devos` prepares a user project so different coding agents follow the same workflow rules:
+`praxis-devos` prepares a project so OpenCode, Codex, and Claude Code can follow the same outer workflow:
 
-- OpenSpec for proposal, spec, validation, and archive flows
-- SuperPowers for execution skills such as planning, debugging, and completion verification
-- Agent-specific adapters for OpenCode, Codex, and Claude Code
+- OpenSpec stays the visible governance flow for propose, apply, validate, and archive
+- SuperPowers stays the execution layer for planning, debugging, verification, and similar skills
+- agent-specific adapters make those rules discoverable in each tool's native entrypoints
 
-This package is meant to be installed into the user project and then run there with `npx praxis-devos ...`.
+`praxis-devos` is intentionally thin. It is a scaffold and orchestration harness, not a content generator.
 
-## Project Layout
+## What `setup` Changes
 
-After `setup`, a user project typically contains:
+Running `npx praxis-devos setup ...` can touch both the project and the local user environment.
+
+Inside the project, Praxis may create or refresh:
 
 ```text
 your-project/
-├── AGENTS.md          # Shared project rules for Codex/OpenCode
+├── AGENTS.md          # Shared project rules for supported agents
 ├── CLAUDE.md          # Thin Claude wrapper that imports @AGENTS.md
 ├── openspec/          # OpenSpec workspace
 ├── .opencode/         # OpenCode compatibility marker when selected
-└── opencode.json      # OpenCode plugin config when selected
+└── opencode.json      # Project-level OpenCode config when selected
 ```
 
-`AGENTS.md` is the shared project instruction file. `CLAUDE.md` stays thin and imports `@AGENTS.md` so Claude Code reads the shared rules without duplicating them.
+Outside the project, Praxis may also:
+
+- project bundled skills and commands into the selected agent's native discovery location
+- configure OpenCode plugins in the user's OpenCode config when automation is supported
+- install or validate OpenSpec availability
+- install or validate agent-specific SuperPowers integration
 
 ## Quick Start
 
@@ -45,12 +52,6 @@ npx praxis-devos doctor --strict
 ```bash
 npx praxis-devos setup --agent claude
 npx praxis-devos doctor --strict
-```
-
-Praxis now uses the Claude CLI to install SuperPowers automatically:
-
-```bash
-claude plugin install superpowers@claude-plugins-official --scope user
 ```
 
 ### OpenCode
@@ -72,87 +73,53 @@ npx praxis-devos doctor --strict
 | Command | Purpose |
 |---|---|
 | `setup` | Primary onboarding and repair entrypoint |
-| `init` | Lower-level project skeleton initialization |
-| `sync` | Refresh managed adapter outputs |
-| `migrate` | Legacy compatibility command; currently re-syncs adapters |
-| `status` | Show current project/runtime state |
-| `doctor` | Check OpenSpec and SuperPowers dependencies |
-| `bootstrap` | Print repair/install guidance without full setup |
-| `validate-session` | Validate a transcript against Praxis hook evidence |
+| `init` | Initialize the project skeleton and managed adapters |
+| `sync` | Refresh managed adapters and native projections |
+| `status` | Show current project and dependency state |
+| `doctor` | Check OpenSpec, agent dependencies, and projections |
+| `bootstrap` | Print or apply dependency bootstrap guidance |
 
-## Runtime Behavior
+## Docs Workflows
 
-`setup` currently does the following:
+Praxis also treats codemaps and API docs as harnessed workflows rather than hardcoded JS generation.
 
-- ensure OpenSpec is available, installing it locally when needed
-- install or configure SuperPowers for the selected agents when the runtime supports automation
-- create or refresh `openspec/`
-- write the shared managed rules block into `AGENTS.md`
-- write a thin Claude wrapper into `CLAUDE.md` that imports `@AGENTS.md`
-- create the minimal `.opencode/README.md` compatibility marker for OpenCode
-- run dependency checks after setup
+- Project-level codemap and surface docs are driven through the docs skill flow under the Praxis harness model.
+- Change-level blackbox docs and change-specific API docs are driven through change-doc skills.
+- Archive-time API reference sync is also a harnessed workflow.
+- The JS scaffold may route, project, validate, or constrain these workflows, but it should not generate the human-facing document content itself.
 
-Agent-specific runtime behavior:
+In other words, Praxis is the thin outer harness for docs workflows too, not just for setup and dependency management.
 
-- OpenCode: writes plugin declarations into `opencode.json` and projects shared OpenSpec skills under `~/.claude/skills`
-- Codex: clones SuperPowers into `~/.codex/superpowers` and links skills into `~/.codex/skills/superpowers`
-- Claude Code: runs `claude plugin install superpowers@claude-plugins-official --scope user`
+## How Agent Setup Works
 
-## OpenSpec + SuperPowers Contract
+Praxis keeps the same high-level contract across tools, but each agent has a different runtime path:
 
-Praxis does not replace OpenSpec or SuperPowers. It binds them together.
+- OpenCode: merges required plugin declarations into the user's OpenCode config and projects bundled assets
+- Codex: validates or installs the SuperPowers clone/link layout under `~/.codex/`
+- Claude Code: validates or installs the official SuperPowers plugin through the Claude CLI
 
-The managed project rules tell agents to:
+`bootstrap` is the lower-friction repair path when you want dependency guidance without running the full project setup flow.
 
-- use `/opsx:propose` or `/opsx:explore` for proposal/exploration flow
-- perform Proposal Intake before implementation
-- treat OpenSpec as the only visible workflow once an OpenSpec stage is active
-- use SuperPowers only as stage-local execution method, without a second workflow announcement
-- keep brainstorming/planning/debugging/verification outputs inside the current `openspec/changes/<change>/...` artifacts
+## Extension Packs
 
-Praxis does not currently fork or override the upstream SuperPowers plugin. The coordination contract is enforced through:
+Praxis is meant to stay small at the framework layer. Company-specific rules, skills, hooks, or stack conventions are better shipped as separate extension packs instead of being hardcoded into this repository.
 
-- the shared managed rules in `AGENTS.md` plus the thin `CLAUDE.md` wrapper
-- projected OpenSpec skills (`opsx-*`) that define OpenSpec as the outer workflow
-- transcript/session validation rules that flag duplicate workflow announcements or `docs/superpowers/...` outputs inside OpenSpec flow
+That split keeps responsibilities clean:
 
-## Enterprise Extension Packs
-
-Praxis is intentionally kept as the core framework layer. Enterprise-specific assets are expected to live in separate extension packages rather than being hardcoded into this repository.
-
-That extension-pack model is meant for assets such as:
-
-- company rules
-- company skills
-- company hooks
-- language- or domain-specific standards
-- common layer + stack layer packaging
-
-One example is an external rules pack such as `iuap-rules-pack`, which organizes:
-
-- `common/` shared enterprise assets
-- `stacks/<stack>/` stack-specific assets
-- `rules/`, `skills/`, and `hooks/` as separate deliverable types
-- target-specific projection into Claude, Codex, and OpenCode native surfaces
-
-That gives Praxis a useful split of responsibilities:
-
-- `praxis-devos`: OpenSpec governance, SuperPowers runtime setup, agent adapter management, unified workflow entrypoints
-- enterprise extension pack: enterprise rules/skills/hooks content and target-specific projection logic
-
-The next planned step is for `praxis-devos` to expose a unified extension-pack entrypoint such as `praxis-devos install-rules`. That integration is close and should be understood as the near-term product direction, but it is not yet a finished command in this repository today.
+- `praxis-devos`: OpenSpec harness, SuperPowers integration, adapter management, projection, and shared workflow entrypoints
+- extension packs: company rules, stack-specific skills, hooks, and additional projection content
 
 ## Repository Layout
 
-This repository itself is a package source repo. The important directories are:
+If you are working on this package itself, the important directories are:
 
 ```text
-assets/            # Bundled OpenSpec skill assets
-bin/               # Published CLI entrypoint
-src/core/          # Main setup/doctor/sync CLI logic
-src/projection/    # Agent-specific projection logic
-src/templates/     # Managed entry block templates
-test/              # Unit tests and install smoke scripts
+assets/              # Bundled skills and command assets
+bin/                 # Published CLI entrypoint
+src/core/            # Scaffold orchestration, runtime checks, adapters, constants
+src/projection/      # Agent-specific projection logic
+src/templates/       # Managed entry templates
+test/                # Unit tests and smoke scripts
 ```
 
 ## Development
@@ -160,7 +127,7 @@ test/              # Unit tests and install smoke scripts
 Run tests locally:
 
 ```bash
-npm test
+node --test
 ```
 
 Install smoke for a packed tarball:
@@ -170,8 +137,6 @@ npm pack
 node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario opencode
 node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario claude
 ```
-
-`codex` install smoke is also supported, but it exercises the Codex clone/link path and is more environment-sensitive.
 
 ## License
 

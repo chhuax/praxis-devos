@@ -1,35 +1,42 @@
 # praxis-devos
 
-> 面向 OpenCode、Codex、Claude Code 的 OpenSpec 治理层与 SuperPowers 执行层集成框架。
+> 一个轻量级 harness，用来把 OpenSpec 治理层、SuperPowers 技能层，以及各类 agent adapter 连接到用户项目中。
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-## 它做什么
+## 它是什么
 
-`praxis-devos` 用来把用户项目准备成一个统一的 AI 开发工作区，让不同 agent 遵守同一套流程约束：
+`praxis-devos` 会把项目准备成一个统一的 AI 工作区，让 OpenCode、Codex、Claude Code 在同一套外层流程下工作：
 
-- 用 OpenSpec 管理提案、spec、校验、归档
-- 用 SuperPowers 提供计划、调试、完成前验证等执行能力
-- 为 OpenCode、Codex、Claude Code 生成各自的接入适配
+- OpenSpec 负责 propose、apply、validate、archive 等治理流程
+- SuperPowers 负责 planning、debugging、verification 等执行技能
+- agent-specific adapter 负责把这些规则投放到各工具的原生入口里
 
-这个包的定位是安装到用户项目里，然后在那个项目目录下通过 `npx praxis-devos ...` 使用。
+`praxis-devos` 的定位是薄脚手架和编排层，不是内容生成器。
 
-## 项目结构
+## `setup` 会改什么
 
-执行 `setup` 后，用户项目通常会出现这些入口：
+执行 `npx praxis-devos setup ...` 时，Praxis 既可能改项目，也可能改本机用户环境。
+
+在项目内，通常会创建或刷新这些入口：
 
 ```text
 your-project/
-├── AGENTS.md          # Codex / OpenCode 共享项目规则
+├── AGENTS.md          # 各 agent 共享的项目规则
 ├── CLAUDE.md          # 通过 @AGENTS.md 引入共享规则的薄包装
 ├── openspec/          # OpenSpec 工作区
-├── .opencode/         # 选中 OpenCode 时生成的最小兼容目录
-└── opencode.json      # OpenCode 插件配置
+├── .opencode/         # 选中 OpenCode 时生成的兼容标记目录
+└── opencode.json      # 选中 OpenCode 时的项目级配置
 ```
 
-`AGENTS.md` 是跨 agent 的共享项目规则文件；`CLAUDE.md` 保持很薄，只通过 `@AGENTS.md` 引入共享规则，避免再复制一份。
+在项目外，Praxis 还可能：
+
+- 向目标 agent 的原生发现位置投放内置 skills 和 commands
+- 在 OpenCode 支持自动化时修改用户级 OpenCode 插件配置
+- 安装或校验 OpenSpec 运行时
+- 安装或校验各 agent 所需的 SuperPowers 依赖
 
 ## 快速开始
 
@@ -45,12 +52,6 @@ npx praxis-devos doctor --strict
 ```bash
 npx praxis-devos setup --agent claude
 npx praxis-devos doctor --strict
-```
-
-Praxis 现在会通过 Claude CLI 自动安装 SuperPowers：
-
-```bash
-claude plugin install superpowers@claude-plugins-official --scope user
 ```
 
 ### OpenCode
@@ -72,87 +73,53 @@ npx praxis-devos doctor --strict
 | 命令 | 用途 |
 |---|---|
 | `setup` | 主 onboarding / 修复入口 |
-| `init` | 底层项目骨架初始化 |
-| `sync` | 刷新托管适配输出 |
-| `migrate` | 遗留兼容命令；当前主要做 adapter 重同步 |
-| `status` | 查看当前项目与运行时状态 |
-| `doctor` | 检查 OpenSpec 与 SuperPowers 依赖 |
-| `bootstrap` | 打印修复/安装指导，不执行完整 setup |
-| `validate-session` | 按 Praxis hook 证据校验会话记录 |
+| `init` | 初始化项目骨架和托管 adapter |
+| `sync` | 刷新托管 adapter 与原生投放 |
+| `status` | 查看当前项目与依赖状态 |
+| `doctor` | 检查 OpenSpec、agent 依赖和投放情况 |
+| `bootstrap` | 打印或执行依赖 bootstrap 指引 |
 
-## 运行时行为
+## 文档工作流
 
-当前 `setup` 会做这些事：
+Praxis 也把 codemap 和 API 文档视为 harnessed workflow，而不是硬编码在 JS 里的内容生成。
 
-- 确保 OpenSpec 可用；缺失时自动安装项目本地版本
-- 为所选 agent 自动安装或配置 SuperPowers
-- 创建或刷新 `openspec/`
-- 将共享托管规则写入 `AGENTS.md`
-- 在 `CLAUDE.md` 中写入引用 `@AGENTS.md` 的薄包装
-- 为 OpenCode 创建最小 `.opencode/README.md` 兼容目录
-- 在 setup 结束后执行依赖检查
+- project-level 的 codemap / surface 文档通过 docs skill 流程完成
+- change-level 的黑盒文档和 API 变更文档通过 change-doc skill 流程完成
+- archive 时的 API reference 同步也是 harness 驱动的工作流
+- JS 脚手架只负责路由、投放、约束和校验，不负责生成这些给人看的正文内容
 
-各 agent 当前行为：
+也就是说，Praxis 不只是 setup 的 harness，也是 docs workflow 的 outer harness。
 
-- OpenCode：向 `opencode.json` 写入插件声明，并把共享 OpenSpec skills 投放到 `~/.claude/skills`
-- Codex：将 SuperPowers clone 到 `~/.codex/superpowers`，并把 skills 链接到 `~/.codex/skills/superpowers`
-- Claude Code：执行 `claude plugin install superpowers@claude-plugins-official --scope user`
+## 各 Agent 的接入方式
 
-## OpenSpec 与 SuperPowers 的结合方式
+Praxis 对外给用户的是统一契约，但每个 agent 的底层接入方式不同：
 
-Praxis 不替代 OpenSpec 或 SuperPowers，而是把两者编排到一起。
+- OpenCode：向用户 OpenCode 配置合并必须的插件声明，并投放内置资产
+- Codex：校验或安装 `~/.codex/` 下的 SuperPowers clone/link 布局
+- Claude Code：通过 Claude CLI 校验或安装官方 SuperPowers 插件
 
-托管项目规则会要求 agent：
+如果你只想做依赖修复或查看指导而不执行完整 setup，可以使用 `bootstrap`。
 
-- 用 `/opsx:propose` 或 `/opsx:explore` 进入提案/探索流程
-- 在进入实现前先完成 Proposal Intake
-- 一旦进入 OpenSpec 阶段，始终以 OpenSpec 作为唯一对外可见的主流程
-- 仅把 SuperPowers 当作阶段内的方法论能力使用，不再额外宣告第二层流程
-- brainstorming / planning / debugging / verification 的结论与产物必须收敛到当前 `openspec/changes/<change>/...`
+## 扩展包
 
-Praxis 目前不会 fork 或覆盖上游 SuperPowers 插件。当前的协调方式由三层构成：
+Praxis 应该保持在框架层尽量轻。企业 rules、skills、hooks、stack 约定，更适合放到独立 extension pack，而不是继续硬编码到这个仓库里。
 
-- `AGENTS.md` 中的共享托管规则，以及负责引入它的薄 `CLAUDE.md`
-- 投影后的 OpenSpec `opsx-*` skills，它们定义 OpenSpec 是外层主流程
-- transcript/session validator，它会拦截 OpenSpec flow 中重复的流程公告或写入 `docs/superpowers/...` 的输出
+这样职责会比较清楚：
 
-## 企业级扩展包
-
-Praxis 有意保持为核心框架层，企业定制资产不再硬编码在这个仓库里，而是放到独立扩展包中。
-
-这种扩展包模型适合承载：
-
-- 企业 rules
-- 企业 skills
-- 企业 hooks
-- 语言或领域级标准
-- common 层 + stack 层的组合分发
-
-一个典型例子就是外部规则包 `iuap-rules-pack`。它按下面的方式组织能力：
-
-- `common/`：企业公共资产
-- `stacks/<stack>/`：技术栈专属资产
-- `rules/`、`skills/`、`hooks/` 分开管理
-- 再按 Claude、Codex、OpenCode 的原生入口做 target-specific 投影
-
-这样 Praxis 的职责边界会更清晰：
-
-- `praxis-devos`：负责 OpenSpec 治理、SuperPowers 运行时接入、agent adapter 管理、统一工作流入口
-- 企业扩展包：负责企业 rules/skills/hooks 内容，以及各 target 的具体投放逻辑
-
-下一步即将落地的方向，是让 `praxis-devos` 提供类似 `praxis-devos install-rules` 这样的统一扩展包入口。这个方向已经很近了，但截至当前版本，仍不应把它理解成已经在本仓库里落地完成的现成功能。
+- `praxis-devos`：负责 OpenSpec harness、SuperPowers 集成、adapter 管理、projection 和统一工作流入口
+- extension pack：负责企业规则、stack-specific skills、hooks 和额外投放内容
 
 ## 仓库结构
 
-这个仓库本身是 npm 包源码仓库，当前重要目录如下：
+如果你是在维护这个包本身，当前最重要的目录是：
 
 ```text
-assets/            # 内置 OpenSpec skill 资产
-bin/               # 发布后的 CLI 入口
-src/core/          # setup/doctor/sync 等主逻辑
-src/projection/    # 各 agent 的 projection 逻辑
-src/templates/     # AGENTS.md 共享规则模板
-test/              # 单测与安装 smoke 脚本
+assets/              # 内置 skills 和 commands 资产
+bin/                 # 发布后的 CLI 入口
+src/core/            # 脚手架编排、运行时检查、adapter、共享常量
+src/projection/      # 各 agent 的 projection 逻辑
+src/templates/       # 托管模板
+test/                # 单测与 smoke 脚本
 ```
 
 ## 开发
@@ -160,7 +127,7 @@ test/              # 单测与安装 smoke 脚本
 本地运行测试：
 
 ```bash
-npm test
+node --test
 ```
 
 对打包产物执行安装 smoke：
@@ -170,8 +137,6 @@ npm pack
 node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario opencode
 node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario claude
 ```
-
-`codex` 场景也支持，但它会走真实的 clone/link 路径，对环境更敏感。
 
 ## License
 

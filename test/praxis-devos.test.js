@@ -7,16 +7,11 @@ import { injectMarker } from '../src/projection/markers.js';
 import { collectBundledSkillSources } from '../src/projection/index.js';
 
 import {
-  assessDocsRefreshNeed,
   PRAXIS_ROOT,
   bootstrapOpenSpec,
-  buildDocsContextPack,
   bootstrapProject,
-  buildDocsSubagentRequest,
-  createChangeScaffold,
   doctorProject,
   initProject,
-  migrateProject,
   parseCliArgs,
   projectNativeSkills,
   renderHelp,
@@ -24,7 +19,6 @@ import {
   setupProject,
   statusProject,
   syncProject,
-  validateDocsGenerationResult,
 } from '../src/core/praxis-devos.js';
 const releaseLibPath = path.join(PRAXIS_ROOT, 'scripts', 'release', 'lib.mjs');
 const maintainerReleaseSkillPath = path.join(PRAXIS_ROOT, 'skills', 'maintainer-release', 'SKILL.md');
@@ -301,15 +295,13 @@ test('renderHelp reflects the current CLI surface', () => {
   const help = renderHelp();
 
   assert.match(help, /setup/);
-  assert.match(help, /docs\s+Compatibility\/fallback init, refresh, or check for codemap\/surfaces artifacts/);
-  assert.doesNotMatch(help, /record-selection/);
-  assert.doesNotMatch(help, /record-capability/);
-  assert.doesNotMatch(help, /Internal monitoring helper option/);
-  assert.doesNotMatch(help, /^\s*openspec\s+/m);
-  assert.doesNotMatch(help, /change\s+Create an OpenSpec change scaffold/);
-  assert.doesNotMatch(help, /proposal\s+Compatibility alias/);
-  assert.doesNotMatch(help, /list-stacks/);
-  assert.doesNotMatch(help, /use-stack/);
+  assert.match(help, /^\s*init\s+/m);
+  assert.match(help, /^\s*sync\s+/m);
+  assert.match(help, /^\s*status\s+/m);
+  assert.match(help, /^\s*doctor\s+/m);
+  assert.match(help, /^\s*bootstrap\s+/m);
+  assert.doesNotMatch(help, /^\s*migrate\s+/m);
+  assert.doesNotMatch(help, /^\s*docs\s+/m);
 });
 
 test('parseCliArgs parses current flags and rejects removed --openspec', () => {
@@ -322,35 +314,41 @@ test('parseCliArgs parses current flags and rejects removed --openspec', () => {
     'opencode',
     '--project-dir',
     'tmp/project',
-    '--change-id',
-    'add-auth',
-    '--stage',
-    'apply',
     '--strict',
   ]);
 
   assert.equal(parsed.command, 'instrumentation');
   assert.deepEqual(parsed.agents, ['codex', 'claude', 'opencode']);
   assert.equal(parsed.projectDir, path.resolve('tmp/project'));
-  assert.equal(parsed.changeId, 'add-auth');
-  assert.equal(parsed.stage, 'apply');
   assert.deepEqual(parsed.positional, ['enable']);
   assert.equal(parsed.strict, true);
-
-  const docsParsed = parseCliArgs([
-    'docs',
-    'check',
-    '--project-dir',
-    'tmp/project',
-  ]);
-  assert.equal(docsParsed.command, 'docs');
-  assert.equal(docsParsed.projectDir, path.resolve('tmp/project'));
-  assert.deepEqual(docsParsed.positional, ['check']);
 
   assert.throws(
     () => parseCliArgs(['bootstrap', '--openspec']),
     /`--openspec` has been removed/,
   );
+});
+
+test('core helpers are split into focused runtime and project modules', async () => {
+  const commands = await import('../src/core/runtime/commands.js');
+  const dependencies = await import('../src/core/runtime/dependencies.js');
+  const agentDependencies = await import('../src/core/runtime/agent-dependencies.js');
+  const openspecRuntime = await import('../src/core/runtime/openspec.js');
+  const adapters = await import('../src/core/project/adapters.js');
+  const state = await import('../src/core/project/state.js');
+
+  assert.equal(typeof commands.commandExists, 'function');
+  assert.equal(typeof commands.runFile, 'function');
+  assert.equal(typeof dependencies.ensureRuntimeDependencies, 'function');
+  assert.equal(typeof dependencies.doctorProject, 'function');
+  assert.equal(typeof agentDependencies.detectSuperpowersForAgent, 'function');
+  assert.equal(typeof agentDependencies.bootstrapProject, 'function');
+  assert.equal(typeof openspecRuntime.ensureOpenSpecRuntime, 'function');
+  assert.equal(typeof openspecRuntime.bootstrapOpenSpec, 'function');
+  assert.equal(typeof adapters.syncProject, 'function');
+  assert.equal(typeof adapters.initProject, 'function');
+  assert.equal(typeof state.projectPaths, 'function');
+  assert.equal(typeof state.uniqueAgents, 'function');
 });
 
 test('syncProject refreshes adapters and preserves user-owned content', () => {
@@ -369,37 +367,12 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(output, /Synced adapters: codex, claude, opencode/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
-  assert.match(agentsMd, /Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors/);
-  assert.match(agentsMd, /native OpenSpec proposal flow has been executed through `\/opsx:propose` or `\/opsx:explore` plus native OpenSpec commands/);
-  assert.match(agentsMd, /Inside OpenSpec, `opsx-explore`, `opsx-propose`, `opsx-apply`, and `opsx-archive` are the only visible workflow layer/);
-  assert.match(agentsMd, /Superpowers may run only as embedded capabilities inside the active OpenSpec stage/);
-  assert.match(agentsMd, /Do not re-announce `Using \[skill\]` or `superpowers:/);
-  assert.match(agentsMd, /finish clarification and option comparison inside the current OpenSpec stage before implementation/);
-  assert.match(agentsMd, /keep all parallel work, subtasks, outputs, and status under the current change/);
   assert.match(agentsMd, /docs\/surfaces\.yaml/);
-  assert.match(agentsMd, /On first entry, read `docs\/surfaces\.yaml` first\./);
-  assert.match(agentsMd, /Read `docs\/codemaps\/project-overview\.md` if needed\./);
-  assert.match(agentsMd, /Read other `docs\/codemaps\/\*\*` artifacts on demand rather than by default\./);
-  assert.doesNotMatch(agentsMd, /\/devos:docs-init/);
-  assert.doesNotMatch(agentsMd, /\/devos:docs-refresh/);
-  assert.match(agentsMd, /OpenSpec \+ Superpowers Contract/);
-  assert.match(agentsMd, /Stage Gates/);
-  assert.match(agentsMd, /Capability execution is judged by evidence/);
-  assert.doesNotMatch(agentsMd, /\/devos-docs-init/);
-  assert.doesNotMatch(agentsMd, /\/devos-docs-refresh/);
-  assert.doesNotMatch(agentsMd, /[\u4e00-\u9fff]/u);
-  assert.doesNotMatch(agentsMd, /praxis-devos openspec/);
-  assert.doesNotMatch(agentsMd, /显式加载 `superpowers:brainstorming`/);
-  assert.doesNotMatch(agentsMd, /显式加载 `superpowers:writing-plans`/);
-  assert.doesNotMatch(agentsMd, /`brainstorming` 方法/);
-  assert.doesNotMatch(agentsMd, /brainstorming \/ writing-plans \/ debugging \/ verification/);
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
   assert.match(claudeMd, /^<!-- PRAXIS_DEVOS_START -->\n@AGENTS\.md/m);
-  assert.match(claudeMd, /Claude Code 通过 `CLAUDE\.md` 读取项目指令/);
-  assert.doesNotMatch(claudeMd, /Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors/);
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')));
+  assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')), false);
 });
 
 test('projectNativeSkills writes user-level docs commands and registers managed assets', () => {
@@ -429,11 +402,7 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   const claudeInit = fs.readFileSync(claudeInitPath, 'utf8');
   const opencodeRefresh = fs.readFileSync(opencodeRefreshPath, 'utf8');
   assert.match(claudeInit, /^# devos-docs-init/m);
-  assert.match(claudeInit, /mode=init/i);
-  assert.match(claudeInit, /stable docs routing order/i);
   assert.match(opencodeRefresh, /^# devos-docs-refresh/m);
-  assert.match(opencodeRefresh, /mode=refresh/i);
-  assert.match(opencodeRefresh, /change-aware refresh context/i);
 
   const manifest = readJson(manifestPath);
   assert.equal(manifest.version, 1);
@@ -522,7 +491,7 @@ test('runCli sync refreshes managed user-level docs commands and skips user-owne
   });
 });
 
-test('syncProject restores missing docs-lite files', () => {
+test('syncProject refreshes adapters without generating docs artifacts', () => {
   const projectDir = makeTempProject();
 
   syncProject({
@@ -531,15 +500,13 @@ test('syncProject restores missing docs-lite files', () => {
   });
 
   const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
-  fs.rmSync(codemapPath);
-
   const output = syncProject({
     projectDir,
     agents: ['codex'],
   });
 
   assert.match(output, /Synced adapters: codex/);
-  assert.ok(fs.existsSync(codemapPath));
+  assert.equal(fs.existsSync(codemapPath), false);
 });
 
 test('injectMarker preserves YAML frontmatter at the top of projected skills', () => {
@@ -553,7 +520,7 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
   assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
 });
 
-test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance without promoting a second visible workflow', () => {
+test('OpenSpec skill bundles keep expected names and overlay sections', () => {
   const propose = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'SKILL.md'),
     'utf8',
@@ -579,57 +546,9 @@ test('OpenSpec skills embed internal SuperPowers sub-skill invocation guidance w
   assert.match(apply, /## PRAXIS_DEVOS_OVERLAY/);
   assert.match(archive, /## PRAXIS_DEVOS_OVERLAY/);
   assert.match(explore, /## PRAXIS_DEVOS_OVERLAY/);
-  assert.match(propose, /invoke `brainstorming` internally/);
-  assert.match(propose, /read the docs context pack before broad repository scanning/);
-  assert.match(propose, /always `docs\/surfaces\.yaml`/);
-  assert.match(propose, /Docs Impact/i);
-  assert.match(propose, /change-blackbox/i);
-  assert.match(propose, /project-api-sync/i);
-  assert.match(propose, /docs-delivery section/i);
-  assert.match(propose, /machine-readable refresh intent/i);
-  assert.match(propose, /`openspec\/config\.yaml`/);
-  assert.match(propose, /artifact language policy/i);
-  assert.match(propose, /dominant language already present in that change/i);
-  assert.match(propose, /do not announce `Using brainstorming`/);
-  assert.match(propose, /Embedded capability contract:/);
-  assert.match(propose, /mode: embedded/);
-  assert.match(propose, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
-  assert.match(apply, /invoke `writing-plans` internally/);
-  assert.match(apply, /build a docs context pack when project docs exist/);
-  assert.match(apply, /Read Docs Impact intent from change artifacts/i);
-  assert.match(apply, /devos-change-docs/);
-  assert.match(apply, /Sidecar subagents may draft/i);
-  assert.match(apply, /primary signal for docs refresh routing/i);
-  assert.match(apply, /deterministic docs refresh assessment/);
-  assert.match(apply, /invoke `devos-docs` in `mode=refresh`/);
-  assert.match(apply, /invoke `systematic-debugging` internally/);
-  assert.match(apply, /invoke `subagent-driven-development` internally/);
-  assert.match(apply, /invoke `verification-before-completion` internally/);
-  assert.match(apply, /evidence_target: user-level Praxis state directory/);
-  assert.doesNotMatch(apply, /record-selection/);
-  assert.doesNotMatch(apply, /record-capability/);
-  assert.match(apply, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
-  assert.match(archive, /invoke `verification-before-completion` internally/);
-  assert.match(archive, /If Docs Impact indicates refresh/i);
-  assert.match(archive, /docs\/reference\/api\.md/);
-  assert.match(archive, /waived with an explicit reason/i);
-  assert.match(archive, /Before archive, run a deterministic docs refresh assessment/);
-  assert.match(archive, /ensure `devos-docs` refresh has run or the workflow explicitly records why refresh is waived/);
-  assert.match(archive, /Embedded capability contract:/);
-  assert.match(archive, /pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints/);
-  assert.match(explore, /invoke `brainstorming` internally/);
-  assert.match(explore, /`openspec\/config\.yaml`/);
-  assert.match(explore, /dominant language already present in that change/i);
-  assert.match(explore, /do not switch languages mid-change/i);
-  assert.match(explore, /mode: embedded/);
-  assert.match(explore, /pass the current flow type, current stage goal, current artifact locations, and current output constraints/);
-  assert.doesNotMatch(propose, /[\u4e00-\u9fff]/u);
-  assert.doesNotMatch(apply, /[\u4e00-\u9fff]/u);
-  assert.doesNotMatch(archive, /[\u4e00-\u9fff]/u);
-  assert.doesNotMatch(explore, /[\u4e00-\u9fff]/u);
 });
 
-test('devos-docs bundled skill defines mode-based AI-first docs generation guidance', () => {
+test('devos-docs bundled skill declares supported modes', () => {
   const docsSkill = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-docs', 'SKILL.md'),
     'utf8',
@@ -638,20 +557,9 @@ test('devos-docs bundled skill defines mode-based AI-first docs generation guida
   assert.match(docsSkill, /^---\nname: devos-docs\n/m);
   assert.match(docsSkill, /mode=init/);
   assert.match(docsSkill, /mode=refresh/);
-  assert.match(docsSkill, /docs context pack/);
-  assert.match(docsSkill, /change-aware refresh context/);
-  assert.match(docsSkill, /contracts\/surfaces\.yaml/);
-  assert.match(docsSkill, /docs\/codemaps\/project-overview\.md/);
-  assert.match(docsSkill, /Write for AI readers first/);
-  assert.match(docsSkill, /problem-routing guidance/i);
-  assert.match(docsSkill, /critical runtime or request flows/i);
-  assert.match(docsSkill, /What part of the system probably owns this change\?/);
-  assert.match(docsSkill, /Codemap Composition Strategy/);
-  assert.match(docsSkill, /not just a welcome page/i);
-  assert.match(docsSkill, /Repository Interrogation Order/);
 });
 
-test('devos-change-docs bundled skill defines mode-based change docs generation guidance', () => {
+test('devos-change-docs bundled skill declares supported modes', () => {
   const docsSkill = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'skills', 'devos-change-docs', 'SKILL.md'),
     'utf8',
@@ -661,11 +569,6 @@ test('devos-change-docs bundled skill defines mode-based change docs generation 
   assert.match(docsSkill, /mode=change-blackbox/);
   assert.match(docsSkill, /mode=change-api/);
   assert.match(docsSkill, /mode=project-api-sync/);
-  assert.match(docsSkill, /structured result/i);
-  assert.match(docsSkill, /openspec\/changes\/<change>\/blackbox-test\.md/);
-  assert.match(docsSkill, /openspec\/changes\/<change>\/api-doc\.md/);
-  assert.match(docsSkill, /docs\/reference\/api\.md/);
-  assert.match(docsSkill, /managed section/i);
 });
 
 test('collectBundledSkillSources discovers unified skill bundles by sourceDir', () => {
@@ -946,631 +849,15 @@ test('initProject bootstraps openspec workspace through the detected runtime', (
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
   assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')));
-  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')));
+  assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')), false);
 });
 
-test('runCli docs init seeds the docs-lite skeleton without OpenSpec runtime', () => {
-  const projectDir = makeTempProject();
-
-  const output = runCli([
-    'docs',
-    'init',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  assert.match(output, /docs-lite/i);
-  const codemap = fs.readFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), 'utf8');
-  assert.match(codemap, /Primary surface: `public-interface`/);
-  assert.match(codemap, /Surface location: `src\/index\.ts`/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')));
-  assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'reference', 'api.md')), false);
-});
-
-test('runCli docs check reports missing primary_surface and missing fields', () => {
-  const projectDir = makeTempProject();
-  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
-  const surfacesPath = path.join(projectDir, 'docs', 'surfaces.yaml');
-
-  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
-  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
-  fs.writeFileSync(codemapPath, '# overview\n', 'utf8');
-  fs.writeFileSync(
-    surfacesPath,
-    `surfaces:
-  - id: public-sdk
-    kind: sdk
-`,
-    'utf8',
+test('runCli rejects removed docs command surface', () => {
+  assert.throws(
+    () => runCli(['docs', 'check']),
+    /Unknown command: docs/,
   );
-
-  const output = runCli([
-    'docs',
-    'check',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  assert.match(output, /status: needs-attention/);
-  assert.match(output, /primary_surface/);
-  assert.match(output, /location/);
-});
-
-test('runCli docs check reports non-canonical surfaces path conflicts', () => {
-  const projectDir = makeTempProject();
-  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
-  const canonicalSurfacesPath = path.join(projectDir, 'docs', 'surfaces.yaml');
-  const nonCanonicalSurfacesPath = path.join(projectDir, 'contracts', 'surfaces.yaml');
-
-  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
-  fs.mkdirSync(path.dirname(canonicalSurfacesPath), { recursive: true });
-  fs.mkdirSync(path.dirname(nonCanonicalSurfacesPath), { recursive: true });
-  fs.writeFileSync(codemapPath, '# overview\n', 'utf8');
-  fs.writeFileSync(
-    canonicalSurfacesPath,
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: src/index.ts
-`,
-    'utf8',
-  );
-  fs.writeFileSync(nonCanonicalSurfacesPath, 'primary_surface: duplicate\n', 'utf8');
-
-  const output = runCli([
-    'docs',
-    'check',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  assert.match(output, /status: needs-attention/);
-  assert.match(output, /contracts\/surfaces\.yaml/);
-  assert.match(output, /conflict/i);
-});
-
-test('runCli docs refresh populates codemap from project heuristics and preserves user notes', () => {
-  const projectDir = makeTempProject();
-  const srcDir = path.join(projectDir, 'src');
-  const testDir = path.join(projectDir, 'test');
-  const readmePath = path.join(projectDir, 'README.md');
-  const packageJsonPath = path.join(projectDir, 'package.json');
-  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
-  const surfacesPath = path.join(projectDir, 'docs', 'surfaces.yaml');
-
-  fs.mkdirSync(srcDir, { recursive: true });
-  fs.mkdirSync(testDir, { recursive: true });
-  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
-  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
-  fs.writeFileSync(path.join(srcDir, 'index.ts'), 'export const ok = true;\n', 'utf8');
-  fs.writeFileSync(path.join(testDir, 'app.test.js'), 'test("ok", () => {});\n', 'utf8');
-  fs.writeFileSync(readmePath, '# Example\n', 'utf8');
-  fs.writeFileSync(packageJsonPath, '{\n  "name": "example"\n}\n', 'utf8');
-  fs.writeFileSync(
-    codemapPath,
-    `# Codemap: Project Overview
-
-<!-- PRAXIS_DOCS_REFRESH_START -->
-old
-<!-- PRAXIS_DOCS_REFRESH_END -->
-
-## User Notes
-
-Keep this note.
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    surfacesPath,
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: src/index.ts
-    description: Public SDK entry.
-`,
-    'utf8',
-  );
-
-  const output = runCli([
-    'docs',
-    'refresh',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  const codemap = fs.readFileSync(codemapPath, 'utf8');
-  assert.match(output, /Refreshed docs-lite codemap/);
-  assert.match(codemap, /Primary surface: `public-sdk`/);
-  assert.match(codemap, /Surface kind: `sdk`/);
-  assert.match(codemap, /Surface location: `src\/index\.ts`/);
-  assert.match(codemap, /External surface changes: read `docs\/surfaces\.yaml`/);
-  assert.match(codemap, /`README\.md`/);
-  assert.match(codemap, /`src\/index\.ts`/);
-  assert.match(codemap, /`test\/`/);
-  assert.match(codemap, /Keep this note\./);
-});
-
-test('runCli docs refresh replaces fallback placeholder when codemap exists without managed markers', () => {
-  const projectDir = makeTempProject();
-  const srcDir = path.join(projectDir, 'src');
-  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
-  const surfacesPath = path.join(projectDir, 'docs', 'surfaces.yaml');
-
-  fs.mkdirSync(srcDir, { recursive: true });
-  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
-  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
-  fs.writeFileSync(path.join(srcDir, 'index.ts'), 'export const ok = true;\n', 'utf8');
-  fs.writeFileSync(
-    codemapPath,
-    `# Existing Overview
-
-## User Notes
-
-Keep this note.
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    surfacesPath,
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: src/index.ts
-`,
-    'utf8',
-  );
-
-  runCli([
-    'docs',
-    'refresh',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  const codemap = fs.readFileSync(codemapPath, 'utf8');
-  assert.match(codemap, /<!-- PRAXIS_DOCS_REFRESH_START -->/);
-  assert.match(codemap, /Primary surface: `public-sdk`/);
-  assert.doesNotMatch(codemap, /Praxis DevOS will refresh this block/);
-  assert.match(codemap, /Keep this note\./);
-});
-
-test('runCli docs refresh generates recursive Maven module codemaps and docs check enforces coverage', () => {
-  const projectDir = makeTempProject();
-  const codemapPath = path.join(projectDir, 'docs', 'codemaps', 'project-overview.md');
-  const surfacesPath = path.join(projectDir, 'docs', 'surfaces.yaml');
-  const rootPomPath = path.join(projectDir, 'pom.xml');
-  const platformPomDir = path.join(projectDir, 'platform');
-  const servicePomDir = path.join(platformPomDir, 'service-a');
-  const sdkPomDir = path.join(projectDir, 'sdk');
-
-  fs.mkdirSync(servicePomDir, { recursive: true });
-  fs.mkdirSync(sdkPomDir, { recursive: true });
-  fs.mkdirSync(path.dirname(codemapPath), { recursive: true });
-  fs.mkdirSync(path.dirname(surfacesPath), { recursive: true });
-
-  fs.writeFileSync(
-    rootPomPath,
-    `<project>
-  <modelVersion>4.0.0</modelVersion>
-  <artifactId>root</artifactId>
-  <modules>
-    <module>platform</module>
-    <module>sdk</module>
-  </modules>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(platformPomDir, 'pom.xml'),
-    `<project>
-  <modelVersion>4.0.0</modelVersion>
-  <artifactId>platform</artifactId>
-  <modules>
-    <module>service-a</module>
-  </modules>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(servicePomDir, 'pom.xml'),
-    `<project>
-  <modelVersion>4.0.0</modelVersion>
-  <artifactId>service-a</artifactId>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(sdkPomDir, 'pom.xml'),
-    `<project>
-  <modelVersion>4.0.0</modelVersion>
-  <artifactId>sdk</artifactId>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    surfacesPath,
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: sdk/src/main/java
-`,
-    'utf8',
-  );
-
-  runCli([
-    'docs',
-    'refresh',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  const moduleMapPath = path.join(projectDir, 'docs', 'codemaps', 'module-map.md');
-  const platformModulePath = path.join(projectDir, 'docs', 'codemaps', 'modules', 'platform.md');
-  const serviceModulePath = path.join(projectDir, 'docs', 'codemaps', 'modules', 'service-a.md');
-  const sdkModulePath = path.join(projectDir, 'docs', 'codemaps', 'modules', 'sdk.md');
-
-  assert.ok(fs.existsSync(moduleMapPath));
-  assert.ok(fs.existsSync(platformModulePath));
-  assert.ok(fs.existsSync(serviceModulePath));
-  assert.ok(fs.existsSync(sdkModulePath));
-  assert.match(fs.readFileSync(moduleMapPath, 'utf8'), /platform/);
-  assert.match(fs.readFileSync(moduleMapPath, 'utf8'), /service-a/);
-  assert.match(fs.readFileSync(moduleMapPath, 'utf8'), /sdk/);
-
-  fs.rmSync(serviceModulePath);
-
-  const checkOutput = runCli([
-    'docs',
-    'check',
-    '--project-dir',
-    projectDir,
-  ]);
-
-  assert.match(checkOutput, /status: needs-attention/);
-  assert.match(checkOutput, /docs\/codemaps\/modules\/service-a\.md/);
-});
-
-test('buildDocsSubagentRequest packages deterministic init and refresh context for host integration', () => {
-  const projectDir = makeTempProject();
-  fs.mkdirSync(path.join(projectDir, 'src'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, 'openspec', 'changes', 'add-auth'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'src', 'index.ts'), 'export const ok = true;\n', 'utf8');
-  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
-  fs.writeFileSync(
-    path.join(projectDir, 'docs', 'surfaces.yaml'),
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: src/index.ts
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(projectDir, 'openspec', 'changes', 'add-auth', 'proposal.md'),
-    'Update the external surface for auth.\n',
-    'utf8',
-  );
-
-  const initRequest = buildDocsSubagentRequest({ projectDir, mode: 'init' });
-  const refreshRequest = buildDocsSubagentRequest({
-    projectDir,
-    mode: 'refresh',
-    changeId: 'add-auth',
-    changeArtifactPaths: [path.join(projectDir, 'openspec', 'changes', 'add-auth', 'proposal.md')],
-    changedPaths: ['src/index.ts'],
-    targetModuleHints: ['public-sdk'],
-  });
-
-  assert.equal(initRequest.schemaVersion, 1);
-  assert.equal(initRequest.mode, 'init');
-  assert.equal(refreshRequest.mode, 'refresh');
-  assert.equal(initRequest.canonicalSurfacesPath, 'docs/surfaces.yaml');
-  assert.deepEqual(
-    initRequest.allowedTargets.slice(0, 3),
-    [
-      'docs/surfaces.yaml',
-      'docs/codemaps/project-overview.md',
-      'docs/codemaps/module-map.md',
-    ],
-  );
-  assert.equal(initRequest.context.primarySurface, 'public-sdk');
-  assert.equal(initRequest.context.primarySurfaceLocation, 'src/index.ts');
-  assert.deepEqual(initRequest.docsContextPack.selectedPaths, [
-    'docs/surfaces.yaml',
-    'docs/codemaps/project-overview.md',
-  ]);
-  assert.equal(refreshRequest.refreshContext.changeId, 'add-auth');
-  assert.deepEqual(refreshRequest.refreshContext.changedPaths, ['src/index.ts']);
-  assert.deepEqual(
-    refreshRequest.refreshContext.changeArtifactPaths,
-    ['openspec/changes/add-auth/proposal.md'],
-  );
-  assert.deepEqual(refreshRequest.refreshContext.targetModuleHints, ['public-sdk']);
-  assert.match(initRequest.readPaths.join('\n'), /docs\/surfaces\.yaml/);
-});
-
-test('buildDocsContextPack selects the default docs read set for non-module tasks', () => {
-  const projectDir = makeTempProject();
-  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'docs', 'surfaces.yaml'), 'primary_surface: public-sdk\n', 'utf8');
-  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
-
-  const pack = buildDocsContextPack({ projectDir });
-
-  assert.deepEqual(pack.selectedPaths, [
-    'docs/surfaces.yaml',
-    'docs/codemaps/project-overview.md',
-  ]);
-  assert.equal(pack.multiModule, false);
-  assert.equal(pack.targetModule, null);
-  assert.deepEqual(
-    pack.routingMetadata.map((entry) => [entry.path, entry.route, entry.reason]),
-    [
-      ['docs/surfaces.yaml', 'default', 'canonical-surface'],
-      ['docs/codemaps/project-overview.md', 'default', 'project-overview'],
-    ],
-  );
-});
-
-test('buildDocsContextPack routes multi-module docs to a targeted module only', () => {
-  const projectDir = makeTempProject();
-  const platformPomDir = path.join(projectDir, 'platform');
-  const servicePomDir = path.join(platformPomDir, 'service-a');
-  const sdkPomDir = path.join(projectDir, 'sdk');
-  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps', 'modules'), { recursive: true });
-  fs.mkdirSync(servicePomDir, { recursive: true });
-  fs.mkdirSync(sdkPomDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(projectDir, 'pom.xml'),
-    `<project>
-  <modules>
-    <module>platform</module>
-    <module>sdk</module>
-  </modules>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(platformPomDir, 'pom.xml'),
-    `<project>
-  <artifactId>platform</artifactId>
-  <modules>
-    <module>service-a</module>
-  </modules>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(path.join(servicePomDir, 'pom.xml'), '<project><artifactId>service-a</artifactId></project>', 'utf8');
-  fs.writeFileSync(path.join(sdkPomDir, 'pom.xml'), '<project><artifactId>sdk</artifactId></project>', 'utf8');
-
-  const targetedPack = buildDocsContextPack({
-    projectDir,
-    changedPaths: ['platform/service-a/src/main/java/App.java'],
-  });
-  const fallbackPack = buildDocsContextPack({
-    projectDir,
-    changedPaths: ['README.md'],
-  });
-
-  assert.deepEqual(targetedPack.selectedPaths, [
-    'docs/surfaces.yaml',
-    'docs/codemaps/project-overview.md',
-    'docs/codemaps/module-map.md',
-    'docs/codemaps/modules/service-a.md',
-  ]);
-  assert.equal(targetedPack.targetModule, 'service-a');
-  assert.match(
-    targetedPack.routingMetadata.find((entry) => entry.path === 'docs/codemaps/modules/service-a.md').reason,
-    /changed-path:/,
-  );
-
-  assert.deepEqual(fallbackPack.selectedPaths, [
-    'docs/surfaces.yaml',
-    'docs/codemaps/project-overview.md',
-    'docs/codemaps/module-map.md',
-  ]);
-  assert.equal(fallbackPack.targetModule, null);
-  assert.ok(!fallbackPack.selectedPaths.some((entry) => entry.startsWith('docs/codemaps/modules/')));
-});
-
-test('assessDocsRefreshNeed uses deterministic signals for surface, topology, and no-op changes', () => {
-  const projectDir = makeTempProject();
-  const moduleDir = path.join(projectDir, 'platform', 'service-a');
-  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-auth');
-  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
-  fs.mkdirSync(moduleDir, { recursive: true });
-  fs.mkdirSync(changeDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(projectDir, 'docs', 'surfaces.yaml'),
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: src/index.ts
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(projectDir, 'pom.xml'),
-    `<project>
-  <modules>
-    <module>platform/service-a</module>
-  </modules>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(path.join(moduleDir, 'pom.xml'), '<project><artifactId>service-a</artifactId></project>', 'utf8');
-  fs.writeFileSync(path.join(changeDir, 'proposal.md'), 'This change updates the external surface and project map.\n', 'utf8');
-
-  const surfaceAssessment = assessDocsRefreshNeed({
-    projectDir,
-    changedPaths: ['src/index.ts'],
-  });
-  const topologyAssessment = assessDocsRefreshNeed({
-    projectDir,
-    changedPaths: ['platform/service-a/pom.xml'],
-  });
-  const artifactAssessment = assessDocsRefreshNeed({
-    projectDir,
-    changeArtifactPaths: [path.join(changeDir, 'proposal.md')],
-  });
-  const noOpAssessment = assessDocsRefreshNeed({
-    projectDir,
-    changedPaths: ['test/app.test.js'],
-  });
-
-  assert.equal(surfaceAssessment.needed, true);
-  assert.match(surfaceAssessment.reasons.join('\n'), /primary surface location/i);
-
-  assert.equal(topologyAssessment.needed, true);
-  assert.match(topologyAssessment.reasons.join('\n'), /module topology input/i);
-
-  assert.equal(artifactAssessment.needed, true);
-  assert.match(artifactAssessment.reasons.join('\n'), /change artifacts declare docs impact/i);
-
-  assert.equal(noOpAssessment.needed, false);
-  assert.deepEqual(noOpAssessment.reasons, []);
-});
-
-test('buildDocsContextPack and refresh assessment ignore change inputs outside the repository root', () => {
-  const projectDir = makeTempProject();
-  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-outside-'));
-  const outsideArtifact = path.join(outsideDir, 'proposal.md');
-  fs.mkdirSync(path.join(projectDir, 'docs', 'codemaps'), { recursive: true });
-  fs.writeFileSync(path.join(projectDir, 'docs', 'surfaces.yaml'), 'primary_surface: public-sdk\n', 'utf8');
-  fs.writeFileSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'), '# Overview\n', 'utf8');
-  fs.writeFileSync(outsideArtifact, 'external surface\n', 'utf8');
-
-  const contextPack = buildDocsContextPack({
-    projectDir,
-    changedPaths: ['../../outside/file.ts'],
-    changeArtifactPaths: [outsideArtifact],
-  });
-  const assessment = assessDocsRefreshNeed({
-    projectDir,
-    changedPaths: ['../../outside/file.ts'],
-    changeArtifactPaths: [outsideArtifact],
-  });
-
-  assert.deepEqual(contextPack.changedPaths, []);
-  assert.deepEqual(contextPack.changeArtifactPaths, []);
-  assert.equal(assessment.needed, false);
-  assert.deepEqual(assessment.reasons, []);
-});
-
-test('validateDocsGenerationResult rejects invalid docs AI output contracts before writeback', () => {
-  const projectDir = makeTempProject();
-  fs.mkdirSync(path.join(projectDir, 'docs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(projectDir, 'docs', 'surfaces.yaml'),
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: src/index.ts
-`,
-    'utf8',
-  );
-
-  const invalid = validateDocsGenerationResult({
-    projectDir,
-    result: {
-      schemaVersion: 2,
-      mode: 'rewrite',
-      surfacesYaml: '   ',
-      codemaps: [
-        { path: 'docs/codemaps/project-overview.md', content: '', action: 'upsert' },
-        { path: 'docs/codemaps/project-overview.md', content: 'duplicate', action: 'upsert' },
-        { path: 'contracts/surfaces.yaml', content: 'invalid', action: 'upsert' },
-      ],
-    },
-  });
-
-  assert.equal(invalid.status, 'invalid');
-  assert.match(invalid.findings.join('\n'), /schemaVersion/i);
-  assert.match(invalid.findings.join('\n'), /mode/i);
-  assert.match(invalid.findings.join('\n'), /surfacesYaml/i);
-  assert.match(invalid.findings.join('\n'), /duplicate/i);
-  assert.match(invalid.findings.join('\n'), /contracts\/surfaces\.yaml/);
-});
-
-test('validateDocsGenerationResult rejects duplicate module names and sanitizes unsafe artifactIds in module targets', () => {
-  const projectDir = makeTempProject();
-  fs.mkdirSync(path.join(projectDir, 'docs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(projectDir, 'docs', 'surfaces.yaml'),
-    `primary_surface: public-sdk
-
-surfaces:
-  - id: public-sdk
-    kind: sdk
-    location: modules/a/src/index.ts
-`,
-    'utf8',
-  );
-  fs.mkdirSync(path.join(projectDir, 'modules', 'a'), { recursive: true });
-  fs.mkdirSync(path.join(projectDir, 'modules', 'b'), { recursive: true });
-  fs.writeFileSync(
-    path.join(projectDir, 'pom.xml'),
-    `<project>
-  <modules>
-    <module>modules/a</module>
-    <module>modules/b</module>
-  </modules>
-</project>
-`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(projectDir, 'modules', 'a', 'pom.xml'),
-    `<project><artifactId>../evil</artifactId></project>`,
-    'utf8',
-  );
-  fs.writeFileSync(
-    path.join(projectDir, 'modules', 'b', 'pom.xml'),
-    `<project><artifactId>evil</artifactId></project>`,
-    'utf8',
-  );
-
-  const result = validateDocsGenerationResult({
-    projectDir,
-    result: {
-      schemaVersion: 1,
-      mode: 'refresh',
-      surfacesYaml: 'primary_surface: public-sdk',
-      codemaps: [
-        { path: 'docs/codemaps/project-overview.md', content: '# ok', action: 'upsert' },
-        { path: 'docs/codemaps/module-map.md', content: '# modules', action: 'upsert' },
-        { path: 'docs/codemaps/modules/evil.md', content: '# module', action: 'upsert' },
-      ],
-    },
-  });
-
-  assert.equal(result.status, 'invalid');
-  assert.match(result.findings.join('\n'), /Duplicate module codemap name detected: evil/);
-  assert.ok(result.allowedTargets.includes('docs/codemaps/modules/evil.md'));
-  assert.ok(!result.allowedTargets.some((entry) => entry.includes('..')));
 });
 
 test('statusProject reports initialized state for the selected agents', () => {
@@ -1831,24 +1118,6 @@ test('setupProject handles quoted Windows command paths with spaces during autom
   }))));
 });
 
-test('createChangeScaffold remains available as an internal scaffold helper', () => {
-  const projectDir = makeTempProject();
-  ensureOpenSpecWorkspace(projectDir);
-
-  const output = createChangeScaffold({
-    projectDir,
-    title: 'Add Two Factor Auth',
-    summary: 'Harden account access.',
-  });
-
-  const changeDir = path.join(projectDir, 'openspec', 'changes', 'add-two-factor-auth');
-  assert.match(output, /Created OpenSpec full change scaffold: add-two-factor-auth/);
-  assert.match(output, /type: auto -> full/);
-  assert.ok(fs.existsSync(path.join(changeDir, 'proposal.md')));
-  assert.ok(fs.existsSync(path.join(changeDir, 'tasks.md')));
-  assert.ok(fs.existsSync(path.join(changeDir, 'specs', 'two-factor-auth', 'spec.md')));
-});
-
 test('setupProject ignores invalid Windows where candidates for openspec', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-bad-where-home-'));
@@ -1924,23 +1193,16 @@ test('doctorProject reports missing Claude plugin when settings do not contain i
   }));
 });
 
-test('runCli routes help and migrate but rejects openspec wrapper usage', () => {
+test('runCli routes help but rejects removed wrapper commands', () => {
   const projectDir = makeTempProject();
-  const fakeOpenSpec = installFakeOpenSpec(projectDir, 'CLI');
-  ensureOpenSpecWorkspace(projectDir);
 
   const help = runCli([]);
-  const migration = withPrependedPath(fakeOpenSpec.globalBinDir, () => runCli([
-    'migrate',
-    '--project-dir',
-    projectDir,
-    '--agent',
-    'codex',
-  ]));
 
   assert.match(help, /praxis-devos <command> \[options\]/);
-  assert.match(migration, /Migration completed/);
-  assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+  assert.throws(
+    () => runCli(['migrate', '--project-dir', projectDir]),
+    /Unknown command: migrate/,
+  );
   assert.throws(
     () => runCli(['openspec', '--project-dir', projectDir, 'list', '--specs']),
     /Unknown command: openspec/,
