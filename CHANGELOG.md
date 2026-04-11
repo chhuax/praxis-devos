@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-04-12
+
+### Added
+- `release-kit/` maintainer-only release workflow with verify → publish → release stages
+
+### Changed
+- Lightened opsx skill overlays: `tasks.md` is now the single authority for docs work; removed chain-escalation, mandatory 3-stage subagent review, and redundant docs gates from propose/apply/archive
+- Updated `openspec-docs-sync` spec to align with tasks.md-only gating model; `Docs Impact` is now advisory routing context, not a hard gate
+
 ## [0.6.1] - 2026-04-11
 
 ### Added
