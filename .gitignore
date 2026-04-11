@@ -44,6 +44,7 @@ logs/
 *.tmp
 *.temp
 .cache/
+.release-state.json
 
 # Private / Enterprise stacks (do NOT commit)
 stacks/yonbip-java/
