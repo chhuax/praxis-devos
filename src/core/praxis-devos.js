@@ -9,18 +9,6 @@ import {
   expectedSkillNames,
 } from '../projection/index.js';
 import { resolveUserHomeDir } from '../support/home.js';
-import {
-  handleInstrumentationCommand,
-  handleRecordCapabilityCommand,
-  handleRecordSelectionCommand,
-  handleValidateChangeCommand,
-  initializeCapabilityEvidence,
-  recordCapabilityEvidence,
-  recordCapabilitySelection,
-  updateCapabilityEvidenceStage,
-  validateChangeEvidence,
-} from '../monitoring/index.js';
-import { selectCapabilities } from './capability-policy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -589,9 +577,11 @@ const projectPaths = (projectDir) => ({
   legacyOpenCodeDir: path.join(projectDir, '.opencode'),
   legacyOpenCodeSkillsDir: path.join(projectDir, '.opencode', 'skills'),
   docsCodemapsDir: path.join(projectDir, 'docs', 'codemaps'),
+  docsReferenceDir: path.join(projectDir, 'docs', 'reference'),
   codemapOverviewPath: path.join(projectDir, 'docs', 'codemaps', 'project-overview.md'),
   codemapModuleMapPath: path.join(projectDir, 'docs', 'codemaps', 'module-map.md'),
   codemapModulesDir: path.join(projectDir, 'docs', 'codemaps', 'modules'),
+  apiReferencePath: path.join(projectDir, 'docs', 'reference', 'api.md'),
   surfacesPath: path.join(projectDir, 'docs', 'surfaces.yaml'),
   nonCanonicalSurfacesPath: path.join(projectDir, 'contracts', 'surfaces.yaml'),
   rootPomPath: path.join(projectDir, 'pom.xml'),
@@ -1276,44 +1266,6 @@ export const assessDocsRefreshNeed = ({
   };
 };
 
-export const buildOpenSpecDocsStageContext = ({
-  projectDir,
-  stage,
-  changeId = '',
-  changeArtifactPaths = [],
-  changedPaths = [],
-  targetModuleHints = [],
-}) => {
-  const normalizedArtifactPaths = [...new Set((changeArtifactPaths || [])
-    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
-    .filter(Boolean))];
-  const normalizedChangedPaths = [...new Set((changedPaths || [])
-    .map((entry) => normalizeRepoRelativePath({ projectDir, filePath: entry }))
-    .filter(Boolean))];
-  const buildContextPack = ['propose', 'apply'].includes(stage);
-  const runRefreshAssessment = ['apply', 'archive'].includes(stage);
-
-  return {
-    stage,
-    changeId,
-    docsContextPack: buildContextPack
-      ? buildDocsContextPack({
-        projectDir,
-        changedPaths: normalizedChangedPaths,
-        targetModuleHints,
-        changeArtifactPaths: normalizedArtifactPaths,
-      })
-      : null,
-    refreshAssessment: runRefreshAssessment
-      ? assessDocsRefreshNeed({
-        projectDir,
-        changedPaths: normalizedChangedPaths,
-        changeArtifactPaths: normalizedArtifactPaths,
-      })
-      : null,
-    shouldRunRefreshAssessment: runRefreshAssessment,
-  };
-};
 
 export const buildDocsSubagentRequest = ({
   projectDir,
@@ -2058,7 +2010,6 @@ export const createChangeScaffold = ({
   }
 
   writeText(specPath, renderSpecDeltaContent({ title: trimmedTitle }));
-  initializeCapabilityEvidence({ projectDir, changeId: nextChangeId });
 
   const created = [
     path.relative(projectDir, proposalPath),
@@ -2834,369 +2785,6 @@ const parseChangeCliArgs = (argv) => {
   return parsed;
 };
 
-const normalizeTranscriptText = (input) => input
-  .replace(/\r\n/g, '\n')
-  .replace(/\r/g, '\n');
-
-const matchAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
-
-const PROPOSAL_INTAKE_PATTERNS = [
-  /Proposal Intake/i,
-  /change target/i,
-  /intended behavior/i,
-  /scope\/risk/i,
-  /open questions/i,
-  /变更对象/,
-  /预期变化/,
-  /范围.*风险/,
-  /开放问题/,
-];
-
-const NATIVE_OPENSPEC_PROPOSAL_PATTERNS = [
-  /openspec new change\b/i,
-];
-
-const WRITING_PLANS_PATTERNS = [
-  /writing-plans/i,
-  /实施计划/,
-  /执行计划/,
-  /分步计划/,
-];
-
-const OPENSPEC_VISIBLE_FLOW_PATTERNS = [
-  /\/opsx:(?:propose|explore|apply|archive)\b/i,
-  /proposal flow/i,
-  /implementation flow/i,
-  /archive flow/i,
-  /当前进入 opsx-/i,
-];
-
-const SUPERPOWERS_VISIBLE_ANNOUNCEMENT_PATTERNS = [
-  /Using (?:brainstorming|writing-plans|systematic-debugging|verification-before-completion|subagent-driven-development)/i,
-  /显式加载 `?superpowers:/i,
-  /进入\s+subagent-driven-development/i,
-];
-
-const SUPERPOWERS_DOC_OUTPUT_PATTERNS = [
-  /docs\/superpowers\/(?:specs|plans)\//i,
-];
-
-const OPENSPEC_DUPLICATE_RECAP_PATTERNS = [
-  /最后再总结一遍/,
-  /再次总结/,
-  /重复总结/,
-  /再做一次收尾总结/,
-  /最终总结/,
-  /close-out recap/i,
-  /summary again/i,
-];
-
-const SESSION_EVENT_RULES = [
-  {
-    id: 'proposal-flow',
-    label: 'proposal flow',
-    signal: [
-      /\/opsx:propose\b/i,
-      /\/opsx:explore\b/i,
-      /proposal flow/i,
-      /提案通道/,
-      /proposal\.md/i,
-      /spec delta/i,
-    ],
-    requirements: [
-      {
-        id: 'proposal-intake',
-        label: 'Proposal Intake',
-        patterns: PROPOSAL_INTAKE_PATTERNS,
-      },
-      {
-        id: 'native-openspec-proposal',
-        label: 'native OpenSpec proposal execution',
-        patterns: NATIVE_OPENSPEC_PROPOSAL_PATTERNS,
-      },
-    ],
-  },
-  {
-    id: 'proposal-ambiguity',
-    label: 'proposal ambiguity',
-    signal: [
-      /open questions/i,
-      /阻塞缺口/,
-      /多种可行方案/,
-      /架构分歧/,
-      /边界分歧/,
-      /不确定/,
-      /方案探索/,
-    ],
-    requirements: [
-      {
-        id: 'brainstorming',
-        label: 'brainstorming',
-        patterns: [
-          /brainstorming/i,
-          /澄清范围/,
-          /澄清需求/,
-          /方案比较/,
-          /方案探索/,
-          /边界收敛/,
-        ],
-      },
-    ],
-  },
-  {
-    id: 'planning-before-proposal',
-    label: 'planning before proposal',
-    signal: WRITING_PLANS_PATTERNS,
-    requirements: [
-      {
-        id: 'proposal-intake',
-        label: 'Proposal Intake',
-        patterns: PROPOSAL_INTAKE_PATTERNS,
-      },
-      {
-        id: 'native-openspec-proposal',
-        label: 'native OpenSpec proposal execution',
-        patterns: NATIVE_OPENSPEC_PROPOSAL_PATTERNS,
-      },
-    ],
-  },
-  {
-    id: 'implementation-branch-gate',
-    label: 'approved proposal implementation',
-    signal: [
-      /已批准.*实现/,
-      /继续实现/,
-      /approved proposal/i,
-      /start implementation/i,
-      /implementation flow/i,
-    ],
-    requirements: [
-      {
-        id: 'git-workflow',
-        label: 'git-workflow / branch check',
-        patterns: [
-          /git-workflow/i,
-          /当前 Git 分支/,
-          /专用实现分支/,
-          /创建.*分支/,
-          /切换.*分支/,
-          /reuse.*branch/i,
-          /branch check/i,
-        ],
-      },
-    ],
-  },
-  {
-    id: 'multi-step-work',
-    label: 'multi-step work',
-    signal: [
-      /多步骤/,
-      /tasks\.md/i,
-      /实施计划/,
-      /分步/,
-      /步骤\s*[1-9]/,
-      /step 1/i,
-    ],
-    requirements: [
-      {
-        id: 'writing-plans',
-        label: 'writing-plans',
-        patterns: [
-          ...WRITING_PLANS_PATTERNS,
-          /step 1/i,
-          /1\.\s.+\n2\.\s/s,
-        ],
-      },
-    ],
-  },
-  {
-    id: 'bug-debugging',
-    label: 'bug / failure debugging',
-    signal: [
-      /\bbug\b/i,
-      /测试失败/,
-      /failing test/i,
-      /failed test/i,
-      /报错/,
-      /异常/,
-      /回归/,
-    ],
-    requirements: [
-      {
-        id: 'systematic-debugging',
-        label: 'systematic-debugging',
-        patterns: [
-          /systematic-debugging/i,
-          /复现步骤/,
-          /复现条件/,
-          /假设/,
-          /验证假设/,
-          /根因/,
-          /排查步骤/,
-        ],
-      },
-    ],
-  },
-  {
-    id: 'parallel-work',
-    label: 'parallelizable work',
-    signal: [
-      /并行/,
-      /parallel/i,
-      /多个独立子任务/,
-      /subagent/i,
-      /委派/,
-    ],
-    requirements: [
-      {
-        id: 'subagent-driven-development',
-        label: 'subagent-driven-development',
-        patterns: [
-          /subagent-driven-development/i,
-          /subagent/i,
-          /并行子任务/,
-          /并行拆分/,
-          /委派/,
-        ],
-      },
-    ],
-  },
-  {
-    id: 'completion-gate',
-    label: 'completion gate',
-    signal: [
-      /准备提交/,
-      /提交前/,
-      /即将完成/,
-      /准备合并/,
-      /\bPR\b/,
-      /merge/i,
-      /发布/,
-      /验证结果/,
-      /收尾/,
-    ],
-    requirements: [
-      {
-        id: 'verification-before-completion',
-        label: 'verification-before-completion',
-        patterns: [
-          /verification-before-completion/i,
-          /验证结果/,
-          /验收清单/,
-          /验证项/,
-          /npm test/i,
-          /git diff --check/i,
-          /openspec validate/i,
-        ],
-      },
-    ],
-  },
-];
-
-export const analyzeSessionTranscript = (transcriptText) => {
-  const text = normalizeTranscriptText(transcriptText);
-  const triggered = [];
-  const findings = [];
-
-  for (const rule of SESSION_EVENT_RULES) {
-    if (!matchAny(text, rule.signal)) {
-      continue;
-    }
-
-    const requirements = rule.requirements.map((requirement) => {
-      const ok = matchAny(text, requirement.patterns);
-      if (!ok) {
-        findings.push(`Missing ${requirement.label} evidence after ${rule.label} signal`);
-      }
-
-      return {
-        id: requirement.id,
-        label: requirement.label,
-        ok,
-      };
-    });
-
-    triggered.push({
-      id: rule.id,
-      label: rule.label,
-      requirements,
-    });
-  }
-
-  if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, SUPERPOWERS_VISIBLE_ANNOUNCEMENT_PATTERNS)) {
-    findings.push('Avoid separate SuperPowers workflow announcements inside OpenSpec flow');
-  }
-
-  if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, SUPERPOWERS_DOC_OUTPUT_PATTERNS)) {
-    findings.push('Keep OpenSpec-stage outputs in the current change artifacts, not docs/superpowers');
-  }
-
-  if (matchAny(text, OPENSPEC_VISIBLE_FLOW_PATTERNS) && matchAny(text, OPENSPEC_DUPLICATE_RECAP_PATTERNS)) {
-    findings.push('Avoid duplicate stage summaries or close-out recaps inside OpenSpec flow');
-  }
-
-  return {
-    status: findings.length === 0 ? 'pass' : 'needs-attention',
-    triggered,
-    findings,
-  };
-};
-
-export const validateSessionTranscript = ({ filePath, strict = false }) => {
-  if (!filePath) {
-    throw new Error('Missing transcript file. Use `npx praxis-devos validate-session --file <path>`.');
-  }
-
-  const transcriptText = readFile(filePath);
-  if (transcriptText == null) {
-    throw new Error(`Transcript file not found: ${filePath}`);
-  }
-
-  const result = analyzeSessionTranscript(transcriptText);
-  const lines = [
-    'Session transcript validation',
-    `file: ${filePath}`,
-    `status: ${result.status}`,
-  ];
-
-  if (result.triggered.length === 0) {
-    lines.push('triggered hooks: none');
-  } else {
-    lines.push('triggered hooks:');
-    for (const hook of result.triggered) {
-      lines.push(`- ${hook.label}`);
-      for (const requirement of hook.requirements) {
-        lines.push(`  - ${requirement.label}: ${requirement.ok ? 'ok' : 'missing'}`);
-      }
-    }
-  }
-
-  if (result.findings.length === 0) {
-    lines.push('findings: none');
-  } else {
-    lines.push('findings:');
-    for (const finding of result.findings) {
-      lines.push(`- ${finding}`);
-    }
-  }
-
-  const report = lines.join('\n');
-  if (strict && result.findings.length > 0) {
-    throw new Error(report);
-  }
-
-  return report;
-};
-
-export {
-  selectCapabilities,
-  validateChangeEvidence,
-  initializeCapabilityEvidence,
-  recordCapabilityEvidence,
-  recordCapabilitySelection,
-  updateCapabilityEvidenceStage,
-};
-
 export const renderHelp = () => `praxis-devos <command> [options]
 
 Commands:
@@ -3205,20 +2793,15 @@ Commands:
   sync           Refresh agent adapters and managed blocks
   docs           Compatibility/fallback init, refresh, or check for codemap/surfaces artifacts
   migrate        Sync adapters (legacy .praxis migration is no longer needed)
-  instrumentation Enable, disable, or inspect projected monitoring overlays
   status         Show current project initialization and dependency state
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
-  validate-session  Validate a transcript against Praxis evidence hooks
-  validate-change  Validate embedded capability evidence for an OpenSpec change
   help           Show this help
 
 Options:
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
   --project-dir <path>   Project directory (defaults to cwd)
-  --file <path>          Transcript file for \`validate-session\`
-  --change-id <name>     OpenSpec change id for \`validate-change\`
   --stage <name>         Capability stage to validate (\`explore\`, \`propose\`, \`apply\`, \`archive\`)
   --strict               Fail doctor if required dependencies are missing
 
@@ -3247,14 +2830,6 @@ export const runCli = (argv) => {
       agents,
       strict: parsed.strict,
     });
-  }
-
-  if (parsed.command === 'instrumentation') {
-    const action = parsed.positional[0] || 'status';
-    const logs = [];
-    const log = (msg) => logs.push(msg);
-    const lines = handleInstrumentationCommand({ action, agents, log });
-    return [...lines, ...logs].join('\n');
   }
 
   if (parsed.command === 'bootstrap') {
@@ -3299,44 +2874,6 @@ export const runCli = (argv) => {
     }
 
     throw new Error(`Unknown docs subcommand: ${action}`);
-  }
-
-  if (parsed.command === 'validate-session') {
-    return validateSessionTranscript({
-      filePath: parsed.file,
-      strict: parsed.strict,
-    });
-  }
-
-  if (parsed.command === 'validate-change') {
-    return handleValidateChangeCommand({
-      projectDir: parsed.projectDir,
-      changeId: parsed.changeId,
-      stage: parsed.stage,
-      strict: parsed.strict,
-    });
-  }
-
-  if (parsed.command === 'record-selection') {
-    return handleRecordSelectionCommand({
-      projectDir: parsed.projectDir,
-      changeId: parsed.changeId,
-      stage: parsed.stage,
-      signals: parsed.signals,
-    });
-  }
-
-  if (parsed.command === 'record-capability') {
-    return handleRecordCapabilityCommand({
-      projectDir: parsed.projectDir,
-      changeId: parsed.changeId,
-      stage: parsed.stage,
-      capability: parsed.capability,
-      selected: parsed.selected,
-      reasons: parsed.reasons,
-      evidenceJson: parsed.evidenceJson,
-      signals: parsed.signals,
-    });
   }
 
   if (parsed.command === 'init') {
