@@ -16,9 +16,9 @@ The system SHALL support consuming a docs context pack during OpenSpec-driven wo
 - **AND** the pack may include change-aware module routing when change metadata or changed paths make that possible
 - **AND** the pack may prefer artifacts named by `Docs Impact` when that declaration exists
 
-### Requirement: Docs refresh assessment SHALL be deterministic
+### Requirement: Docs refresh assessment SHALL use deterministic signals as advisory input
 
-The system SHALL evaluate docs refresh need using deterministic signals rather than free-form model judgment, with declared `Docs Impact` treated as the primary signal when available.
+The system SHALL evaluate docs refresh need using deterministic signals rather than free-form model judgment. These signals inform routing but do not independently create obligations; `tasks.md` is the authoritative source for which docs work to execute.
 
 #### Scenario: Surface change triggers refresh assessment
 - **WHEN** changed paths or change metadata indicate the primary external surface or its source location has changed
@@ -34,19 +34,19 @@ The system SHALL evaluate docs refresh need using deterministic signals rather t
 
 ## ADDED Requirements
 
-### Requirement: OpenSpec apply and archive SHALL use docs-impact declarations to gate refresh follow-through
+### Requirement: OpenSpec apply and archive SHALL treat tasks.md as the authoritative source for docs work
 
-The system SHALL require apply and archive stages to account for declared docs impact instead of silently ignoring it.
+The system SHALL use `tasks.md` as the single authority for which docs tasks to execute. `Docs Impact` declarations serve as advisory routing context but do not independently create obligations or hard gates.
 
-#### Scenario: Apply uses docs impact as primary refresh routing signal
-- **WHEN** `Docs Impact` is present for the active change
-- **THEN** OpenSpec-linked docs refresh uses that declaration before falling back to changed-path heuristics
-- **AND** the refresh request keeps the existing non-destructive docs behavior
+#### Scenario: Apply uses tasks.md to determine docs work
+- **WHEN** `tasks.md` explicitly lists docs tasks (blackbox, api-doc, docs-refresh, etc.)
+- **THEN** OpenSpec apply executes those tasks after the relevant implementation has stabilized
+- **AND** `Docs Impact` may inform routing decisions but does not independently trigger docs work beyond what `tasks.md` declares
 
-#### Scenario: Archive requires evidence or waiver for declared docs impact
-- **WHEN** `Docs Impact` indicates refresh-sensitive docs changes
-- **THEN** archive flow requires either evidence that docs refresh was performed or an explicit waiver reason
-- **AND** archive flow does not silently treat the requirement as satisfied
+#### Scenario: Archive verifies only planned docs tasks
+- **WHEN** `tasks.md` listed docs tasks for the active change
+- **THEN** archive flow verifies those tasks were completed before archiving
+- **AND** missing docs that were never planned in `tasks.md` do not block archive
 
 ### Requirement: OpenSpec artifact generation SHALL honor project-configured artifact language
 

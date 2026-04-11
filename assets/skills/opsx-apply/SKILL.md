@@ -50,7 +50,7 @@ Stage hooks:
 - When `tasks.md` explicitly lists docs tasks (blackbox, api-doc, etc.), execute them after the relevant implementation has stabilized. Invoke `devos-change-docs` for declared targets.
 - If you hit a bug, failed test, regression, exception, or blocker, invoke `systematic-debugging` internally before deciding on a fix.
 - After all tasks are complete, consider running `requesting-code-review` internally on the full diff. Address critical issues before proceeding to archive.
-- Before completion or handoff, if `tasks.md` includes a docs-refresh task, run the docs refresh assessment and invoke `devos-docs` in `mode=refresh`. If no docs-refresh task is listed, skip this step.
+- Before completion or handoff, if `tasks.md` includes a docs-refresh task, invoke `devos-docs` in `mode=refresh`. If no docs-refresh task is listed, skip this step.
 - Before saying work is complete, fixed, or passing, invoke `verification-before-completion` internally and use real verification evidence in the status update.
 - When all tasks are complete and verification passes, suggest the user run `finishing-a-development-branch` to handle merge, PR, or worktree cleanup before proceeding to archive.
 
