@@ -1,3 +1,10 @@
+<!-- PRAXIS_DEVOS_START -->
+@AGENTS.md
+
+> Claude Code 通过 `CLAUDE.md` 读取项目指令；共享项目规则统一维护在 `AGENTS.md`。
+> 如需 Claude 专属补充，请只在此文件追加少量差异内容，不要复制 `AGENTS.md` 全文。
+<!-- PRAXIS_DEVOS_END -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
