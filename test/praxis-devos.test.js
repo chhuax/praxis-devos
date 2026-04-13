@@ -49,6 +49,9 @@ const withPrependedPath = (binDir, fn) => withEnv(
   fn,
 );
 
+const normalizeEol = (value) => value.replace(/\r\n/g, '\n');
+const normalizeSlashes = (value) => value.replace(/\\/g, '/');
+
 const withPlatform = (platform, fn) => {
   const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
   Object.defineProperty(process, 'platform', {
@@ -65,10 +68,24 @@ const withPlatform = (platform, fn) => {
 
 const installFakeOpenSpec = (projectDir, label = 'GLOBAL') => {
   const binDir = path.join(projectDir, 'node_modules', '.bin');
-  const scriptPath = path.join(binDir, 'openspec');
   const globalBinDir = path.join(projectDir, '.fake-global-bin');
-  const globalScriptPath = path.join(globalBinDir, 'openspec');
-  const scriptBody = `#!/bin/sh
+  const actualHostPlatform = os.platform();
+  const isWindowsHost = actualHostPlatform === 'win32';
+  const scriptName = isWindowsHost ? 'openspec.cmd' : 'openspec';
+  const scriptPath = path.join(binDir, scriptName);
+  const globalScriptPath = path.join(globalBinDir, scriptName);
+  const scriptBody = isWindowsHost ? `@echo off
+setlocal
+set "cmd=%~1"
+if "%cmd%"=="init" (
+  set "target=%~2"
+  mkdir "%target%\\openspec\\specs" 2>nul
+  mkdir "%target%\\openspec\\changes\\archive" 2>nul
+  > "%target%\\openspec\\config.yaml" echo # context:
+  exit /b 0
+)
+echo ${label}:%*
+` : `#!/bin/sh
 set -eu
 cmd="\${1:-}"
 if [ "$cmd" = "init" ]; then
@@ -137,11 +154,29 @@ const OPENSPEC_WORKFLOW_EXPECTATIONS = [
 
 const installFakeClaude = (homeDir) => {
   const binDir = path.join(homeDir, 'fake-claude-bin');
-  const scriptPath = path.join(binDir, 'claude');
+  const actualHostPlatform = os.platform();
+  const isWindowsHost = actualHostPlatform === 'win32';
+  const scriptPath = path.join(binDir, isWindowsHost ? 'claude.cmd' : 'claude');
   fs.mkdirSync(binDir, { recursive: true });
   fs.writeFileSync(
     scriptPath,
-    `#!/bin/sh
+    isWindowsHost ? `@echo off
+setlocal
+if "%~1"=="plugin" if "%~2"=="install" if "%~3"=="superpowers@claude-plugins-official" if "%~4"=="--scope" if "%~5"=="user" (
+  mkdir "%HOME%\\.claude" 2>nul
+  > "%HOME%\\.claude\\settings.json" (
+    echo {
+    echo   "enabledPlugins": [
+    echo     "superpowers@claude-plugins-official"
+    echo   ]
+    echo }
+  )
+  echo installed
+  exit /b 0
+)
+echo unsupported claude invocation: %* 1>&2
+exit /b 1
+` : `#!/bin/sh
 set -eu
 if [ "$1" = "plugin" ] && [ "$2" = "install" ] && [ "$3" = "superpowers@claude-plugins-official" ] && [ "$4" = "--scope" ] && [ "$5" = "user" ]; then
   mkdir -p "$HOME/.claude"
@@ -170,14 +205,15 @@ const installFakeWindowsBatchRuntime = ({
   includeBrokenOpenSpecCandidate = false,
   includeExtensionlessOpenSpecCandidate = false,
 }) => {
+  const isWindowsHost = os.platform() === 'win32';
   const harnessDir = path.join(homeDir, 'fake-win-tools');
   const commandDir = path.join(homeDir, 'Program Files', 'nodejs');
   const npmPath = path.join(commandDir, 'npm.cmd');
   const claudePath = path.join(commandDir, 'claude.cmd');
   const globalOpenSpecNoExtPath = path.join(commandDir, 'openspec');
   const globalOpenSpecPath = path.join(commandDir, 'openspec.cmd');
-  const comSpecPath = path.join(harnessDir, 'cmd.exe');
-  const wherePath = path.join(harnessDir, 'where');
+  const comSpecPath = isWindowsHost ? (process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe') : path.join(harnessDir, 'cmd.exe');
+  const wherePath = path.join(harnessDir, isWindowsHost ? 'where.cmd' : 'where');
   const openspecPath = path.join(projectDir, 'node_modules', '.bin', 'openspec.cmd');
 
   fs.mkdirSync(harnessDir, { recursive: true });
@@ -187,7 +223,37 @@ const installFakeWindowsBatchRuntime = ({
 
   fs.writeFileSync(
     wherePath,
-    `#!/bin/sh
+    isWindowsHost ? `@echo off
+setlocal
+if /I "%~1"=="npm" goto npm
+if /I "%~1"=="npm.cmd" goto npm
+if /I "%~1"=="claude" goto claude
+if /I "%~1"=="claude.cmd" goto claude
+if /I "%~1"=="openspec" goto openspec
+if /I "%~1"=="openspec.cmd" goto openspec
+exit /b 1
+
+:npm
+echo "${npmPath}"
+exit /b 0
+
+:claude
+echo "${claudePath}"
+exit /b 0
+
+:openspec
+${includeBrokenOpenSpecCandidate ? `echo "${brokenOpenSpecPath}"` : ''}
+${includeExtensionlessOpenSpecCandidate ? `echo "${globalOpenSpecNoExtPath}"` : ''}
+if exist "${globalOpenSpecPath}" (
+  echo "${globalOpenSpecPath}"
+  exit /b 0
+)
+if exist "${openspecPath}" (
+  echo "${openspecPath}"
+  exit /b 0
+)
+exit /b 1
+` : `#!/bin/sh
 set -eu
 case "$1" in
   npm|npm.cmd)
@@ -215,9 +281,10 @@ esac
     { mode: 0o755 },
   );
 
-  fs.writeFileSync(
-    comSpecPath,
-    `#!/bin/sh
+  if (!isWindowsHost) {
+    fs.writeFileSync(
+      comSpecPath,
+      `#!/bin/sh
 set -eu
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "/c" ] || [ "$1" = "-c" ]; then
@@ -234,12 +301,37 @@ if [ "$first_char" = '"' ] && [ "$last_char" = '"' ]; then
 fi
 /bin/sh -c "$command"
 `,
-    { mode: 0o755 },
-  );
+      { mode: 0o755 },
+    );
+  }
 
   fs.writeFileSync(
     npmPath,
-    `#!/bin/sh
+    isWindowsHost ? `@echo off
+setlocal
+if "%~1"=="install" if "%~2"=="-g" if "%~3"=="@fission-ai/openspec" (
+  mkdir "${commandDir}" 2>nul
+  > "${globalOpenSpecPath}" (
+    echo @echo off
+    echo setlocal
+    echo if "%%~1"=="init" ^(
+    echo   set "target=%%~2"
+    echo   mkdir "%%target%%\\openspec\\specs" 2^>nul
+    echo   mkdir "%%target%%\\openspec\\changes\\archive" 2^>nul
+    echo   ^> "%%target%%\\openspec\\config.yaml" echo # context:
+    echo   exit /b 0
+    echo ^)
+    echo echo LOCAL:%%*
+  )
+  > "${globalOpenSpecNoExtPath}" (
+    echo @echo off
+    echo "${globalOpenSpecPath}" %%*
+  )
+  exit /b 0
+)
+echo unsupported npm invocation: %* 1>&2
+exit /b 1
+` : `#!/bin/sh
 set -eu
 if [ "$1" = "install" ] && [ "$2" = "-g" ] && [ "$3" = "@fission-ai/openspec" ]; then
   bin_dir="${commandDir}"
@@ -275,7 +367,23 @@ exit 1
 
   fs.writeFileSync(
     claudePath,
-    `#!/bin/sh
+    isWindowsHost ? `@echo off
+setlocal
+if "%~1"=="plugin" if "%~2"=="install" if "%~3"=="superpowers@claude-plugins-official" if "%~4"=="--scope" if "%~5"=="user" (
+  mkdir "%HOME%\\.claude" 2>nul
+  > "%HOME%\\.claude\\settings.json" (
+    echo {
+    echo   "enabledPlugins": [
+    echo     "superpowers@claude-plugins-official"
+    echo   ]
+    echo }
+  )
+  echo installed
+  exit /b 0
+)
+echo unsupported claude invocation: %* 1>&2
+exit /b 1
+` : `#!/bin/sh
 set -eu
 if [ "$1" = "plugin" ] && [ "$2" = "install" ] && [ "$3" = "superpowers@claude-plugins-official" ] && [ "$4" = "--scope" ] && [ "$5" = "user" ]; then
   mkdir -p "$HOME/.claude"
@@ -296,7 +404,9 @@ exit 1
   );
 
   fs.chmodSync(wherePath, 0o755);
-  fs.chmodSync(comSpecPath, 0o755);
+  if (!isWindowsHost) {
+    fs.chmodSync(comSpecPath, 0o755);
+  }
   fs.chmodSync(npmPath, 0o755);
   fs.chmodSync(claudePath, 0o755);
 
@@ -434,7 +544,7 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.equal(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.type, 'skill');
   assert.ok(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.agents?.includes('copilot'));
   assert.match(
-    manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.sourceDir || '',
+    normalizeSlashes(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.sourceDir || ''),
     /assets\/skills\/devos-docs$/,
   );
 
@@ -538,7 +648,7 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
     'utf8',
   );
 
-  const projected = injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->');
+  const projected = normalizeEol(injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->'));
 
   assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
 });
@@ -581,8 +691,8 @@ test('OpenSpec upstream snapshots and overlays are stored separately', () => {
     'utf8',
   );
 
-  assert.match(proposeUpstream, /^---\nname: openspec-propose\n/m);
-  assert.match(applyUpstream, /^---\nname: openspec-apply-change\n/m);
+  assert.match(normalizeEol(proposeUpstream), /^---\nname: openspec-propose\n/m);
+  assert.match(normalizeEol(applyUpstream), /^---\nname: openspec-apply-change\n/m);
   assert.doesNotMatch(proposeUpstream, /## PRAXIS_DEVOS_OVERLAY/);
   assert.match(archiveOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
   assert.match(applyOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
@@ -596,7 +706,7 @@ test('OpenSpec upstream snapshots and overlays are stored separately', () => {
   assert.match(archiveOverlayCurrent, /warning\/compatibility section/);
   assert.match(applyTaskLocalPlanning, /^# Task-Local Planning Contract$/m);
   assert.match(exploreOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
-  assert.match(currentOpenSpecConfig, /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
+  assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
 });
 
 test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overlays', () => {
@@ -619,11 +729,11 @@ test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overl
       overlayFileName,
     );
 
-    const projected = composeProjectedSkill({
+    const projected = normalizeEol(composeProjectedSkill({
       projectedName,
       upstreamContent,
       overlayPath,
-    });
+    }));
 
     assert.match(projected, new RegExp(`^---\\nname: ${projectedName}\\n`, 'm'));
     assert.match(projected, /generatedBy: "1\.3\.0"/);
@@ -641,7 +751,7 @@ test('devos-docs bundled skill declares supported modes', () => {
     'utf8',
   );
 
-  assert.match(docsSkill, /^---\nname: devos-docs\n/m);
+  assert.match(normalizeEol(docsSkill), /^---\nname: devos-docs\n/m);
   assert.match(docsSkill, /mode=init/);
   assert.match(docsSkill, /mode=refresh/);
 });
@@ -699,7 +809,7 @@ test('devos-change-docs bundled skill declares supported modes', () => {
     'utf8',
   );
 
-  assert.match(docsSkill, /^---\nname: devos-change-docs\n/m);
+  assert.match(normalizeEol(docsSkill), /^---\nname: devos-change-docs\n/m);
   assert.match(docsSkill, /mode=change-blackbox/);
   assert.match(docsSkill, /mode=change-api/);
   assert.match(docsSkill, /mode=project-api-sync/);
@@ -719,10 +829,10 @@ test('collectBundledSkillSources discovers unified skill bundles by sourceDir', 
   assert.ok(docs);
   assert.ok(changeDocs);
   assert.equal('sourcePath' in propose, false);
-  assert.match(propose.sourceDir, /assets\/upstream\/openspec\/skills\/openspec-propose$/);
-  assert.match(propose.overlayPath || '', /assets\/overlays\/openspec\/skills\/opsx-propose\.overlay\.md$/);
-  assert.match(docs.sourceDir, /assets\/skills\/devos-docs$/);
-  assert.match(changeDocs.sourceDir, /assets\/skills\/devos-change-docs$/);
+  assert.match(normalizeSlashes(propose.sourceDir), /assets\/upstream\/openspec\/skills\/openspec-propose$/);
+  assert.match(normalizeSlashes(propose.overlayPath || ''), /assets\/overlays\/openspec\/skills\/opsx-propose\.overlay\.md$/);
+  assert.match(normalizeSlashes(docs.sourceDir), /assets\/skills\/devos-docs$/);
+  assert.match(normalizeSlashes(changeDocs.sourceDir), /assets\/skills\/devos-change-docs$/);
   assert.deepEqual(managedOpenSpecNames, ['opsx-apply', 'opsx-archive', 'opsx-explore', 'opsx-propose']);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-verify'), false);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-sync'), false);
@@ -796,35 +906,35 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
       log: (msg) => logs.push(msg),
     });
 
-    const projectedCodexSkill = fs.readFileSync(
+    const projectedCodexSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
-    );
-    const projectedCodexDocsSkill = fs.readFileSync(
+    ));
+    const projectedCodexDocsSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.codex', 'skills', 'devos-docs', 'SKILL.md'),
       'utf8',
-    );
-    const projectedClaudeSkill = fs.readFileSync(
+    ));
+    const projectedClaudeSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
-    );
-    const projectedClaudeDocsSkill = fs.readFileSync(
+    ));
+    const projectedClaudeDocsSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md'),
       'utf8',
-    );
-    const projectedOpenCodeSkill = fs.readFileSync(
+    ));
+    const projectedOpenCodeSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
-    );
+    ));
 
     assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedCodexSkill, /^---\nname: opsx-propose\n/m);
     assert.match(projectedCodexSkill, /generatedBy: "1\.3\.0"/);
     assert.match(projectedCodexSkill, /## PRAXIS_DEVOS_OVERLAY/);
-    const projectedApplySkill = fs.readFileSync(
+    const projectedApplySkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'SKILL.md'),
       'utf8',
-    );
+    ));
     const projectedApplyPlanning = fs.readFileSync(
       path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'task-local-planning.md'),
       'utf8',
