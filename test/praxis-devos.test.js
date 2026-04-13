@@ -412,6 +412,7 @@ exit 1
 
   return {
     harnessDir,
+    commandDir,
     comSpecPath,
   };
 };
@@ -1279,9 +1280,9 @@ test('setupProject provisions GitHub Copilot through the shared Claude-compatibl
 test('setupProject handles quoted Windows command paths with spaces during automatic installs', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-home-'));
-  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({ homeDir: fakeHome, projectDir });
+  const { harnessDir, commandDir, comSpecPath } = installFakeWindowsBatchRuntime({ homeDir: fakeHome, projectDir });
 
-  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(commandDir, () => withPrependedPath(harnessDir, () => {
     const output = setupProject({
       projectDir,
       agents: ['claude'],
@@ -1291,19 +1292,19 @@ test('setupProject handles quoted Windows command paths with spaces during autom
     assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
     assert.ok(fs.existsSync(path.join(fakeHome, 'Program Files', 'nodejs', 'openspec.cmd')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
-  }))));
+  })))));
 });
 
 test('setupProject ignores invalid Windows where candidates for openspec', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-bad-where-home-'));
-  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({
+  const { harnessDir, commandDir, comSpecPath } = installFakeWindowsBatchRuntime({
     homeDir: fakeHome,
     projectDir,
     includeBrokenOpenSpecCandidate: true,
   });
 
-  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(commandDir, () => withPrependedPath(harnessDir, () => {
     const output = setupProject({
       projectDir,
       agents: ['claude'],
@@ -1313,26 +1314,26 @@ test('setupProject ignores invalid Windows where candidates for openspec', () =>
     assert.match(output, /Installed Claude SuperPowers with Claude Code CLI/);
     assert.ok(fs.existsSync(path.join(fakeHome, 'Program Files', 'nodejs', 'openspec.cmd')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'settings.json')));
-  }))));
+  })))));
 });
 
 test('setupProject prefers Windows executable extension over extensionless openspec candidate', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-ext-priority-home-'));
-  const { harnessDir, comSpecPath } = installFakeWindowsBatchRuntime({
+  const { harnessDir, commandDir, comSpecPath } = installFakeWindowsBatchRuntime({
     homeDir: fakeHome,
     projectDir,
     includeExtensionlessOpenSpecCandidate: true,
   });
 
-  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(harnessDir, () => {
+  withPlatform('win32', () => withEnv('HOME', fakeHome, () => withEnv('ComSpec', comSpecPath, () => withPrependedPath(commandDir, () => withPrependedPath(harnessDir, () => {
     const output = setupProject({
       projectDir,
       agents: ['opencode'],
     });
 
     assert.match(output, /OpenSpec CLI is available on PATH via .*openspec\.cmd/);
-  }))));
+  })))));
 });
 
 test('doctorProject reports current dependency status for OpenCode', () => {

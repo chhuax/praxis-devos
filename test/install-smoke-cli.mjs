@@ -64,6 +64,8 @@ const prependToPath = (env, entry) => {
   env[pathKey] = currentPath ? `${entry}${path.delimiter}${currentPath}` : entry;
 };
 
+const normalizeEol = (value) => value.replace(/\r\n/g, '\n');
+
 const runCommand = (command, args, options = {}) => {
   const {
     cwd = process.cwd(),
@@ -193,7 +195,7 @@ const assertProjectedCodexSkills = (fakeHome) => {
 const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
   for (const { name, mustInclude } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
     const skillPath = path.join(skillsRoot, name, 'SKILL.md');
-    const skill = fs.readFileSync(skillPath, 'utf8');
+    const skill = normalizeEol(fs.readFileSync(skillPath, 'utf8'));
 
     assert.match(skill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(skill, new RegExp(`^name: ${name}$`, 'm'));
@@ -517,13 +519,17 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
   if (quotedWindowsWrappers) {
     const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
-    const diagnosticLog = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8');
+    const diagnostics = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8')
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
     assert.match(invocationLog, /npm\.cmd/);
     assert.match(invocationLog, /claude\.cmd/);
-    assert.match(diagnosticLog, /"command":"npm\.cmd"/);
-    assert.match(diagnosticLog, /"command":"claude\.cmd"/);
-    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\npm-shim\.cjs/);
-    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\claude-shim\.cjs/);
+    assert.ok(diagnostics.some((entry) => entry.command === 'npm.cmd'));
+    assert.ok(diagnostics.some((entry) => entry.command === 'claude.cmd'));
+    assert.ok(diagnostics.some((entry) => /Program Files[\\/]+nodejs[\\/]+npm-shim\.cjs$/i.test(entry.shimPath)));
+    assert.ok(diagnostics.some((entry) => /Program Files[\\/]+nodejs[\\/]+claude-shim\.cjs$/i.test(entry.shimPath)));
   }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];
