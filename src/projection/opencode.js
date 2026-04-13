@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
 import { copyBundleDirectory, ensureDir } from './bundles.js';
+import { composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -25,7 +26,13 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(openCodeSkillsDir());
   const results = [];
 
-  for (const { name, sourceDir } of skillSources) {
+  for (const {
+    name,
+    sourceDir,
+    overlayPath = null,
+    overlayAssetsDir = null,
+    sourceType = 'direct',
+  } of skillSources) {
     const targetDir = path.join(openCodeSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
     const sourceSkillPath = path.join(sourceDir, 'SKILL.md');
@@ -52,10 +59,16 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
+        const finalContent = sourceType === 'openspec-upstream'
+          ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
+          : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
-        return injectMarker(content, marker);
+        return injectMarker(finalContent, marker);
       },
     });
+    if (overlayAssetsDir) {
+      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir });
+    }
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -64,6 +77,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       agent: 'opencode',
       extra: {
         sourceDir: path.relative(process.cwd(), sourceDir),
+        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
+        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected' });

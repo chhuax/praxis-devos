@@ -4,8 +4,8 @@
 ## Flow Selection
 
 - Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors, or any request with unclear requirements, unresolved `open questions`, or competing solution options.
-- In those cases, start with `/opsx:propose` or `/opsx:explore` and finish clarification and option comparison inside the current OpenSpec stage before implementation.
-- Use `/opsx:apply` only for small, local implementation work with low ambiguity and no proposal need.
+- In those cases, start with `opsx-propose` or `opsx-explore` and finish clarification and option comparison inside the current OpenSpec stage before implementation.
+- Use `opsx-apply` only for small, local implementation work with low ambiguity and no proposal need.
 - Reviews and audit-style requests should follow the review flow.
 
 ## Project Reading Order
@@ -24,7 +24,7 @@
 
 ## Stage Gates
 
-- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal flow has been executed through `/opsx:propose` or `/opsx:explore` plus native OpenSpec commands.
+- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal flow has been executed through `opsx-propose` or `opsx-explore` plus native OpenSpec actions.
 - Proposal Gate: if `open questions` or competing solution directions remain, stay in propose or explore and finish clarification before implementation.
 - Apply Gate: before implementation, check branch safety, use an isolated workspace when needed, and keep any multi-step plan under the approved OpenSpec change.
 - Execution Gate: when bugs, failed tests, exceptions, or regressions appear, perform root-cause analysis first; keep all parallel work, subtasks, outputs, and status under the current change.

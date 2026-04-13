@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { injectMarker } from '../src/projection/markers.js';
 import { collectBundledSkillSources } from '../src/projection/index.js';
+import { composeProjectedSkill } from '../src/projection/skill-sources.js';
 
 import {
   PRAXIS_ROOT,
@@ -13,6 +14,7 @@ import {
   doctorProject,
   initProject,
   parseCliArgs,
+  populateOpenSpecConfig,
   projectNativeSkills,
   renderHelp,
   runCli,
@@ -105,6 +107,33 @@ const listBackupFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
 const listTempFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
   .filter((entry) => entry.startsWith(`${fileName}.tmp-`))
   .sort();
+
+const OPENSPEC_WORKFLOW_EXPECTATIONS = [
+  {
+    projectedName: 'opsx-explore',
+    upstreamDirName: 'openspec-explore',
+    overlayFileName: 'opsx-explore.overlay.md',
+    mustInclude: [/owner_flow: opsx-explore/, /After `openspec list --json`/],
+  },
+  {
+    projectedName: 'opsx-propose',
+    upstreamDirName: 'openspec-propose',
+    overlayFileName: 'opsx-propose.overlay.md',
+    mustInclude: [/owner_flow: opsx-propose/, /`Docs Impact` section/],
+  },
+  {
+    projectedName: 'opsx-apply',
+    upstreamDirName: 'openspec-apply-change',
+    overlayFileName: 'opsx-apply.overlay.md',
+    mustInclude: [/owner_flow: opsx-apply/, /verification-before-completion/, /task-local-planning\.md/],
+  },
+  {
+    projectedName: 'opsx-archive',
+    upstreamDirName: 'openspec-archive-change',
+    overlayFileName: 'opsx-archive.overlay.md',
+    mustInclude: [/owner_flow: opsx-archive/, /verification-before-completion/],
+  },
+];
 
 const installFakeClaude = (homeDir) => {
   const binDir = path.join(homeDir, 'fake-claude-bin');
@@ -298,13 +327,15 @@ test('parseCliArgs parses current flags and rejects removed --openspec', () => {
     'codex,claude',
     '--agent',
     'opencode',
+    '--agent',
+    'copilot',
     '--project-dir',
     'tmp/project',
     '--strict',
   ]);
 
   assert.equal(parsed.command, 'instrumentation');
-  assert.deepEqual(parsed.agents, ['codex', 'claude', 'opencode']);
+  assert.deepEqual(parsed.agents, ['codex', 'claude', 'opencode', 'copilot']);
   assert.equal(parsed.projectDir, path.resolve('tmp/project'));
   assert.deepEqual(parsed.positional, ['enable']);
   assert.equal(parsed.strict, true);
@@ -345,15 +376,18 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
 
   const output = syncProject({
     projectDir,
-    agents: ['codex', 'claude', 'opencode'],
+    agents: ['codex', 'claude', 'opencode', 'copilot'],
   });
 
   const agentsMd = fs.readFileSync(agentsPath, 'utf8');
   const claudeMd = fs.readFileSync(claudePath, 'utf8');
-  assert.match(output, /Synced adapters: codex, claude, opencode/);
+  assert.match(output, /Synced adapters: codex, claude, opencode, copilot/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
   assert.match(agentsMd, /docs\/surfaces\.yaml/);
+  assert.doesNotMatch(agentsMd, /\/opsx:/);
+  assert.match(agentsMd, /opsx-propose/);
+  assert.match(agentsMd, /opsx-apply/);
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
   assert.match(claudeMd, /^<!-- PRAXIS_DEVOS_START -->\n@AGENTS\.md/m);
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
@@ -368,7 +402,7 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   withEnv('HOME', fakeHome, () => {
     projectNativeSkills({
       projectDir: makeTempProject(),
-      agents: ['claude', 'opencode', 'codex'],
+      agents: ['claude', 'opencode', 'codex', 'copilot'],
       log: (msg) => logs.push(msg),
     });
   });
@@ -396,13 +430,16 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.equal(manifest.assets[claudeRefreshPath]?.type, 'command');
   assert.equal(manifest.assets[opencodeInitPath]?.type, 'command');
   assert.equal(manifest.assets[opencodeRefreshPath]?.type, 'command');
+  assert.ok(manifest.assets[claudeInitPath]?.agents?.includes('copilot'));
   assert.equal(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.type, 'skill');
+  assert.ok(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.agents?.includes('copilot'));
   assert.match(
     manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.sourceDir || '',
     /assets\/skills\/devos-docs$/,
   );
 
   assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
+  assert.match(logs.join('\n'), /GitHub Copilot: projected docs command devos-docs-init/);
   assert.match(logs.join('\n'), /OpenCode: projected docs command devos-docs-refresh/);
 });
 
@@ -497,7 +534,7 @@ test('syncProject refreshes adapters without generating docs artifacts', () => {
 
 test('injectMarker preserves YAML frontmatter at the top of projected skills', () => {
   const content = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'SKILL.md'),
+    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
     'utf8',
   );
 
@@ -506,32 +543,96 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
   assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
 });
 
-test('OpenSpec skill bundles keep expected names and overlay sections', () => {
-  const propose = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-propose', 'SKILL.md'),
+test('OpenSpec upstream snapshots and overlays are stored separately', () => {
+  const proposeUpstream = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
     'utf8',
   );
-  const apply = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-apply', 'SKILL.md'),
+  const applyUpstream = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-apply-change', 'SKILL.md'),
     'utf8',
   );
-  const archive = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-archive', 'SKILL.md'),
+  const archiveOverlay = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-archive.overlay.md'),
     'utf8',
   );
-  const explore = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'skills', 'opsx-explore', 'SKILL.md'),
+  const applyOverlay = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-apply.overlay.md'),
+    'utf8',
+  );
+  const applyTaskLocalPlanning = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-apply', 'task-local-planning.md'),
+    'utf8',
+  );
+  const exploreOverlay = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-explore.overlay.md'),
+    'utf8',
+  );
+  const proposeOverlay = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-propose.overlay.md'),
+    'utf8',
+  );
+  const archiveOverlayCurrent = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-archive.overlay.md'),
+    'utf8',
+  );
+  const currentOpenSpecConfig = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'openspec', 'config.yaml'),
     'utf8',
   );
 
-  assert.match(propose, /^---\nname: opsx-propose\n/m);
-  assert.match(apply, /^---\nname: opsx-apply\n/m);
-  assert.match(archive, /^---\nname: opsx-archive\n/m);
-  assert.match(explore, /^---\nname: opsx-explore\n/m);
-  assert.match(propose, /## PRAXIS_DEVOS_OVERLAY/);
-  assert.match(apply, /## PRAXIS_DEVOS_OVERLAY/);
-  assert.match(archive, /## PRAXIS_DEVOS_OVERLAY/);
-  assert.match(explore, /## PRAXIS_DEVOS_OVERLAY/);
+  assert.match(proposeUpstream, /^---\nname: openspec-propose\n/m);
+  assert.match(applyUpstream, /^---\nname: openspec-apply-change\n/m);
+  assert.doesNotMatch(proposeUpstream, /## PRAXIS_DEVOS_OVERLAY/);
+  assert.match(archiveOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
+  assert.match(applyOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
+  assert.match(applyOverlay, /Follow `\.\/task-local-planning\.md`/);
+  assert.match(proposeOverlay, /praxis_devos\.docs_tasks/);
+  assert.match(proposeOverlay, /change_blackbox: true/);
+  assert.match(proposeOverlay, /change_api: auto/);
+  assert.match(applyOverlay, /mode=change-blackbox/);
+  assert.match(applyOverlay, /mode=change-api/);
+  assert.match(applyOverlay, /compatibility warning section/);
+  assert.match(archiveOverlayCurrent, /warning\/compatibility section/);
+  assert.match(applyTaskLocalPlanning, /^# Task-Local Planning Contract$/m);
+  assert.match(exploreOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
+  assert.match(currentOpenSpecConfig, /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
+});
+
+test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overlays', () => {
+  for (const {
+    projectedName,
+    upstreamDirName,
+    overlayFileName,
+    mustInclude,
+  } of OPENSPEC_WORKFLOW_EXPECTATIONS) {
+    const upstreamContent = fs.readFileSync(
+      path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', upstreamDirName, 'SKILL.md'),
+      'utf8',
+    );
+    const overlayPath = path.join(
+      PRAXIS_ROOT,
+      'assets',
+      'overlays',
+      'openspec',
+      'skills',
+      overlayFileName,
+    );
+
+    const projected = composeProjectedSkill({
+      projectedName,
+      upstreamContent,
+      overlayPath,
+    });
+
+    assert.match(projected, new RegExp(`^---\\nname: ${projectedName}\\n`, 'm'));
+    assert.match(projected, /generatedBy: "1\.3\.0"/);
+    assert.match(projected, /^## PRAXIS_DEVOS_OVERLAY$/m);
+
+    for (const pattern of mustInclude) {
+      assert.match(projected, pattern);
+    }
+  }
 });
 
 test('devos-docs bundled skill declares supported modes', () => {
@@ -609,19 +710,46 @@ test('collectBundledSkillSources discovers unified skill bundles by sourceDir', 
   const propose = skillSources.find((entry) => entry.name === 'opsx-propose');
   const docs = skillSources.find((entry) => entry.name === 'devos-docs');
   const changeDocs = skillSources.find((entry) => entry.name === 'devos-change-docs');
+  const managedOpenSpecNames = skillSources
+    .filter((entry) => entry.sourceType === 'openspec-upstream')
+    .map((entry) => entry.name)
+    .sort();
 
   assert.ok(propose);
   assert.ok(docs);
   assert.ok(changeDocs);
   assert.equal('sourcePath' in propose, false);
-  assert.match(propose.sourceDir, /assets\/skills\/opsx-propose$/);
+  assert.match(propose.sourceDir, /assets\/upstream\/openspec\/skills\/openspec-propose$/);
+  assert.match(propose.overlayPath || '', /assets\/overlays\/openspec\/skills\/opsx-propose\.overlay\.md$/);
   assert.match(docs.sourceDir, /assets\/skills\/devos-docs$/);
   assert.match(changeDocs.sourceDir, /assets\/skills\/devos-change-docs$/);
+  assert.deepEqual(managedOpenSpecNames, ['opsx-apply', 'opsx-archive', 'opsx-explore', 'opsx-propose']);
+  assert.equal(skillSources.some((entry) => entry.name === 'opsx-verify'), false);
+  assert.equal(skillSources.some((entry) => entry.name === 'opsx-sync'), false);
+});
+
+test('populateOpenSpecConfig does not rewrite docs task policy into openspec/config.yaml', () => {
+  const projectDir = makeTempProject();
+  const configPath = path.join(projectDir, 'openspec', 'config.yaml');
+  const logs = [];
+
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, 'schema: spec-driven\n\n# context:\n', 'utf8');
+
+  populateOpenSpecConfig({
+    projectDir,
+    log: (msg) => logs.push(msg),
+  });
+
+  const updated = fs.readFileSync(configPath, 'utf8');
+  assert.equal(updated, 'schema: spec-driven\n\n# context:\n');
+  assert.doesNotMatch(updated, /praxis_devos:/);
+  assert.match(logs.join('\n'), /No stack context to populate into openspec\/config\.yaml/);
 });
 
 test('projectNativeSkills projects supporting files that live alongside SKILL.md', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bundle-home-'));
-  const targetPath = path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'references', 'bundle-proof.txt');
+  const targetPath = path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'task-local-planning.md');
 
   withEnv('HOME', fakeHome, () => {
     projectNativeSkills({
@@ -631,7 +759,7 @@ test('projectNativeSkills projects supporting files that live alongside SKILL.md
     });
   });
 
-  assert.equal(fs.readFileSync(targetPath, 'utf8'), 'bundle-supporting-file\n');
+  assert.match(fs.readFileSync(targetPath, 'utf8'), /^# Task-Local Planning Contract$/m);
 });
 
 test('projectNativeSkills projects host commands from the shared command asset root', () => {
@@ -642,7 +770,7 @@ test('projectNativeSkills projects host commands from the shared command asset r
   withEnv('HOME', fakeHome, () => {
     projectNativeSkills({
       projectDir: makeTempProject(),
-      agents: ['claude', 'opencode'],
+      agents: ['claude', 'opencode', 'copilot'],
       log: () => {},
     });
   });
@@ -664,7 +792,7 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
   withEnv('HOME', fakeHome, () => {
     projectNativeSkills({
       projectDir: makeTempProject(),
-      agents: ['codex', 'claude', 'opencode'],
+      agents: ['codex', 'claude', 'opencode', 'copilot'],
       log: (msg) => logs.push(msg),
     });
 
@@ -690,16 +818,41 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
     );
 
     assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedCodexSkill, /^---\nname: opsx-propose\n/m);
+    assert.match(projectedCodexSkill, /generatedBy: "1\.3\.0"/);
+    assert.match(projectedCodexSkill, /## PRAXIS_DEVOS_OVERLAY/);
+    const projectedApplySkill = fs.readFileSync(
+      path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'SKILL.md'),
+      'utf8',
+    );
+    const projectedApplyPlanning = fs.readFileSync(
+      path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'task-local-planning.md'),
+      'utf8',
+    );
+    assert.match(projectedApplySkill, /task-local micro-plan/);
+    assert.match(projectedApplySkill, /Follow `\.\/task-local-planning\.md`/);
+    assert.match(projectedApplySkill, /Do not write them to `tasks\.md`/);
+    assert.doesNotMatch(projectedApplySkill, /invoke `writing-plans` internally/);
+    assert.match(projectedApplyPlanning, /^# Task-Local Planning Contract$/m);
+    assert.match(projectedApplyPlanning, /Touched files/);
+    assert.match(projectedApplyPlanning, /## File Structure First/);
+    assert.match(projectedApplyPlanning, /## Bite-Sized Step Granularity/);
+    assert.match(projectedApplyPlanning, /## No Placeholders/);
+    assert.match(projectedApplyPlanning, /Optional parallel/);
+    assert.match(projectedApplySkill, /verification-before-completion/);
     assert.match(projectedCodexDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedClaudeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedClaudeDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedOpenCodeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'commands')), false);
   });
 
   assert.match(logs.join('\n'), /Codex: projected opsx-propose/);
   assert.match(logs.join('\n'), /Codex: projected devos-docs/);
   assert.match(logs.join('\n'), /Claude: projected opsx-propose/);
   assert.match(logs.join('\n'), /Claude: projected devos-docs/);
+  assert.match(logs.join('\n'), /GitHub Copilot: projected opsx-propose/);
+  assert.match(logs.join('\n'), /GitHub Copilot: projected devos-docs/);
   assert.match(logs.join('\n'), /OpenCode: projected opsx-propose/);
   assert.match(logs.join('\n'), /OpenCode: projected devos-docs/);
 });
@@ -803,7 +956,7 @@ test('bootstrapProject updates OpenCode plugins and preserves existing config', 
   withEnv('HOME', fakeHome, () => {
     const output = bootstrapProject({
       projectDir,
-      agents: ['opencode', 'codex', 'claude'],
+      agents: ['opencode', 'codex', 'claude', 'copilot'],
     });
 
     const config = readJson(globalConfigPath);
@@ -811,6 +964,7 @@ test('bootstrapProject updates OpenCode plugins and preserves existing config', 
     assert.match(output, /== opencode ==/);
     assert.match(output, /== codex ==/);
     assert.match(output, /== claude ==/);
+    assert.match(output, /== copilot ==/);
     assert.equal(config.theme, 'night');
     assert.ok(config.plugin.includes('existing-plugin'));
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
@@ -989,6 +1143,29 @@ test('setupProject installs Claude SuperPowers with user scope when Claude CLI i
   })));
 });
 
+test('setupProject provisions GitHub Copilot through the shared Claude-compatible projection surface', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-copilot-home-'));
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['copilot'],
+    });
+
+    const managedAssetsPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
+    assert.match(output, /== copilot ==/);
+    assert.match(output, /no separate runtime dependency to install/i);
+    assert.match(output, /\[OK\] superpowers:copilot/);
+    assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
+    assert.equal(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), false);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
+    assert.ok(readJson(managedAssetsPath).assets[path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')]);
+  }));
+});
+
 test('setupProject handles quoted Windows command paths with spaces during automatic installs', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-win32-home-'));
@@ -1080,6 +1257,18 @@ test('doctorProject reports missing Claude plugin when settings do not contain i
     assert.match(output, /\[MISSING\] superpowers:claude/);
     assert.match(output, /claude plugin install superpowers@claude-plugins-official --scope user/);
   }));
+});
+
+test('doctorProject reports GitHub Copilot as ready when shared projection surfaces are supported', () => {
+  const projectDir = makeTempProject();
+
+  const output = doctorProject({
+    projectDir,
+    agents: ['copilot'],
+  });
+
+  assert.match(output, /\[OK\] superpowers:copilot/);
+  assert.match(output, /shared ~\/\.claude skills\/commands discovery surface/i);
 });
 
 test('runCli routes help but rejects removed wrapper commands', () => {

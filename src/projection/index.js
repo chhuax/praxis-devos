@@ -1,29 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import * as claude from './claude.js';
+import * as copilot from './copilot.js';
 import * as codex from './codex.js';
 import * as opencode from './opencode.js';
+import { collectBundledSkillSources } from './skill-sources.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const bundledSkillsRoot = () => path.resolve(__dirname, '../../assets/skills');
-
-const adapters = { claude, codex, opencode };
-
-/**
- * Collect bundled skill sources from bundled assets.
- */
-export const collectBundledSkillSources = () =>
-  (fs.existsSync(bundledSkillsRoot())
-    ? fs.readdirSync(bundledSkillsRoot(), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => ({
-        name: entry.name,
-        sourceDir: path.join(bundledSkillsRoot(), entry.name),
-      }))
-      .filter(({ sourceDir }) => fs.existsSync(path.join(sourceDir, 'SKILL.md')))
-      .sort((a, b) => a.name.localeCompare(b.name))
-    : []);
+const adapters = { claude, copilot, codex, opencode };
+export { collectBundledSkillSources };
 
 /**
  * Project bundled Praxis user-level assets to a specific agent's native directories.

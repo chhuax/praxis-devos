@@ -3,11 +3,11 @@
 ## Flow Selection
 
 - Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors, or any request with unclear requirements, unresolved `open questions`, or competing solution options.
-- In those cases, start with `/opsx:propose` or `/opsx:explore` and finish clarification and option comparison inside the current OpenSpec stage before implementation.
-- Use `/opsx:apply` only for small, local implementation work with low ambiguity and no proposal need.
+- In those cases, start with `opsx-propose` or `opsx-explore` and finish clarification and option comparison inside the current OpenSpec stage before implementation.
+- Use `opsx-apply` only for small, local implementation work with low ambiguity and no proposal need.
 - Reviews and audit-style requests should follow the review flow.
-- Routing examples — requests that REQUIRE `/opsx:propose`: "帮我加一个 X"、"新增 Y 能力"、"我想做一套 Z workflow"、"add a release kit"、"implement feature X". These introduce new capabilities or cross-cutting concerns and must go through proposal first.
-- Routing examples — requests that can use `/opsx:apply` directly: "修一下这个 bug"、"改一下这段文案"、"update the version number"、"fix the failing test". These are small, scoped fixes with no design ambiguity.
+- Routing examples — requests that REQUIRE `opsx-propose`: "帮我加一个 X"、"新增 Y 能力"、"我想做一套 Z workflow"、"add a release kit"、"implement feature X". These introduce new capabilities or cross-cutting concerns and must go through proposal first.
+- Routing examples — requests that can use `opsx-apply` directly: "修一下这个 bug"、"改一下这段文案"、"update the version number"、"fix the failing test". These are small, scoped fixes with no design ambiguity.
 
 ## Project Reading Order
 
@@ -25,7 +25,7 @@
 
 ## Stage Gates
 
-- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal flow has been executed through `/opsx:propose` or `/opsx:explore` plus native OpenSpec commands.
+- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal flow has been executed through `opsx-propose` or `opsx-explore` plus native OpenSpec actions.
 - Proposal Gate: if `open questions` or competing solution directions remain, stay in propose or explore and finish clarification before implementation.
 - Apply Gate: before implementation, keep any multi-step plan under the approved OpenSpec change.
 - Execution Gate: when bugs, failed tests, exceptions, or regressions appear, perform root-cause analysis first; keep all parallel work, subtasks, outputs, and status under the current change.

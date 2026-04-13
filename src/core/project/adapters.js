@@ -195,6 +195,19 @@ const syncClaudeAdapter = ({ projectDir, log }) => {
   log(`✓ Claude Code adapter synced via CLAUDE.md (${claudeStatus})`);
 };
 
+const syncCopilotAdapter = ({ projectDir, log }) => {
+  const paths = projectPaths(projectDir);
+  const status = upsertManagedBlock(
+    paths.rootAgentsMd,
+    AGENTS_MANAGED_START,
+    AGENTS_MANAGED_END,
+    renderManagedBlock(),
+    AGENTS_MD_TEMPLATE,
+  );
+
+  log(`✓ GitHub Copilot adapter synced via AGENTS.md (${status})`);
+};
+
 const syncOpenCodeAdapter = ({ projectDir, log }) => {
   const paths = projectPaths(projectDir);
 
@@ -220,6 +233,11 @@ const syncAgent = ({ projectDir, agent, log }) => {
 
   if (agent === 'claude') {
     syncClaudeAdapter({ projectDir, log });
+    return;
+  }
+
+  if (agent === 'copilot') {
+    syncCopilotAdapter({ projectDir, log });
     return;
   }
 
@@ -285,7 +303,7 @@ export const populateOpenSpecConfig = ({ projectDir, log }) => {
 
   const content = fs.readFileSync(configPath, 'utf8');
   if (content.includes('context:') && !content.includes('# context:') && !content.includes('context: |')) {
-    log('⊘ openspec/config.yaml already has custom context, skipping');
+    log('⊘ openspec/config.yaml already has custom context, skipping context population');
     return;
   }
 
