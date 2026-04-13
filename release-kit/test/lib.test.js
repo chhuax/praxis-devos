@@ -52,6 +52,7 @@ test('ensureMainWorktree returns the current repo when already on clean main at 
 test('ensureMainWorktree creates a temporary worktree when not on a clean synced main branch', () => {
   const calls = [];
   const removed = [];
+  const worktreePath = path.join('/repo', '.worktrees', 'release-kit-origin-main');
   const execFileSync = (command, args, options) => {
     calls.push({ command, args, options });
 
@@ -65,7 +66,7 @@ test('ensureMainWorktree creates a temporary worktree when not on a clean synced
         return 'local-head\n';
       case 'git rev-parse origin/main':
         return 'origin-head\n';
-      case 'git worktree add /repo/.worktrees/release-kit-origin-main --detach origin/main':
+      case `git worktree add ${worktreePath} --detach origin/main`:
         return 'Preparing worktree\n';
       default:
         throw new Error(`Unexpected command: ${key}`);
@@ -82,14 +83,15 @@ test('ensureMainWorktree creates a temporary worktree when not on a clean synced
 
   assert.equal(result.mode, 'worktree');
   assert.equal(result.repoRoot, '/repo');
-  assert.equal(result.workDir, '/repo/.worktrees/release-kit-origin-main');
+  assert.equal(result.workDir, worktreePath);
   assert.equal(typeof result.cleanup, 'function');
 
   result.cleanup();
-  assert.deepEqual(removed, ['/repo/.worktrees/release-kit-origin-main']);
+  assert.deepEqual(removed, [worktreePath]);
 });
 
 test('ensureMainWorktree rejects when worktree creation fails', () => {
+  const worktreePath = path.join('/repo', '.worktrees', 'release-kit-origin-main');
   const execFileSync = (command, args) => {
     const key = `${command} ${args.join(' ')}`;
     switch (key) {
@@ -101,7 +103,7 @@ test('ensureMainWorktree rejects when worktree creation fails', () => {
         return 'local-head\n';
       case 'git rev-parse origin/main':
         return 'origin-head\n';
-      case 'git worktree add /repo/.worktrees/release-kit-origin-main --detach origin/main':
+      case `git worktree add ${worktreePath} --detach origin/main`:
         throw new Error('worktree already exists');
       default:
         throw new Error(`Unexpected command: ${key}`);
@@ -115,6 +117,7 @@ test('ensureMainWorktree rejects when worktree creation fails', () => {
 });
 
 test('ensureMainWorktree registers cleanup hooks and reports manual cleanup path on removal failure', () => {
+  const worktreePath = path.join('/repo', '.worktrees', 'release-kit-origin-main');
   const execFileSync = (command, args) => {
     const key = `${command} ${args.join(' ')}`;
     switch (key) {
@@ -126,7 +129,7 @@ test('ensureMainWorktree registers cleanup hooks and reports manual cleanup path
         return 'local-head\n';
       case 'git rev-parse origin/main':
         return 'origin-head\n';
-      case 'git worktree add /repo/.worktrees/release-kit-origin-main --detach origin/main':
+      case `git worktree add ${worktreePath} --detach origin/main`:
         return 'Preparing worktree\n';
       default:
         throw new Error(`Unexpected command: ${key}`);
@@ -171,7 +174,7 @@ test('ensureMainWorktree registers cleanup hooks and reports manual cleanup path
 
   assert.match(
     messages.join('\n'),
-    /Manual cleanup required for worktree: \/repo\/.worktrees\/release-kit-origin-main/,
+    new RegExp(`Manual cleanup required for worktree: ${worktreePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
   );
 
   assert.deepEqual(killed, [{ pid: 12345, signal: 'SIGINT' }]);

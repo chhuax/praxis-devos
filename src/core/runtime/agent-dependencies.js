@@ -376,6 +376,13 @@ const ensureClaudeSuperpowers = (projectDir) => {
   ].join('\n');
 };
 
+const detectCopilotSuperpowers = () => ({
+  status: 'ok',
+  detail: 'GitHub Copilot uses the shared ~/.claude skills/commands discovery surface; no separate SuperPowers install is required.',
+});
+
+const ensureCopilotSuperpowers = () => '⊘ GitHub Copilot uses the shared ~/.claude skills/commands discovery surface; no separate runtime dependency to install.';
+
 // Ensure per-agent runtime dependencies. Keep this mechanical: detect/install
 // tools and plugins, but do not generate project content.
 export const ensureRuntimeDependencies = ({ projectDir, agents }) => {
@@ -400,6 +407,11 @@ export const ensureRuntimeDependencies = ({ projectDir, agents }) => {
       logs.push(ensureClaudeSuperpowers(projectDir));
       continue;
     }
+
+    if (agent === 'copilot') {
+      logs.push(`== ${agent} ==`);
+      logs.push(ensureCopilotSuperpowers());
+    }
   }
 
   return logs.join('\n');
@@ -416,6 +428,10 @@ export const detectSuperpowersForAgent = (projectDir, agent) => {
 
   if (agent === 'claude') {
     return detectClaudeSuperpowers(projectDir);
+  }
+
+  if (agent === 'copilot') {
+    return detectCopilotSuperpowers();
   }
 
   return {
@@ -495,6 +511,16 @@ const renderBootstrapInstructions = ({ agent }) => {
       '- Run:',
       `  claude plugin install ${CLAUDE_SUPERPOWERS_PLUGIN} --scope user`,
       '- Start a new Claude Code session after installation',
+    ].join('\n');
+  }
+
+  if (agent === 'copilot') {
+    return [
+      'No separate GitHub Copilot runtime dependency is required.',
+      'Praxis projects Copilot-compatible skills and commands to the shared Claude discovery surface:',
+      '- `~/.claude/skills/<name>/SKILL.md`',
+      '- `~/.claude/commands/*.md`',
+      '- Restart GitHub Copilot or start a new session after projection',
     ].join('\n');
   }
 

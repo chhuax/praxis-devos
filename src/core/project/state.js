@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PRAXIS_ROOT = path.resolve(__dirname, '../..', '..');
 export const PACKAGE_JSON = path.join(PRAXIS_ROOT, 'package.json');
 export const MANAGED_ENTRY_TEMPLATE = path.join(PRAXIS_ROOT, 'src', 'templates', 'managed-entry.md');
-export const SUPPORTED_AGENTS = ['opencode', 'codex', 'claude'];
+export const SUPPORTED_AGENTS = ['opencode', 'codex', 'claude', 'copilot'];
 
 export const readFile = (filePath) => {
   try {
