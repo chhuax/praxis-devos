@@ -74,18 +74,10 @@ const installFakeOpenSpec = (projectDir, label = 'GLOBAL') => {
   const scriptName = isWindowsHost ? 'openspec.cmd' : 'openspec';
   const scriptPath = path.join(binDir, scriptName);
   const globalScriptPath = path.join(globalBinDir, scriptName);
+  const shimPath = path.join(binDir, 'openspec-shim.cjs');
+  const globalShimPath = path.join(globalBinDir, 'openspec-shim.cjs');
   const scriptBody = isWindowsHost ? `@echo off
-setlocal
-set "cmd=%~1"
-if "%cmd%"=="init" (
-  set "target=%~2"
-  mkdir "%target%\\openspec\\specs" 2>nul
-  mkdir "%target%\\openspec\\changes\\archive" 2>nul
-  type nul > "%target%\\openspec\\config.yaml"
-  >> "%target%\\openspec\\config.yaml" echo # context:
-  exit /b 0
-)
-echo ${label}:%*
+node "%~dp0\\openspec-shim.cjs" %*
 ` : `#!/bin/sh
 set -eu
 cmd="\${1:-}"
@@ -99,10 +91,26 @@ EOF
 fi
 printf '${label}:%s\\n' "$*"
 `;
+  const shimBody = `const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+if (args[0] === 'init' && args[1]) {
+  const target = args[1];
+  fs.mkdirSync(path.join(target, 'openspec', 'specs'), { recursive: true });
+  fs.mkdirSync(path.join(target, 'openspec', 'changes', 'archive'), { recursive: true });
+  fs.writeFileSync(path.join(target, 'openspec', 'config.yaml'), '# context:\\n');
+  process.exit(0);
+}
+process.stdout.write(${JSON.stringify(`${label}:`)} + args.join(' ') + '\\n');
+`;
   fs.mkdirSync(binDir, { recursive: true });
   fs.mkdirSync(globalBinDir, { recursive: true });
   fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
   fs.writeFileSync(globalScriptPath, scriptBody, { mode: 0o755 });
+  if (isWindowsHost) {
+    fs.writeFileSync(shimPath, shimBody, 'utf8');
+    fs.writeFileSync(globalShimPath, shimBody, 'utf8');
+  }
   fs.chmodSync(scriptPath, 0o755);
   fs.chmodSync(globalScriptPath, 0o755);
   return {
@@ -660,7 +668,7 @@ test('injectMarker preserves YAML frontmatter for CRLF skill content', () => {
   const content = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
     'utf8',
-  ).replace(/\n/g, '\r\n');
+  ).replace(/\r?\n/g, '\r\n');
 
   const projected = normalizeEol(injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->'));
 
@@ -763,7 +771,7 @@ test('composeProjectedSkill rewrites OpenSpec frontmatter names for CRLF upstrea
   const upstreamContent = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-explore', 'SKILL.md'),
     'utf8',
-  ).replace(/\n/g, '\r\n');
+  ).replace(/\r?\n/g, '\r\n');
   const overlayPath = path.join(
     PRAXIS_ROOT,
     'assets',
