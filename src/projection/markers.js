@@ -4,22 +4,25 @@ import path from 'path';
 const PROJECTION_MARKER_PREFIX = '<!-- PRAXIS_PROJECTION';
 const PROJECTION_MARKER_SUFFIX = '-->';
 const FRONTMATTER_PATTERN = /^(---\n[\s\S]*?\n---\n?)/;
+const normalizeLineEndings = (content) => content.replace(/\r\n/g, '\n');
 
 export const buildMarker = ({ source, version }) =>
   `${PROJECTION_MARKER_PREFIX} source=${source} version=${version} ${PROJECTION_MARKER_SUFFIX}`;
 
 export const injectMarker = (content, marker) => {
-  const frontmatterMatch = content.match(FRONTMATTER_PATTERN);
+  const normalizedContent = normalizeLineEndings(content);
+  const frontmatterMatch = normalizedContent.match(FRONTMATTER_PATTERN);
   if (!frontmatterMatch) {
-    return `${marker}\n${content}`;
+    return `${marker}\n${normalizedContent}`;
   }
 
-  return `${frontmatterMatch[1]}${marker}\n${content.slice(frontmatterMatch[1].length)}`;
+  return `${frontmatterMatch[1]}${marker}\n${normalizedContent.slice(frontmatterMatch[1].length)}`;
 };
 
 export const parseMarker = (content) => {
-  const frontmatterMatch = content.match(FRONTMATTER_PATTERN);
-  const markerLine = (frontmatterMatch ? content.slice(frontmatterMatch[1].length) : content)
+  const normalizedContent = normalizeLineEndings(content);
+  const frontmatterMatch = normalizedContent.match(FRONTMATTER_PATTERN);
+  const markerLine = (frontmatterMatch ? normalizedContent.slice(frontmatterMatch[1].length) : normalizedContent)
     .split('\n')[0];
   if (!markerLine.startsWith(PROJECTION_MARKER_PREFIX)) {
     return null;

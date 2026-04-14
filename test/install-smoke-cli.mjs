@@ -20,6 +20,25 @@ const PROJECTED_PRAXIS_SKILLS = [
   'devos-docs',
 ];
 
+const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
+  {
+    name: 'opsx-explore',
+    mustInclude: [/owner_flow: opsx-explore/, /## PRAXIS_DEVOS_OVERLAY/],
+  },
+  {
+    name: 'opsx-propose',
+    mustInclude: [/owner_flow: opsx-propose/, /`Docs Impact` section/],
+  },
+  {
+    name: 'opsx-apply',
+    mustInclude: [/owner_flow: opsx-apply/, /verification-before-completion/, /task-local-planning\.md/],
+  },
+  {
+    name: 'opsx-archive',
+    mustInclude: [/owner_flow: opsx-archive/, /verification-before-completion/],
+  },
+];
+
 const quoteWindowsArg = (value) => {
   if (value.length === 0) {
     return '""';
@@ -44,6 +63,8 @@ const prependToPath = (env, entry) => {
   const currentPath = env[pathKey] || '';
   env[pathKey] = currentPath ? `${entry}${path.delimiter}${currentPath}` : entry;
 };
+
+const normalizeEol = (value) => value.replace(/\r\n/g, '\n');
 
 const runCommand = (command, args, options = {}) => {
   const {
@@ -111,7 +132,7 @@ const parseArgs = (argv) => {
     throw new Error('Missing `--package <path>`.');
   }
   if (!parsed.scenario) {
-    throw new Error('Missing `--scenario <codex|opencode|claude>`.');
+    throw new Error('Missing `--scenario <codex|opencode|claude|copilot>`.');
   }
   if (!['normal', 'quoted-windows-space'].includes(parsed.commandPathMode)) {
     throw new Error('Invalid `--command-path-mode`. Use `normal` or `quoted-windows-space`.');
@@ -129,6 +150,9 @@ const scenarioConfig = (scenario) => {
   }
   if (scenario === 'claude') {
     return { agent: 'claude', strictDoctor: true };
+  }
+  if (scenario === 'copilot') {
+    return { agent: 'copilot', strictDoctor: true };
   }
   throw new Error(`Unsupported scenario: ${scenario}`);
 };
@@ -168,6 +192,21 @@ const assertProjectedCodexSkills = (fakeHome) => {
   }
 };
 
+const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
+  for (const { name, mustInclude } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
+    const skillPath = path.join(skillsRoot, name, 'SKILL.md');
+    const skill = normalizeEol(fs.readFileSync(skillPath, 'utf8'));
+
+    assert.match(skill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(skill, new RegExp(`^name: ${name}$`, 'm'));
+    assert.match(skill, /generatedBy: "1\.3\.0"/);
+
+    for (const pattern of mustInclude) {
+      assert.match(skill, pattern);
+    }
+  }
+};
+
 const assertProjectedClaudeSkills = (fakeHome) => {
   const skillsRoot = path.join(fakeHome, '.claude', 'skills');
   for (const name of PROJECTED_PRAXIS_SKILLS) {
@@ -188,10 +227,38 @@ const assertProjectedOpenCodeSkills = (fakeHome) => {
   }
 };
 
+const assertProjectedCopilotSkills = (fakeHome) => {
+  const skillsRoot = path.join(fakeHome, '.claude', 'skills');
+  for (const name of PROJECTED_PRAXIS_SKILLS) {
+    assert.ok(
+      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
+      `Expected GitHub Copilot shared skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
+    );
+  }
+};
+
 const assertOpenSpecWorkspace = (projectDir) => {
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec')), 'Expected openspec/ workspace');
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')), 'Expected openspec/specs');
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')), 'Expected openspec/changes/archive');
+};
+
+const installFakeCodexSuperpowers = (fakeHome) => {
+  const skillPath = path.join(fakeHome, '.codex', 'skills', 'superpowers', 'example', 'SKILL.md');
+  fs.mkdirSync(path.dirname(skillPath), { recursive: true });
+  fs.writeFileSync(
+    skillPath,
+    [
+      '---',
+      'name: superpowers-example',
+      'description: Minimal fake Codex SuperPowers skill for install smoke.',
+      '---',
+      '',
+      'Install smoke fixture.',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
 };
 
 const installFakeClaude = (fakeHome) => {
@@ -347,6 +414,9 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     const fakeClaudeBin = installFakeClaude(fakeHome);
     prependToPath(env, fakeClaudeBin);
   }
+  if (scenario === 'codex') {
+    installFakeCodexSuperpowers(fakeHome);
+  }
 
   runCommand(npmCmd, ['init', '-y'], { cwd: projectDir, env });
   runCommand(npmCmd, ['install', '-D', packagePath], { cwd: projectDir, env });
@@ -390,6 +460,8 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(fs.existsSync(codexSkillsPath), `Expected Codex skills path at ${codexSkillsPath}`);
     assert.ok(findSkillMarkdown(codexSkillsPath), `Expected Codex SuperPowers content under ${codexSkillsPath}`);
     assertProjectedCodexSkills(fakeHome);
+    assertProjectedOpenSpecSkillBodies(path.join(fakeHome, '.codex', 'skills'));
+    assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'commands')), false);
     assert.match(setupResult.stdout, /== codex ==/);
 
     const doctor = runCommand(npxCmd, ['praxis-devos', 'doctor', '--strict', '--agent', 'codex'], {
@@ -409,6 +481,9 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
     assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
     assertProjectedOpenCodeSkills(fakeHome);
+    assertProjectedOpenSpecSkillBodies(path.join(fakeHome, '.claude', 'skills'));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md')));
 
     const doctor = runCommand(npxCmd, ['praxis-devos', 'doctor', '--strict', '--agent', 'opencode'], {
       cwd: projectDir,
@@ -418,18 +493,43 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     return;
   }
 
+  if (scenario === 'copilot') {
+    assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')), `Expected AGENTS.md in ${projectDir}`);
+    assert.equal(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), false);
+    assertProjectedCopilotSkills(fakeHome);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
+    assert.match(setupResult.stdout, /== copilot ==/);
+    assert.match(setupResult.stdout, /no separate runtime dependency to install/i);
+
+    const doctor = runCommand(npxCmd, ['praxis-devos', 'doctor', '--strict', '--agent', 'copilot'], {
+      cwd: projectDir,
+      env,
+    });
+    assert.match(doctor.stdout, /\[OK\] superpowers:copilot/);
+    assert.match(doctor.stdout, /\[OK\] projection:copilot/);
+    return;
+  }
+
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), `Expected CLAUDE.md in ${projectDir}`);
   assertProjectedClaudeSkills(fakeHome);
+  assertProjectedOpenSpecSkillBodies(path.join(fakeHome, '.claude', 'skills'));
+  assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
+  assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
   if (quotedWindowsWrappers) {
     const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
-    const diagnosticLog = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8');
+    const diagnostics = fs.readFileSync(quotedWindowsWrappers.diagnosticLogPath, 'utf8')
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
     assert.match(invocationLog, /npm\.cmd/);
     assert.match(invocationLog, /claude\.cmd/);
-    assert.match(diagnosticLog, /"command":"npm\.cmd"/);
-    assert.match(diagnosticLog, /"command":"claude\.cmd"/);
-    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\npm-shim\.cjs/);
-    assert.match(diagnosticLog, /Program Files\\\\nodejs\\\\claude-shim\.cjs/);
+    assert.ok(diagnostics.some((entry) => entry.command === 'npm.cmd'));
+    assert.ok(diagnostics.some((entry) => entry.command === 'claude.cmd'));
+    assert.ok(diagnostics.some((entry) => /Program Files[\\/]+nodejs[\\/]+npm-shim\.cjs$/i.test(entry.shimPath)));
+    assert.ok(diagnostics.some((entry) => /Program Files[\\/]+nodejs[\\/]+claude-shim\.cjs$/i.test(entry.shimPath)));
   }
 
   const doctorArgs = ['praxis-devos', 'doctor', '--agent', 'claude'];

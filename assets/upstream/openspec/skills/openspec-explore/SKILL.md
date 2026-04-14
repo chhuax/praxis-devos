@@ -1,52 +1,19 @@
 ---
-name: opsx-explore
+name: openspec-explore
 description: Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.2.0"
+  generatedBy: "1.3.0"
 ---
 
 Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
 
-**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks. That's capturing thinking, not implementing.
+**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
 
 **This is a stance, not a workflow.** There are no fixed steps, no required sequence, no mandatory outputs. You're a thinking partner helping the user explore.
-
-## PRAXIS_DEVOS_OVERLAY
-
-Framework-specific coordination for embedded Superpowers usage:
-
-- `opsx-explore` remains the only visible flow for this stage.
-- If you invoke `brainstorming` internally, do not announce `Using brainstorming` or start a second workflow.
-- If discussion is already tied to a change, keep conclusions and notes in the current change artifacts instead of creating `docs/superpowers/...`.
-- Superpowers methods affect how you think, not the fact that you are still in `explore`.
-- When invoking any internal Superpowers capability, pass the current flow type, current stage goal, current artifact locations, and current output constraints. If a change is already active, also pass the current change id.
-
-Embedded capability contract:
-
-- `mode: embedded`
-- `owner_flow: opsx-explore`
-- `visibility: internal`
-- `artifact_targets: current change artifacts only`
-- `evidence_target: user-level Praxis state directory`
-
-Internal capabilities must not:
-
-- announce a second workflow
-- create `docs/superpowers/...`
-- output a second final recap
-
-Stage hooks:
-
-- If scope is unclear, open questions remain, or multiple approaches need comparison, invoke `brainstorming` internally to clarify constraints and compare options.
-- If the discussion becomes concrete enough to capture, write conclusions back to the current change artifacts such as `proposal.md`, `design.md`, `tasks.md`, or a relevant spec.
-- When writing back to change artifacts, honor the project artifact language policy from `openspec/config.yaml` when present.
-- If `openspec/config.yaml` does not declare an artifact language policy, continue in the dominant language already present in that change and do not switch languages mid-change unless the user explicitly requests it.
-- If the user is still exploring, stay in `explore` and do not force a transition to proposal or implementation.
-- After `openspec list --json`, if the main issue is still ambiguity, disagreement, or missing constraints, invoke `brainstorming` internally and continue exploring inside the same visible flow.
 
 ---
 
@@ -84,15 +51,15 @@ Depending on what the user brings, you might:
 - Recommend a path (if asked)
 
 **Visualize**
-```text
+```
 ┌─────────────────────────────────────────┐
 │     Use ASCII diagrams liberally        │
 ├─────────────────────────────────────────┤
 │                                         │
-│   ┌────────┐         ┌────────┐        │
-│   │ State  │────────▶│ State  │        │
-│   │   A    │         │   B    │        │
-│   └────────┘         └────────┘        │
+│      ┌────────┐         ┌────────┐      │
+│      │ State  │────────▶│ State  │      │
+│      │   A    │         │   B    │      │
+│      └────────┘         └────────┘      │
 │                                         │
 │   System diagrams, state machines,      │
 │   data flows, architecture sketches,    │
@@ -129,7 +96,7 @@ This tells you:
 Think freely. When insights crystallize, you might offer:
 
 - "This feels solid enough to start a change. Want me to create a proposal?"
-- Or keep exploring. There is no pressure to formalize
+- Or keep exploring - no pressure to formalize
 
 ### When a change exists
 
@@ -140,7 +107,6 @@ If the user mentions a change or you detect one is relevant:
    - `openspec/changes/<name>/design.md`
    - `openspec/changes/<name>/tasks.md`
    - etc.
-   - If you later update those artifacts, keep them in the project-configured language from `openspec/config.yaml`, or in the dominant language already present in that change when no config is provided
 
 2. **Reference them naturally in conversation**
    - "Your design mentions using Redis, but we just realized SQLite fits better..."
@@ -148,14 +114,14 @@ If the user mentions a change or you detect one is relevant:
 
 3. **Offer to capture when decisions are made**
 
-   | Insight Type | Where to Capture |
-   |--------------|------------------|
-   | New requirement discovered | `specs/<capability>/spec.md` |
-   | Requirement changed | `specs/<capability>/spec.md` |
-   | Design decision made | `design.md` |
-   | Scope changed | `proposal.md` |
-   | New work identified | `tasks.md` |
-   | Assumption invalidated | Relevant artifact |
+    | Insight Type               | Where to Capture               |
+    |----------------------------|--------------------------------|
+    | New requirement discovered | `specs/<capability>/spec.md` |
+    | Requirement changed        | `specs/<capability>/spec.md` |
+    | Design decision made       | `design.md`                  |
+    | Scope changed              | `proposal.md`                |
+    | New work identified        | `tasks.md`                   |
+    | Assumption invalidated     | Relevant artifact              |
 
    Example offers:
    - "That's a design decision. Capture it in design.md?"
@@ -180,7 +146,7 @@ If the user mentions a change or you detect one is relevant:
 ## Handling Different Entry Points
 
 **User brings a vague idea:**
-```text
+```
 User: I'm thinking about adding real-time collaboration
 
 You: Real-time collab is a big space. Let me think about this...
@@ -203,7 +169,7 @@ You: Real-time collab is a big space. Let me think about this...
 ```
 
 **User brings a specific problem:**
-```text
+```
 User: The auth system is a mess
 
 You: [reads codebase]
@@ -234,8 +200,8 @@ You: [reads codebase]
 ```
 
 **User is stuck mid-implementation:**
-```text
-User: /opsx:explore add-auth-system
+```
+User: opsx-explore add-auth-system
       The OAuth integration is more complex than expected
 
 You: [reads change artifacts]
@@ -251,7 +217,7 @@ You: [reads change artifacts]
 ```
 
 **User wants to compare options:**
-```text
+```
 User: Should we use Postgres or SQLite?
 
 You: Generic answer is boring. What's the context?
@@ -261,7 +227,7 @@ User: A CLI tool that tracks local dev environments
 You: That changes everything.
 
      ┌─────────────────────────────────────────────────┐
-     │         CLI TOOL DATA STORAGE                  │
+     │          CLI TOOL DATA STORAGE                  │
      └─────────────────────────────────────────────────┘
 
      Key constraints:
@@ -287,12 +253,12 @@ There's no required ending. Discovery might:
 
 - **Flow into a proposal**: "Ready to start? I can create a change proposal."
 - **Result in artifact updates**: "Updated design.md with these decisions"
-- **Just provide clarity**: User has what they need and moves on
+- **Just provide clarity**: User has what they need, moves on
 - **Continue later**: "We can pick this up anytime"
 
 When it feels like things are crystallizing, you might summarize:
 
-```text
+```
 ## What We Figured Out
 
 **The problem**: [crystallized understanding]
@@ -306,7 +272,7 @@ When it feels like things are crystallizing, you might summarize:
 - Keep exploring: just keep talking
 ```
 
-But this summary is optional. Sometimes the thinking is the value.
+But this summary is optional. Sometimes the thinking IS the value.
 
 ---
 

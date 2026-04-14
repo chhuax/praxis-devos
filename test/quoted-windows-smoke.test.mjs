@@ -32,8 +32,9 @@ test('quoted windows npm shim installs a global openspec wrapper for setup smoke
 
   assert.equal(install.status, 0, install.stderr);
   assert.equal(fs.readFileSync(invocationLogPath, 'utf8').trim(), 'npm.cmd install -g @fission-ai/openspec');
-  assert.match(fs.readFileSync(diagnosticLogPath, 'utf8'), /"shimPath":/);
-  assert.match(fs.readFileSync(diagnosticLogPath, 'utf8'), new RegExp(shimPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const diagnostic = JSON.parse(fs.readFileSync(diagnosticLogPath, 'utf8').trim());
+  assert.equal(diagnostic.command, 'npm.cmd');
+  assert.equal(fs.realpathSync(diagnostic.shimPath), fs.realpathSync(shimPath));
   assert.ok(fs.existsSync(openspecCmdPath));
   assert.ok(fs.existsSync(openspecShimPath));
 

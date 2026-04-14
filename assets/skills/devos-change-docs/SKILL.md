@@ -105,6 +105,7 @@ The document should cover:
 - error cases
 - example calls
 - implementation locations
+- compatibility notes and warnings when the change is breaking, migration-sensitive, or caller-visible
 
 Scope discipline:
 
@@ -112,6 +113,7 @@ Scope discipline:
 - use implementation changes to fill in request, response, error, and compatibility details
 - if the artifacts and implementation clearly conflict, return `needs-clarification`
 - do not treat existing `docs/reference/api.md` as the source of truth for deciding the current change scope
+- when no API change exists, this mode should not be selected by the caller
 
 ### `mode=project-api-sync`
 

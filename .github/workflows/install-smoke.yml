@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   install-smoke:
+    name: Install Smoke (${{ matrix.os }} / ${{ matrix.scenario }} / ${{ matrix.command_path_mode }})
     strategy:
       fail-fast: false
       matrix:

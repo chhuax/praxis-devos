@@ -108,6 +108,7 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   const adapterStatuses = [
     { name: 'codex', ok: fs.existsSync(paths.rootAgentsMd) },
     { name: 'claude', ok: fs.existsSync(paths.rootClaudeMd) },
+    { name: 'copilot', ok: fs.existsSync(paths.rootAgentsMd) },
     { name: 'opencode', ok: fs.existsSync(paths.legacyOpenCodeDir) },
   ];
   const openspecRuntime = resolveOpenSpecRuntime(projectDir);
