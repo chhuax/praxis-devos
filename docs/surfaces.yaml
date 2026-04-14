@@ -6,6 +6,7 @@ supported_agents:
   - opencode
   - codex
   - claude
+  - copilot
 commands:
   - setup
   - init
@@ -25,10 +26,12 @@ bundled_commands:
   - devos-docs-refresh
 projection_targets:
   claude: ~/.claude/skills/<name>/SKILL.md
+  copilot: ~/.claude/skills/<name>/SKILL.md + ~/.claude/commands/*.md (shared Claude-compatible discovery surface)
   codex: ~/.codex/skills/<name>/SKILL.md
-  opencode: ~/.config/opencode/config.json (plugin registration)
+  opencode: ~/.claude/skills/<name>/SKILL.md + ~/.config/opencode/commands/*.md + ~/.config/opencode/config.json
 external_dependencies:
   openspec: "@fission-ai/openspec (global npm)"
   superpowers_claude: "claude plugin install"
+  superpowers_copilot: "none (shared ~/.claude skills/commands projection only)"
   superpowers_codex: "git clone + symlink at ~/.codex/superpowers"
   superpowers_opencode: "declared in ~/.config/opencode/config.json"
