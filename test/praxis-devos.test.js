@@ -81,7 +81,8 @@ if "%cmd%"=="init" (
   set "target=%~2"
   mkdir "%target%\\openspec\\specs" 2>nul
   mkdir "%target%\\openspec\\changes\\archive" 2>nul
-  > "%target%\\openspec\\config.yaml" echo # context:
+  type nul > "%target%\\openspec\\config.yaml"
+  >> "%target%\\openspec\\config.yaml" echo # context:
   exit /b 0
 )
 echo ${label}:%*
@@ -318,7 +319,8 @@ if "%~1"=="install" if "%~2"=="-g" if "%~3"=="@fission-ai/openspec" (
     echo   set "target=%%~2"
     echo   mkdir "%%target%%\\openspec\\specs" 2^>nul
     echo   mkdir "%%target%%\\openspec\\changes\\archive" 2^>nul
-    echo   ^> "%%target%%\\openspec\\config.yaml" echo # context:
+    echo   type nul ^> "%%target%%\\openspec\\config.yaml"
+    echo   ^>^> "%%target%%\\openspec\\config.yaml" echo # context:
     echo   exit /b 0
     echo ^)
     echo echo LOCAL:%%*
@@ -654,6 +656,17 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
   assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
 });
 
+test('injectMarker preserves YAML frontmatter for CRLF skill content', () => {
+  const content = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
+    'utf8',
+  ).replace(/\n/g, '\r\n');
+
+  const projected = normalizeEol(injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->'));
+
+  assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+});
+
 test('OpenSpec upstream snapshots and overlays are stored separately', () => {
   const proposeUpstream = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
@@ -744,6 +757,30 @@ test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overl
       assert.match(projected, pattern);
     }
   }
+});
+
+test('composeProjectedSkill rewrites OpenSpec frontmatter names for CRLF upstream content', () => {
+  const upstreamContent = fs.readFileSync(
+    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-explore', 'SKILL.md'),
+    'utf8',
+  ).replace(/\n/g, '\r\n');
+  const overlayPath = path.join(
+    PRAXIS_ROOT,
+    'assets',
+    'overlays',
+    'openspec',
+    'skills',
+    'opsx-explore.overlay.md',
+  );
+
+  const projected = normalizeEol(composeProjectedSkill({
+    projectedName: 'opsx-explore',
+    upstreamContent,
+    overlayPath,
+  }));
+
+  assert.match(projected, /^---\nname: opsx-explore\n/m);
+  assert.match(projected, /^## PRAXIS_DEVOS_OVERLAY$/m);
 });
 
 test('devos-docs bundled skill declares supported modes', () => {
@@ -1045,7 +1082,7 @@ test('bootstrapOpenSpec reports the detected runtime', () => {
 
   assert.match(output, /OpenSpec already available \((global|project-local)\)/);
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
-  assert.match(output, /openspec list --specs/);
+  assert.match(output, /openspec(?:\.cmd)? list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
 });
 

@@ -31,6 +31,7 @@ const openSpecWorkflowSkills = [
 ];
 
 const FRONTMATTER_PATTERN = /^(---\n[\s\S]*?\n---\n?)([\s\S]*)$/;
+const normalizeLineEndings = (content) => content.replace(/\r\n/g, '\n');
 
 const collectDirectSkillSources = () =>
   (fs.existsSync(directSkillsRoot())
@@ -86,9 +87,10 @@ const injectOverlay = (body, overlayContent) => {
 };
 
 export const composeProjectedSkill = ({ projectedName, upstreamContent, overlayPath = null }) => {
-  const frontmatterMatch = upstreamContent.match(FRONTMATTER_PATTERN);
+  const normalizedUpstreamContent = normalizeLineEndings(upstreamContent);
+  const frontmatterMatch = normalizedUpstreamContent.match(FRONTMATTER_PATTERN);
   if (!frontmatterMatch) {
-    return upstreamContent;
+    return normalizedUpstreamContent;
   }
 
   const frontmatter = replaceProjectedName(frontmatterMatch[1], projectedName);
