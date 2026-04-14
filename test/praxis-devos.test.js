@@ -76,8 +76,9 @@ const installFakeOpenSpec = (projectDir, label = 'GLOBAL') => {
   const globalScriptPath = path.join(globalBinDir, scriptName);
   const shimPath = path.join(binDir, 'openspec-shim.cjs');
   const globalShimPath = path.join(globalBinDir, 'openspec-shim.cjs');
+  const nodeExecPath = JSON.stringify(process.execPath);
   const scriptBody = isWindowsHost ? `@echo off
-node "%~dp0\\openspec-shim.cjs" %*
+${nodeExecPath} "%~dp0\\openspec-shim.cjs" %*
 ` : `#!/bin/sh
 set -eu
 cmd="\${1:-}"
