@@ -8,7 +8,7 @@
 
 ## What It Is
 
-`praxis-devos` prepares a project so OpenCode, Codex, and Claude Code can follow the same outer workflow:
+`praxis-devos` prepares a project so OpenCode, Codex, Claude Code, and GitHub Copilot can follow the same outer workflow:
 
 - OpenSpec stays the visible governance flow for propose, apply, validate, and archive
 - SuperPowers stays the execution layer for planning, debugging, verification, and similar skills
@@ -61,10 +61,17 @@ npx praxis-devos setup --agent opencode
 npx praxis-devos doctor --strict
 ```
 
+### GitHub Copilot
+
+```bash
+npx praxis-devos setup --agent copilot
+npx praxis-devos doctor --strict
+```
+
 ### Multi-Agent Project
 
 ```bash
-npx praxis-devos setup --agents opencode,codex,claude
+npx praxis-devos setup --agents opencode,codex,claude,copilot
 npx praxis-devos doctor --strict
 ```
 
@@ -113,6 +120,7 @@ Praxis keeps the same high-level contract across tools, but each agent has a dif
 - OpenCode: merges required plugin declarations into the user's OpenCode config and projects bundled assets
 - Codex: validates or installs the SuperPowers clone/link layout under `~/.codex/`
 - Claude Code: validates or installs the official SuperPowers plugin through the Claude CLI
+- GitHub Copilot: projects bundled skills and commands to the shared Claude-compatible discovery surface at `~/.claude/skills/` and `~/.claude/commands/`
 
 `bootstrap` is the lower-friction repair path when you want dependency guidance without running the full project setup flow.
 

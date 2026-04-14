@@ -4,7 +4,7 @@ _Scanned: 2026-04-11 | Scope: full repository_
 
 ## Project Summary
 
-`praxis-devos` is a CLI scaffold and orchestration harness (not a content generator) that connects three layers inside a user project: **OpenSpec** governance for propose/apply/validate/archive workflows, **SuperPowers** as the execution layer for skills like planning and debugging, and **agent-specific adapters** that make those rules natively discoverable in Claude Code, Codex, and OpenCode. It installs and validates external dependencies, writes and refreshes managed blocks in project root files, and projects bundled skills/commands into each agent's native user-level discovery directories.
+`praxis-devos` is a CLI scaffold and orchestration harness (not a content generator) that connects three layers inside a user project: **OpenSpec** governance for propose/apply/validate/archive workflows, **SuperPowers** as the execution layer for skills like planning and debugging, and **agent-specific adapters** that make those rules natively discoverable in Claude Code, Codex, OpenCode, and GitHub Copilot. It installs and validates external dependencies, writes and refreshes managed blocks in project root files, and projects bundled skills/commands into each agent's native user-level discovery directories.
 
 ## First-Read Paths
 
@@ -17,6 +17,7 @@ _Scanned: 2026-04-11 | Scope: full repository_
 | `src/core/runtime/openspec.js` | OpenSpec detection, install, and bootstrap |
 | `src/projection/index.js` | Projection dispatch to agent adapters |
 | `src/projection/claude.js` | Claude skill and command projection |
+| `src/projection/copilot.js` | GitHub Copilot projection via shared Claude-compatible skills/commands surfaces |
 | `src/core/project/state.js` | Shared paths, filesystem helpers, agent normalization |
 | `src/projection/markers.js` | `<!-- PRAXIS_PROJECTION ... -->` marker read/write |
 | `assets/` | Bundled SKILL.md files and slash command assets |
@@ -33,6 +34,7 @@ CLI (bin/praxis-devos.js)
         │     └── project/state.js (paths, fs helpers)
         └── projection/index.js (user-level skill/command projection)
               ├── projection/claude.js
+              ├── projection/copilot.js
               ├── projection/codex.js
               ├── projection/opencode.js
               └── projection/markers.js (marker inject/parse)
@@ -74,6 +76,7 @@ Read-only: checks OpenSpec runtime, per-agent SuperPowers, and projection covera
 |---|---|---|
 | `@fission-ai/openspec` | npm global | auto-installed by `setup`; needed for `openspec init` |
 | SuperPowers (Claude) | Claude CLI plugin | `claude plugin install <plugin> --scope user` |
+| SuperPowers (Copilot) | no extra runtime dependency | projects to `~/.claude/skills/` + `~/.claude/commands/` |
 | SuperPowers (Codex) | git clone + symlink | `~/.codex/superpowers` + `~/.codex/skills/superpowers → ...` |
 | SuperPowers (OpenCode) | JSON config merge | `~/.config/opencode/config.json` plugin array |
 
