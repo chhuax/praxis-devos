@@ -46,4 +46,10 @@ test('quoted windows npm shim installs a global openspec wrapper for setup smoke
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
   assert.match(fs.readFileSync(path.join(projectDir, 'openspec', 'config.yaml'), 'utf8'), /# context:/);
+
+  const configSet = spawnSync(process.execPath, [openspecShimPath, 'config', 'set', 'delivery', 'both'], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(configSet.status, 0, configSet.stderr);
 });
