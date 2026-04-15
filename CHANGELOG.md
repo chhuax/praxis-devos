@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-04-16
+
+### Added
+- Bundled the company OpenSpec schema as `spec-super`, including formal templates for `proposal.md`, `design.md`, `tasks.md`, `spec.md`, and `blackbox-test.md`
+- Added project-local OpenSpec generated asset adoption so workflow skills and commands can be promoted into user-level agent surfaces during setup
+
+### Changed
+- OpenSpec setup now installs and binds the bundled company schema, repairs user config, and keeps `openspec/config.yaml` aligned with `spec-super`
+- Projection now keeps only Praxis direct skills as bundled assets and composes OpenSpec workflow assets from generated project-local sources instead of upstream fallback copies
+- README, surfaces docs, and install-smoke coverage were updated to reflect the `init/update`-centric OpenSpec contract and generated workflow adoption model
+
+### Fixed
+- Repeated setup/update runs now preserve already adopted OpenSpec workflow projections instead of cleaning them as stale managed assets
+- Smoke and validation coverage now tolerate upstream OpenSpec wording differences while keeping assertions focused on stable Praxis overlay contracts and isolated schema state
 ## [0.6.2] - 2026-04-12
 
 ### Added
