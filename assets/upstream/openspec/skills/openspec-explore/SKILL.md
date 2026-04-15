@@ -1,6 +1,6 @@
 ---
 name: openspec-explore
-description: Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.
+description: "Enter explore mode as a thinking partner — ask clarifying questions, map trade-offs, visualize with diagrams, and surface risks. Use when the user wants to brainstorm, discuss options, compare approaches, or think through a problem before implementing."
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -52,21 +52,11 @@ Depending on what the user brings, you might:
 
 **Visualize**
 ```
-┌─────────────────────────────────────────┐
-│     Use ASCII diagrams liberally        │
-├─────────────────────────────────────────┤
-│                                         │
-│      ┌────────┐         ┌────────┐      │
-│      │ State  │────────▶│ State  │      │
-│      │   A    │         │   B    │      │
-│      └────────┘         └────────┘      │
-│                                         │
-│   System diagrams, state machines,      │
-│   data flows, architecture sketches,    │
-│   dependency graphs, comparison tables  │
-│                                         │
-└─────────────────────────────────────────┘
+┌────────┐       ┌────────┐
+│ State A│──────▶│ State B│
+└────────┘       └────────┘
 ```
+Use ASCII diagrams liberally — system diagrams, state machines, data flows, architecture sketches, dependency graphs, comparison tables.
 
 **Surface risks and unknowns**
 - Identify what could go wrong
@@ -197,52 +187,6 @@ You: [reads codebase]
                   └───────────┘
 
      I see three tangles. Which one's burning?
-```
-
-**User is stuck mid-implementation:**
-```
-User: opsx-explore add-auth-system
-      The OAuth integration is more complex than expected
-
-You: [reads change artifacts]
-
-     You're on task 4: "Implement OAuth flow"
-
-     Let me trace what's involved...
-
-     [draws diagram, explores options, suggests paths]
-
-     Want to update the design to reflect this?
-     Or add a spike task to investigate?
-```
-
-**User wants to compare options:**
-```
-User: Should we use Postgres or SQLite?
-
-You: Generic answer is boring. What's the context?
-
-User: A CLI tool that tracks local dev environments
-
-You: That changes everything.
-
-     ┌─────────────────────────────────────────────────┐
-     │          CLI TOOL DATA STORAGE                  │
-     └─────────────────────────────────────────────────┘
-
-     Key constraints:
-     • No daemon running
-     • Must work offline
-     • Single user
-
-                  SQLite          Postgres
-     Deployment   embedded ✓      needs server ✗
-     Offline      yes ✓           no ✗
-     Single file  yes ✓           no ✗
-
-     SQLite. Not even close.
-
-     Unless... is there a sync component?
 ```
 
 ---

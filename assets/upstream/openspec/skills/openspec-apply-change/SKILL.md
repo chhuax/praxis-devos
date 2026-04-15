@@ -1,6 +1,6 @@
 ---
 name: openspec-apply-change
-description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
+description: "Implement tasks from an OpenSpec change by reading context artifacts, making code changes, and tracking task completion. Use when the user wants to start or continue implementing tasks from a change proposal."
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -87,56 +87,14 @@ Implement tasks from an OpenSpec change.
    - If all done: suggest archive
    - If paused: explain why and wait for guidance
 
-**Output During Implementation**
+**Output Format**
 
-```
-## Implementing: <change-name> (schema: <schema-name>)
-
-Working on task 3/7: <task description>
-[...implementation happening...]
-✓ Task complete
-
-Working on task 4/7: <task description>
-[...implementation happening...]
-✓ Task complete
-```
-
-**Output On Completion**
-
-```
-## Implementation Complete
-
-**Change:** <change-name>
-**Schema:** <schema-name>
-**Progress:** 7/7 tasks complete ✓
-
-### Completed This Session
-- [x] Task 1
-- [x] Task 2
-...
-
-All tasks complete! Ready to archive this change.
-```
-
-**Output On Pause (Issue Encountered)**
-
-```
-## Implementation Paused
-
-**Change:** <change-name>
-**Schema:** <schema-name>
-**Progress:** 4/7 tasks complete
-
-### Issue Encountered
-<description of the issue>
-
-**Options:**
-1. <option 1>
-2. <option 2>
-3. Other approach
-
-What would you like to do?
-```
+Always include these elements in output:
+- **Header**: `## Implementing: <change-name> (schema: <schema-name>)`
+- **Per-task progress**: `Working on task N/M: <description>` followed by `✓ Task complete`
+- **Summary on completion or pause**: Change name, schema, progress (N/M complete), list of tasks completed this session
+- **On completion**: Suggest archiving the change
+- **On pause**: Describe the issue encountered, list options, and ask the user what to do next
 
 **Guardrails**
 - Keep going through tasks until done or blocked
@@ -147,10 +105,3 @@ What would you like to do?
 - Update task checkbox immediately after completing each task
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
-
-**Fluid Workflow Integration**
-
-This skill supports the "actions on a change" model:
-
-- **Can be invoked anytime**: Before all artifacts are done (if tasks exist), after partial implementation, interleaved with other actions
-- **Allows artifact updates**: If implementation reveals design issues, suggest updating artifacts - not phase-locked, work fluidly
