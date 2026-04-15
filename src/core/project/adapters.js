@@ -345,7 +345,7 @@ export const projectNativeSkills = ({ projectDir, agents, log }) => {
 export const populateOpenSpecConfig = ({ projectDir, log }) => {
   const configPath = path.join(projectDir, 'openspec', 'config.yaml');
   if (!fs.existsSync(configPath)) {
-    log('⊘ openspec/config.yaml not found, skipping context population');
+    log('⊘ openspec/config.yaml not found, skipping schema binding');
     return;
   }
 

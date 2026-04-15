@@ -17,10 +17,13 @@ commands:
 bundled_skills:
   - devos-docs
   - devos-change-docs
-  - openspec-explore
-  - openspec-propose
-  - openspec-apply-change
-  - openspec-archive-change
+openspec_generated_skills:
+  note: "Generated/adopted from project-local `openspec init` output; not shipped as bundled skills and may be absent until generated."
+  items:
+    - openspec-explore
+    - openspec-propose
+    - openspec-apply-change
+    - openspec-archive-change
 bundled_commands:
   - devos-docs-init
   - devos-docs-refresh
