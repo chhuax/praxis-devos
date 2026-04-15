@@ -204,14 +204,18 @@ export const pruneManagedUserAssets = ({
   projectDir,
   validSkillNames,
   keepCommandNames = commandNames,
+  keepCommandPaths = [],
   log,
 }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(openCodeSkillsDir(), name, 'SKILL.md'));
-  const validCommandPaths = keepCommandNames.map((name) => path.join(openCodeCommandsDir(), `${name}.md`));
+  const validCommandPaths = [
+    ...keepCommandNames.map((name) => path.join(openCodeCommandsDir(), `${name}.md`)),
+    ...keepCommandPaths,
+  ];
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'opencode',
-    validPaths: [...validSkillPaths, ...validCommandPaths],
+    validPaths: [...validSkillPaths, ...new Set(validCommandPaths)],
   });
 
   for (const removedPath of removed) {

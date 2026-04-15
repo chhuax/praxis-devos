@@ -1296,6 +1296,39 @@ test('projectNativeSkills adopts OpenSpec-generated Claude workflow skills and c
   assert.match(logs.join('\n'), /adopted OpenSpec workflow command openspec-propose/i);
 });
 
+test('projectNativeSkills preserves adopted OpenSpec workflow assets across repeated runs', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-repeat-home-'));
+  const projectDir = makeTempProject();
+  const firstLogs = [];
+  const secondLogs = [];
+  writeProjectLocalGeneratedWorkflowAssets({ projectDir, agent: 'claude' });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: (msg) => firstLogs.push(msg),
+    });
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: (msg) => secondLogs.push(msg),
+    });
+  });
+
+  const adoptedSkillPath = path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md');
+  const adoptedCommandPath = path.join(fakeHome, '.claude', 'commands', 'opsx', 'propose.md');
+
+  assert.ok(fs.existsSync(adoptedSkillPath));
+  assert.ok(fs.existsSync(adoptedCommandPath));
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'skills', 'openspec-propose', 'SKILL.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'commands', 'opsx', 'propose.md')), false);
+  assert.match(firstLogs.join('\n'), /adopted OpenSpec workflow skill openspec-propose/i);
+  assert.match(firstLogs.join('\n'), /adopted OpenSpec workflow command openspec-propose/i);
+  assert.doesNotMatch(secondLogs.join('\n'), /removed stale projection openspec-propose/i);
+  assert.doesNotMatch(secondLogs.join('\n'), /removed managed asset .*openspec-propose/i);
+});
+
 test('projectNativeSkills adopts OpenSpec-generated OpenCode workflow commands into the OpenCode user command surface', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-adopt-home-'));
   const projectDir = makeTempProject();

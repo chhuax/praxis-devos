@@ -62,6 +62,8 @@ const generatedWorkflowDefinitions = [
   },
 ];
 
+export const generatedWorkflowSkillNames = generatedWorkflowDefinitions.map((workflow) => workflow.name);
+
 const projectSurfaceByAgent = (projectDir, agent) => {
   if (agent === 'codex') {
     return {
