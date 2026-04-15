@@ -13,29 +13,29 @@ import {
 
 const WINDOWS_BATCH_EXTENSIONS = new Set(['.cmd', '.bat']);
 const PROJECTED_PRAXIS_SKILLS = [
-  'opsx-propose',
-  'opsx-explore',
-  'opsx-apply',
-  'opsx-archive',
+  'openspec-propose',
+  'openspec-explore',
+  'openspec-apply-change',
+  'openspec-archive-change',
   'devos-docs',
 ];
 
 const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
-    name: 'opsx-explore',
-    mustInclude: [/owner_flow: opsx-explore/, /## PRAXIS_DEVOS_OVERLAY/],
+    name: 'openspec-explore',
+    mustInclude: [/owner_flow: openspec-explore/, /PRAXIS_DEVOS_OVERLAY_START/],
   },
   {
-    name: 'opsx-propose',
-    mustInclude: [/owner_flow: opsx-propose/, /`Docs Impact` section/],
+    name: 'openspec-propose',
+    mustInclude: [/owner_flow: openspec-propose/, /`Docs Impact` section/],
   },
   {
-    name: 'opsx-apply',
-    mustInclude: [/owner_flow: opsx-apply/, /verification-before-completion/, /task-local-planning\.md/],
+    name: 'openspec-apply-change',
+    mustInclude: [/owner_flow: openspec-apply-change/, /verification-before-completion/, /task-local-planning\.md/],
   },
   {
-    name: 'opsx-archive',
-    mustInclude: [/owner_flow: opsx-archive/, /verification-before-completion/],
+    name: 'openspec-archive-change',
+    mustInclude: [/owner_flow: openspec-archive-change/, /verification-before-completion/],
   },
 ];
 

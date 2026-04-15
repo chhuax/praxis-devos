@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
 import { copyBundleDirectory, ensureDir } from './bundles.js';
-import { composeProjectedSkill } from './skill-sources.js';
+import { composeProjectedCommand, composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -59,7 +59,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-upstream'
+        const finalContent = sourceType === 'openspec-generated'
           ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
           : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
@@ -81,16 +81,66 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
       },
     });
-    results.push({ name, targetPath, status: 'projected' });
-    log(`✓ OpenCode: projected ${name} → ${targetPath}`);
+    results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
+    if (sourceType === 'openspec-generated') {
+      log(`✓ OpenCode: adopted OpenSpec workflow skill ${name} → ${targetPath}`);
+    } else {
+      log(`✓ OpenCode: projected ${name} → ${targetPath}`);
+    }
   }
 
   return results;
 };
 
-export const projectCommands = ({ projectDir, version, log }) => {
+export const projectCommands = ({ projectDir, version, log, workflowCommandSources = [] }) => {
   ensureDir(openCodeCommandsDir());
   const results = [];
+
+  for (const {
+    name,
+    sourcePath,
+    sourceType,
+    targetRelativePath,
+    overlayPath = null,
+    overlayAssetsDir = null,
+  } of workflowCommandSources) {
+    const targetPath = path.join(openCodeCommandsDir(), targetRelativePath);
+    ensureDir(path.dirname(targetPath));
+    if (!canSafelyOverwrite({
+      assetPath: targetPath,
+      projectDir,
+      agent: 'opencode',
+      allowAnyManagedOwner: true,
+    })) {
+      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType });
+      log(`⊘ OpenCode: skipped OpenSpec workflow command ${name} because ${targetPath} is not a Praxis-managed asset`);
+      continue;
+    }
+
+    const content = fs.readFileSync(sourcePath, 'utf8');
+    const finalContent = sourceType === 'openspec-generated'
+      ? composeProjectedCommand({ upstreamContent: content, overlayPath })
+      : content;
+    fs.writeFileSync(targetPath, finalContent, 'utf8');
+    if (overlayAssetsDir) {
+      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir: path.dirname(targetPath) });
+    }
+    registerManagedAsset({
+      projectDir,
+      assetPath: targetPath,
+      type: 'command',
+      version,
+      agent: 'opencode',
+      extra: {
+        commandName: name,
+        sourcePath: path.relative(process.cwd(), sourcePath),
+        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
+        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
+      },
+    });
+    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
+    log(`✓ OpenCode: adopted OpenSpec workflow command ${name} → ${targetPath}`);
+  }
 
   for (const name of commandNames) {
     const templatePath = path.join(commandAssetRoot(), `${name}.md`);
@@ -101,7 +151,7 @@ export const projectCommands = ({ projectDir, version, log }) => {
       agent: 'opencode',
       allowAnyManagedOwner: true,
     })) {
-      results.push({ name, targetPath, status: 'skipped' });
+      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType: 'direct' });
       log(`⊘ OpenCode: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
       continue;
     }
@@ -117,7 +167,7 @@ export const projectCommands = ({ projectDir, version, log }) => {
         commandName: name,
       },
     });
-    results.push({ name, targetPath, status: 'projected' });
+    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType: 'direct' });
     log(`✓ OpenCode: projected docs command ${name} → ${targetPath}`);
   }
 

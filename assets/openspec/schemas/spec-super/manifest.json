@@ -1,0 +1,5 @@
+{
+  "schemaName": "spec-super",
+  "version": "0.1.0",
+  "baselineSchemaPath": "openspec/schemas/spec-super/schema.yaml"
+}

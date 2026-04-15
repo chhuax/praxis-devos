@@ -54,7 +54,7 @@ CLI (bin/praxis-devos.js)
 6. `populateOpenSpecConfig()` — optionally populates `openspec/config.yaml` context
 7. `doctorProject()` — read-only health report
 
-### `npx praxis-devos sync`
+### `npx praxis-devos update`
 
 Refresh only: `syncProject()` + `projectNativeSkills()`. No dependency install.
 

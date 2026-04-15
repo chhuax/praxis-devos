@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PRAXIS_ROOT = path.resolve(__dirname, '../..', '..');
 export const PACKAGE_JSON = path.join(PRAXIS_ROOT, 'package.json');
 export const MANAGED_ENTRY_TEMPLATE = path.join(PRAXIS_ROOT, 'src', 'templates', 'managed-entry.md');
+export const BUNDLED_OPENSPEC_SCHEMAS_ROOT = path.join(PRAXIS_ROOT, 'assets', 'openspec', 'schemas');
 export const SUPPORTED_AGENTS = ['opencode', 'codex', 'claude', 'copilot'];
 
 export const readFile = (filePath) => {
@@ -47,6 +48,10 @@ export const readJson = (filePath) => {
 };
 
 export const getPackageVersion = () => readJson(PACKAGE_JSON)?.version || '0.0.0';
+export const bundledOpenSpecSchemaRoot = (schemaName = 'spec-super') =>
+  path.join(BUNDLED_OPENSPEC_SCHEMAS_ROOT, schemaName);
+export const bundledOpenSpecSchemaManifestPath = (schemaName = 'spec-super') =>
+  path.join(bundledOpenSpecSchemaRoot(schemaName), 'manifest.json');
 
 // Centralize scaffold-owned project paths so the rest of the core uses one
 // shared view of the workspace layout.
