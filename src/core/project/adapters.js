@@ -127,7 +127,40 @@ const renderClaudeManagedBlock = () => [
   '> 如需 Claude 专属补充，请只在此文件追加少量差异内容，不要复制 `AGENTS.md` 全文。',
 ].join('\n');
 
-const ensureOpenSpecLayout = ({ projectDir, log }) => {
+const openSpecToolsForAgents = (agents = SUPPORTED_AGENTS) => {
+  const toolByAgent = {
+    codex: 'codex',
+    claude: 'claude',
+    opencode: 'opencode',
+    copilot: 'github-copilot',
+  };
+
+  return uniqueAgents(agents)
+    .map((agent) => toolByAgent[agent])
+    .filter(Boolean);
+};
+
+const setOpenSpecDelivery = ({ runtime, projectDir, delivery, log }) => {
+  const result = runFile(runtime.command, ['config', 'set', 'delivery', delivery], {
+    cwd: projectDir,
+  });
+  if (!result.ok) {
+    throw new Error(`OpenSpec config set delivery ${delivery} failed: ${result.stderr}`);
+  }
+  log(`✓ OpenSpec delivery set to ${delivery}`);
+};
+
+const runOpenSpecInit = ({ runtime, projectDir, tools, log }) => {
+  const initResult = runFile(runtime.command, ['init', projectDir, '--tools', tools.join(',') || 'none', '--force'], {
+    cwd: projectDir,
+  });
+  if (!initResult.ok) {
+    throw new Error(`OpenSpec init failed: ${initResult.stderr}`);
+  }
+  log(`✓ openspec init completed (${runtime.source})`);
+};
+
+const ensureOpenSpecLayout = ({ projectDir, agents = SUPPORTED_AGENTS, log }) => {
   const runtime = resolveOpenSpecRuntime(projectDir);
   if ((runtime.status !== 'ok' && runtime.status !== 'warning') || !runtime.command) {
     throw new Error(
@@ -135,15 +168,29 @@ const ensureOpenSpecLayout = ({ projectDir, log }) => {
     );
   }
 
-  const initResult = runFile(runtime.command, ['init', projectDir, '--tools', 'none', '--force'], {
-    cwd: projectDir,
-  });
-  if (initResult.ok) {
-    log(`✓ openspec init completed (${runtime.source})`);
+  const selectedAgents = uniqueAgents(agents);
+  const codexSelected = selectedAgents.includes('codex');
+  const nonCodexTools = openSpecToolsForAgents(selectedAgents.filter((agent) => agent !== 'codex'));
+
+  if (nonCodexTools.length > 0) {
+    setOpenSpecDelivery({ runtime, projectDir, delivery: 'both', log });
+    runOpenSpecInit({ runtime, projectDir, tools: nonCodexTools, log });
+  }
+
+  if (codexSelected) {
+    setOpenSpecDelivery({ runtime, projectDir, delivery: 'skills', log });
+    try {
+      runOpenSpecInit({ runtime, projectDir, tools: ['codex'], log });
+    } finally {
+      setOpenSpecDelivery({ runtime, projectDir, delivery: 'both', log });
+    }
     return;
   }
 
-  throw new Error(`OpenSpec init failed: ${initResult.stderr}`);
+  if (nonCodexTools.length === 0) {
+    setOpenSpecDelivery({ runtime, projectDir, delivery: 'both', log });
+    runOpenSpecInit({ runtime, projectDir, tools: ['none'], log });
+  }
 };
 
 const ensureFrameworkFiles = ({ projectDir, log }) => {
@@ -270,8 +317,9 @@ export const initProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   const log = (msg) => logs.push(msg);
 
   const selectedAgents = uniqueAgents(agents);
-  ensureOpenSpecLayout({ projectDir, log });
+  ensureOpenSpecLayout({ projectDir, agents: selectedAgents, log });
   ensureFrameworkFiles({ projectDir, log });
+  populateOpenSpecConfig({ projectDir, log });
 
   const syncLogs = syncProject({ projectDir, agents: selectedAgents });
   if (syncLogs) {
@@ -297,15 +345,25 @@ export const projectNativeSkills = ({ projectDir, agents, log }) => {
 export const populateOpenSpecConfig = ({ projectDir, log }) => {
   const configPath = path.join(projectDir, 'openspec', 'config.yaml');
   if (!fs.existsSync(configPath)) {
-    log('⊘ openspec/config.yaml not found, skipping context population');
+    log('⊘ openspec/config.yaml not found, skipping schema binding');
     return;
   }
 
   const content = fs.readFileSync(configPath, 'utf8');
-  if (content.includes('context:') && !content.includes('# context:') && !content.includes('context: |')) {
-    log('⊘ openspec/config.yaml already has custom context, skipping context population');
+  const normalized = content.replace(/\r\n/g, '\n');
+  const schemaLine = 'schema: spec-super';
+  const withoutSchema = normalized.replace(/^schema:\s*[^\n]+\n*/m, '');
+  const next = withoutSchema.trimStart().startsWith('# context:')
+    ? `${schemaLine}\n\n${withoutSchema.trimStart()}`
+    : normalized.match(/^schema:\s*spec-super$/m)
+      ? normalized
+      : `${schemaLine}\n\n${withoutSchema.trimStart()}`;
+
+  if (next === normalized) {
+    log('⊘ openspec/config.yaml already binds schema spec-super');
     return;
   }
 
-  log('⊘ No stack context to populate into openspec/config.yaml');
+  fs.writeFileSync(configPath, next, 'utf8');
+  log('✓ Updated openspec/config.yaml to bind schema spec-super');
 };

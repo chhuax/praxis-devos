@@ -1,4 +1,4 @@
-import { detectForAgent, expectedSkillNames } from '../../projection/index.js';
+import { inspectProjectionHealth } from '../../projection/index.js';
 import { uniqueAgents } from '../project/state.js';
 import { resolveOpenSpecRuntime } from './commands.js';
 import {
@@ -12,7 +12,17 @@ import {
   ensureRuntimeDependencies,
   formatStatus,
 } from './agent-dependencies.js';
-import { bootstrapOpenSpec, ensureOpenSpecRuntime, OPENSPEC_PACKAGE } from './openspec.js';
+import {
+  bootstrapOpenSpec,
+  detectBundledOpenSpecSchemaInstallation,
+  detectOpenSpecSchemaPrecedence,
+  detectOpenSpecUserConfig,
+  detectProjectSchemaBinding,
+  ensureBundledOpenSpecSchemaInstalled,
+  ensureOpenSpecRuntime,
+  ensureOpenSpecUserConfig,
+  OPENSPEC_PACKAGE,
+} from './openspec.js';
 
 // This module is now the thin dependency orchestrator. It combines the
 // OpenSpec-specific runtime checks with per-agent dependency health so callers
@@ -31,6 +41,22 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
     status: openspecRuntime.status,
     detail: openspecRuntime.detail,
   });
+  results.push({
+    name: 'openspec:company-schema',
+    ...detectBundledOpenSpecSchemaInstallation(),
+  });
+  results.push({
+    name: 'openspec:user-config',
+    ...detectOpenSpecUserConfig(),
+  });
+  results.push({
+    name: 'openspec:project-schema',
+    ...detectProjectSchemaBinding(projectDir),
+  });
+  results.push({
+    name: 'openspec:schema-precedence',
+    ...detectOpenSpecSchemaPrecedence(projectDir),
+  });
 
   for (const agent of selectedAgents) {
     const detection = detectSuperpowersForAgent(projectDir, agent);
@@ -42,22 +68,37 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
   }
 
   for (const agent of selectedAgents) {
-    const projections = detectForAgent(agent);
-    const expected = expectedSkillNames();
-    const found = projections.map((p) => p.name);
-    const missing = expected.filter((name) => !found.includes(name));
+    const projection = inspectProjectionHealth({ agent, projectDir });
+    const issues = [];
 
-    if (missing.length === 0) {
+    if (projection.missing.length > 0) {
+      issues.push(`missing official skill projections: ${projection.missing.join(', ')}`);
+    }
+    if (projection.pendingGeneratedSkills.length > 0 || projection.pendingGeneratedCommands.length > 0) {
+      const pending = [];
+      if (projection.pendingGeneratedSkills.length > 0) {
+        pending.push(`${projection.pendingGeneratedSkills.length} project-local workflow skill source(s)`);
+      }
+      if (projection.pendingGeneratedCommands.length > 0) {
+        pending.push(`${projection.pendingGeneratedCommands.length} project-local workflow command source(s)`);
+      }
+      issues.push(`OpenSpec-generated workflow assets still remain under the project (${pending.join(', ')})`);
+    }
+    if (projection.legacy.length > 0) {
+      issues.push(`legacy opsx skill projections still installed: ${projection.legacy.join(', ')}`);
+    }
+
+    if (issues.length === 0) {
       results.push({
         name: `projection:${agent}`,
         status: 'ok',
-        detail: `All ${expected.length} bundled Praxis skills projected`,
+        detail: `All ${projection.expected.length} expected Praxis skills are projected with no pending OpenSpec workflow adoption issues`,
       });
     } else {
       results.push({
         name: `projection:${agent}`,
         status: 'warning',
-        detail: `Missing projections: ${missing.join(', ')}. Run \`npx praxis-devos setup --agent ${agent}\` to fix.`,
+        detail: `${issues.join('; ')}. Run \`npx praxis-devos setup --agent ${agent}\` to fix.`,
       });
     }
   }
@@ -93,7 +134,13 @@ export {
   bootstrapProject,
   CLAUDE_SUPERPOWERS_PLUGIN,
   detectSuperpowersForAgent,
+  detectBundledOpenSpecSchemaInstallation,
+  detectOpenSpecSchemaPrecedence,
+  detectOpenSpecUserConfig,
+  detectProjectSchemaBinding,
+  ensureBundledOpenSpecSchemaInstalled,
   ensureOpenSpecRuntime,
+  ensureOpenSpecUserConfig,
   ensureRuntimeDependencies,
   formatStatus,
   OPENSPEC_PACKAGE,

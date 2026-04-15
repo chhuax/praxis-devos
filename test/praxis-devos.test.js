@@ -49,8 +49,87 @@ const withPrependedPath = (binDir, fn) => withEnv(
   fn,
 );
 
+const openSpecDataHomeForTest = (homeDir) => (
+  process.platform === 'win32'
+    ? path.join(homeDir, 'AppData', 'Local')
+    : path.join(homeDir, '.local', 'share')
+);
+
+const openSpecSchemaDirForTest = (homeDir) => path.join(
+  openSpecDataHomeForTest(homeDir),
+  'openspec',
+  'schemas',
+  'spec-super',
+);
+
+const withIsolatedOpenSpecEnv = (homeDir, fn) => withEnv(
+  'HOME',
+  homeDir,
+  () => withEnv(
+    'XDG_DATA_HOME',
+    path.join(homeDir, '.local', 'share'),
+    () => withEnv(
+      'LOCALAPPDATA',
+      path.join(homeDir, 'AppData', 'Local'),
+      fn,
+    ),
+  ),
+);
+
 const normalizeEol = (value) => value.replace(/\r\n/g, '\n');
 const normalizeSlashes = (value) => value.replace(/\\/g, '/');
+
+const GENERATED_OPEN_SPEC_WORKFLOWS = [
+  {
+    projectedName: 'openspec-explore',
+    sourceSkillDirName: 'openspec-explore',
+    claudeCommandRelativePath: path.join('opsx', 'explore.md'),
+    opencodeCommandFileName: 'opsx-explore.md',
+    githubPromptFileName: 'opsx-explore.prompt.md',
+  },
+  {
+    projectedName: 'openspec-propose',
+    sourceSkillDirName: 'openspec-propose',
+    claudeCommandRelativePath: path.join('opsx', 'propose.md'),
+    opencodeCommandFileName: 'opsx-propose.md',
+    githubPromptFileName: 'opsx-propose.prompt.md',
+  },
+  {
+    projectedName: 'openspec-apply-change',
+    sourceSkillDirName: 'openspec-apply-change',
+    claudeCommandRelativePath: path.join('opsx', 'apply.md'),
+    opencodeCommandFileName: 'opsx-apply.md',
+    githubPromptFileName: 'opsx-apply.prompt.md',
+  },
+  {
+    projectedName: 'openspec-archive-change',
+    sourceSkillDirName: 'openspec-archive-change',
+    claudeCommandRelativePath: path.join('opsx', 'archive.md'),
+    opencodeCommandFileName: 'opsx-archive.md',
+    githubPromptFileName: 'opsx-archive.prompt.md',
+  },
+  {
+    projectedName: 'openspec-new-change',
+    sourceSkillDirName: 'openspec-new-change',
+    claudeCommandRelativePath: path.join('opsx', 'new.md'),
+    opencodeCommandFileName: 'opsx-new.md',
+    githubPromptFileName: 'opsx-new.prompt.md',
+  },
+  {
+    projectedName: 'openspec-continue-change',
+    sourceSkillDirName: 'openspec-continue-change',
+    claudeCommandRelativePath: path.join('opsx', 'continue.md'),
+    opencodeCommandFileName: 'opsx-continue.md',
+    githubPromptFileName: 'opsx-continue.prompt.md',
+  },
+  {
+    projectedName: 'openspec-ff-change',
+    sourceSkillDirName: 'openspec-ff-change',
+    claudeCommandRelativePath: path.join('opsx', 'ff.md'),
+    opencodeCommandFileName: 'opsx-ff.md',
+    githubPromptFileName: 'opsx-ff.prompt.md',
+  },
+];
 
 const withPlatform = (platform, fn) => {
   const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
@@ -77,29 +156,113 @@ const installFakeOpenSpec = (projectDir, label = 'GLOBAL') => {
   const shimPath = path.join(binDir, 'openspec-shim.cjs');
   const globalShimPath = path.join(globalBinDir, 'openspec-shim.cjs');
   const nodeExecPath = JSON.stringify(process.execPath);
+  const generatedWorkflowsJson = JSON.stringify(GENERATED_OPEN_SPEC_WORKFLOWS);
   const scriptBody = isWindowsHost ? `@echo off
 ${nodeExecPath} "%~dp0\\openspec-shim.cjs" %*
 ` : `#!/bin/sh
 set -eu
-cmd="\${1:-}"
-if [ "$cmd" = "init" ]; then
-  target="$2"
-  mkdir -p "$target/openspec/specs" "$target/openspec/changes/archive"
-  cat > "$target/openspec/config.yaml" <<'EOF'
-# context:
-EOF
-  exit 0
-fi
-printf '${label}:%s\\n' "$*"
+exec ${process.execPath} "$(dirname "$0")/openspec-shim.cjs" "$@"
 `;
-  const shimBody = `const fs = require('node:fs');
+const shimBody = `const fs = require('node:fs');
 const path = require('node:path');
+const workflows = ${generatedWorkflowsJson};
+const configPath = path.join(process.cwd(), '.fake-openspec-config', 'config.json');
+const toolSetups = {
+  codex: {
+    skillsRoot: ['.codex', 'skills'],
+  },
+  claude: {
+    skillsRoot: ['.claude', 'skills'],
+    commandsRoot: ['.claude', 'commands'],
+    commandRelativeKey: 'claudeCommandRelativePath',
+  },
+  opencode: {
+    skillsRoot: ['.opencode', 'skills'],
+    commandsRoot: ['.opencode', 'commands'],
+    commandRelativeKey: 'opencodeCommandFileName',
+  },
+  'github-copilot': {
+    skillsRoot: ['.github', 'skills'],
+    commandsRoot: ['.github', 'prompts'],
+    commandRelativeKey: 'githubPromptFileName',
+  },
+};
+const readDelivery = () => {
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return typeof config.delivery === 'string' ? config.delivery : 'both';
+  } catch {
+    return 'both';
+  }
+};
+const writeDelivery = (delivery) => {
+  const current = (() => {
+    try {
+      return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } catch {
+      return {};
+    }
+  })();
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify({ ...current, delivery }, null, 2) + '\\n', 'utf8');
+};
+const writeSkill = (target, workflow, tool) => {
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(target, 'SKILL.md'), [
+    '---',
+    'name: ' + workflow.sourceSkillDirName,
+    'description: generated by fake openspec',
+    '---',
+    '',
+    'Generated workflow skill for ' + tool + ': ' + workflow.projectedName,
+    '',
+  ].join('\\n'));
+};
+const writeCommand = (target, workflow, tool, relativeKey) => {
+  const relativePath = workflow[relativeKey];
+  if (!relativePath) {
+    return;
+  }
+
+  const targetPath = path.join(target, relativePath);
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, '# generated ' + tool + ' command for ' + workflow.projectedName + '\\n', 'utf8');
+};
 const args = process.argv.slice(2);
+if (args[0] === 'config' && args[1] === 'set' && args[2] === 'delivery' && args[3]) {
+  writeDelivery(args[3]);
+  process.exit(0);
+}
 if (args[0] === 'init' && args[1]) {
   const target = args[1];
   fs.mkdirSync(path.join(target, 'openspec', 'specs'), { recursive: true });
   fs.mkdirSync(path.join(target, 'openspec', 'changes', 'archive'), { recursive: true });
   fs.writeFileSync(path.join(target, 'openspec', 'config.yaml'), '# context:\\n');
+  const toolsFlagIndex = args.indexOf('--tools');
+  const selectedTools = toolsFlagIndex >= 0 && args[toolsFlagIndex + 1]
+    ? args[toolsFlagIndex + 1].split(',').map((entry) => entry.trim()).filter(Boolean)
+    : [];
+  const delivery = readDelivery();
+  if (!selectedTools.includes('none')) {
+    for (const tool of selectedTools) {
+      const setup = toolSetups[tool];
+      if (!setup) {
+        continue;
+      }
+
+      const skillsRoot = path.join(target, ...setup.skillsRoot);
+      for (const workflow of workflows) {
+        writeSkill(path.join(skillsRoot, workflow.sourceSkillDirName), workflow, tool);
+      }
+
+      if (setup.commandsRoot && delivery !== 'skills') {
+        const commandsRoot = path.join(target, ...setup.commandsRoot);
+        for (const workflow of workflows) {
+          writeCommand(commandsRoot, workflow, tool, setup.commandRelativeKey);
+        }
+      }
+    }
+  }
   process.exit(0);
 }
 process.stdout.write(${JSON.stringify(`${label}:`)} + args.join(' ') + '\\n');
@@ -108,10 +271,8 @@ process.stdout.write(${JSON.stringify(`${label}:`)} + args.join(' ') + '\\n');
   fs.mkdirSync(globalBinDir, { recursive: true });
   fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
   fs.writeFileSync(globalScriptPath, scriptBody, { mode: 0o755 });
-  if (isWindowsHost) {
-    fs.writeFileSync(shimPath, shimBody, 'utf8');
-    fs.writeFileSync(globalShimPath, shimBody, 'utf8');
-  }
+  fs.writeFileSync(shimPath, shimBody, 'utf8');
+  fs.writeFileSync(globalShimPath, shimBody, 'utf8');
   fs.chmodSync(scriptPath, 0o755);
   fs.chmodSync(globalScriptPath, 0o755);
   return {
@@ -137,30 +298,75 @@ const listTempFiles = (dirPath, fileName) => fs.readdirSync(dirPath)
 
 const OPENSPEC_WORKFLOW_EXPECTATIONS = [
   {
-    projectedName: 'opsx-explore',
-    upstreamDirName: 'openspec-explore',
+    projectedName: 'openspec-explore',
     overlayFileName: 'opsx-explore.overlay.md',
-    mustInclude: [/owner_flow: opsx-explore/, /After `openspec list --json`/],
+    mustInclude: [/owner_flow: openspec-explore/, /After `openspec list --json`/],
   },
   {
-    projectedName: 'opsx-propose',
-    upstreamDirName: 'openspec-propose',
+    projectedName: 'openspec-propose',
     overlayFileName: 'opsx-propose.overlay.md',
-    mustInclude: [/owner_flow: opsx-propose/, /`Docs Impact` section/],
+    mustInclude: [/owner_flow: openspec-propose/, /`Docs Impact`/],
   },
   {
-    projectedName: 'opsx-apply',
-    upstreamDirName: 'openspec-apply-change',
+    projectedName: 'openspec-apply-change',
     overlayFileName: 'opsx-apply.overlay.md',
-    mustInclude: [/owner_flow: opsx-apply/, /verification-before-completion/, /task-local-planning\.md/],
+    mustInclude: [/owner_flow: openspec-apply-change/, /test-driven-development/, /verification-before-completion/],
   },
   {
-    projectedName: 'opsx-archive',
-    upstreamDirName: 'openspec-archive-change',
+    projectedName: 'openspec-archive-change',
     overlayFileName: 'opsx-archive.overlay.md',
-    mustInclude: [/owner_flow: opsx-archive/, /verification-before-completion/],
+    mustInclude: [/owner_flow: openspec-archive-change/, /verification-before-completion/],
   },
 ];
+
+const writeProjectLocalGeneratedWorkflowAssets = ({ projectDir, agent }) => {
+  const byAgent = {
+    codex: {
+      skillsRoot: path.join(projectDir, '.codex', 'skills'),
+    },
+    claude: {
+      skillsRoot: path.join(projectDir, '.claude', 'skills'),
+      commandsRoot: path.join(projectDir, '.claude', 'commands'),
+      commandRelativeKey: 'claudeCommandRelativePath',
+    },
+    opencode: {
+      skillsRoot: path.join(projectDir, '.opencode', 'skills'),
+      commandsRoot: path.join(projectDir, '.opencode', 'commands'),
+      commandRelativeKey: 'opencodeCommandFileName',
+    },
+    copilot: {
+      skillsRoot: path.join(projectDir, '.github', 'skills'),
+      commandsRoot: path.join(projectDir, '.github', 'prompts'),
+      commandRelativeKey: 'githubPromptFileName',
+    },
+  };
+
+  const setup = byAgent[agent];
+  if (!setup) {
+    throw new Error(`Unsupported generated workflow fixture agent: ${agent}`);
+  }
+
+  for (const workflow of GENERATED_OPEN_SPEC_WORKFLOWS) {
+    const skillDir = path.join(setup.skillsRoot, workflow.sourceSkillDirName);
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), [
+      '---',
+      `name: ${workflow.sourceSkillDirName}`,
+      'description: generated fixture',
+      '---',
+      '',
+      `Generated workflow skill for ${agent}: ${workflow.projectedName}`,
+      '',
+    ].join('\n'));
+
+    if (setup.commandsRoot) {
+      const relativePath = workflow[setup.commandRelativeKey];
+      const targetPath = path.join(setup.commandsRoot, relativePath);
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.writeFileSync(targetPath, `# generated ${agent} command for ${workflow.projectedName}\n`, 'utf8');
+    }
+  }
+};
 
 const installFakeClaude = (homeDir) => {
   const binDir = path.join(homeDir, 'fake-claude-bin');
@@ -433,7 +639,8 @@ test('renderHelp reflects the current CLI surface', () => {
 
   assert.match(help, /setup/);
   assert.match(help, /^\s*init\s+/m);
-  assert.match(help, /^\s*sync\s+/m);
+  assert.match(help, /^\s*update\s+/m);
+  assert.doesNotMatch(help, /^\s*sync\s+/m);
   assert.match(help, /^\s*status\s+/m);
   assert.match(help, /^\s*doctor\s+/m);
   assert.match(help, /^\s*bootstrap\s+/m);
@@ -508,8 +715,7 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(agentsMd, /Keep this section\./);
   assert.match(agentsMd, /docs\/surfaces\.yaml/);
   assert.doesNotMatch(agentsMd, /\/opsx:/);
-  assert.match(agentsMd, /opsx-propose/);
-  assert.match(agentsMd, /opsx-apply/);
+  assert.doesNotMatch(agentsMd, /opsx-propose|opsx-apply|opsx-explore|opsx-archive/);
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
   assert.match(claudeMd, /^<!-- PRAXIS_DEVOS_START -->\n@AGENTS\.md/m);
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
@@ -600,13 +806,15 @@ test('projectNativeSkills allows a second project to adopt existing Praxis-manag
   assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
 });
 
-test('runCli sync refreshes managed user-level docs commands and skips user-owned same-name commands', () => {
+test('runCli update refreshes managed user-level docs commands and skips user-owned same-name commands', () => {
   const projectDir = makeTempProject();
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-sync-home-'));
   const managedClaudeInitPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md');
   const userOwnedClaudeRefreshPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md');
+  const openSpecConfigPath = path.join(fakeHome, '.config', 'openspec', 'config.json');
+  const installedSchemaPath = path.join(openSpecSchemaDirForTest(fakeHome), 'schema.yaml');
 
-  withEnv('HOME', fakeHome, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => {
     projectNativeSkills({
       projectDir,
       agents: ['claude'],
@@ -622,17 +830,38 @@ test('runCli sync refreshes managed user-level docs commands and skips user-owne
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
     const output = runCli([
-      'sync',
+      'update',
       '--project-dir',
       projectDir,
       '--agent',
       'claude',
     ]);
 
+    assert.match(output, /Installed bundled OpenSpec schema spec-super|Refreshed bundled OpenSpec schema spec-super/);
+    assert.match(output, /Configured OpenSpec user profile in|OpenSpec user profile already configured in/);
     assert.match(output, /Claude: projected docs command devos-docs-init/);
     assert.match(output, /skipped docs command devos-docs-refresh/i);
     assert.match(fs.readFileSync(managedClaudeInitPath, 'utf8'), /^# devos-docs-init/m);
     assert.equal(fs.readFileSync(userOwnedClaudeRefreshPath, 'utf8'), '# user custom refresh command\n');
+    assert.ok(fs.existsSync(installedSchemaPath));
+    assert.equal(readJson(openSpecConfigPath).profile, 'custom');
+  });
+});
+
+test('runCli keeps sync as a compatibility alias for update', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-update-alias-home-'));
+
+  withEnv('HOME', fakeHome, () => {
+    const output = runCli([
+      'sync',
+      '--project-dir',
+      projectDir,
+      '--agent',
+      'codex',
+    ]);
+
+    assert.match(output, /Synced adapters: codex/);
   });
 });
 
@@ -655,10 +884,15 @@ test('syncProject refreshes adapters without generating docs artifacts', () => {
 });
 
 test('injectMarker preserves YAML frontmatter at the top of projected skills', () => {
-  const content = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
-    'utf8',
-  );
+  const content = [
+    '---',
+    'name: openspec-propose',
+    'description: generated test upstream skill',
+    '---',
+    '',
+    'Upstream body',
+    '',
+  ].join('\n');
 
   const projected = normalizeEol(injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->'));
 
@@ -666,35 +900,28 @@ test('injectMarker preserves YAML frontmatter at the top of projected skills', (
 });
 
 test('injectMarker preserves YAML frontmatter for CRLF skill content', () => {
-  const content = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
-    'utf8',
-  ).replace(/\r?\n/g, '\r\n');
+  const content = [
+    '---',
+    'name: openspec-propose',
+    'description: generated test upstream skill',
+    '---',
+    '',
+    'Upstream body',
+    '',
+  ].join('\n').replace(/\r?\n/g, '\r\n');
 
   const projected = normalizeEol(injectMarker(content, '<!-- PRAXIS_PROJECTION source=test version=0.4.1 -->'));
 
   assert.match(projected, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
 });
 
-test('OpenSpec upstream snapshots and overlays are stored separately', () => {
-  const proposeUpstream = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-propose', 'SKILL.md'),
-    'utf8',
-  );
-  const applyUpstream = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-apply-change', 'SKILL.md'),
-    'utf8',
-  );
+test('OpenSpec workflow overlays remain in Praxis overlay assets and config keeps docs policy', () => {
   const archiveOverlay = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-archive.overlay.md'),
     'utf8',
   );
   const applyOverlay = fs.readFileSync(
     path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-apply.overlay.md'),
-    'utf8',
-  );
-  const applyTaskLocalPlanning = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'overlays', 'openspec', 'skills', 'opsx-apply', 'task-local-planning.md'),
     'utf8',
   );
   const exploreOverlay = fs.readFileSync(
@@ -714,35 +941,99 @@ test('OpenSpec upstream snapshots and overlays are stored separately', () => {
     'utf8',
   );
 
-  assert.match(normalizeEol(proposeUpstream), /^---\nname: openspec-propose\n/m);
-  assert.match(normalizeEol(applyUpstream), /^---\nname: openspec-apply-change\n/m);
-  assert.doesNotMatch(proposeUpstream, /## PRAXIS_DEVOS_OVERLAY/);
-  assert.match(archiveOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
-  assert.match(applyOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
-  assert.match(applyOverlay, /Follow `\.\/task-local-planning\.md`/);
-  assert.match(proposeOverlay, /praxis_devos\.docs_tasks/);
-  assert.match(proposeOverlay, /change_blackbox: true/);
-  assert.match(proposeOverlay, /change_api: auto/);
-  assert.match(applyOverlay, /mode=change-blackbox/);
-  assert.match(applyOverlay, /mode=change-api/);
-  assert.match(applyOverlay, /compatibility warning section/);
-  assert.match(archiveOverlayCurrent, /warning\/compatibility section/);
-  assert.match(applyTaskLocalPlanning, /^# Task-Local Planning Contract$/m);
-  assert.match(exploreOverlay, /^## PRAXIS_DEVOS_OVERLAY$/m);
+  assert.match(archiveOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
+  assert.match(applyOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
+  assert.match(applyOverlay, /test-driven-development/);
+  assert.match(applyOverlay, /writing-plans/);
+  assert.match(proposeOverlay, /artifact language policy/);
+  assert.match(proposeOverlay, /正式黑盒 artifact/);
+  assert.match(proposeOverlay, /Docs Impact/);
+  assert.match(applyOverlay, /systematic-debugging/);
+  assert.match(applyOverlay, /subagent-driven-development/);
+  assert.match(archiveOverlayCurrent, /blackbox-test\.md/);
+  assert.match(archiveOverlayCurrent, /mode=refresh/);
+  assert.match(exploreOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
+});
+
+test('company OpenSpec schema bundle keeps blackbox-test as a formal artifact', () => {
+  const schemaPath = path.join(
+    PRAXIS_ROOT,
+    'assets',
+    'openspec',
+    'schemas',
+    'spec-super',
+    'schema.yaml',
+  );
+  const manifestPath = path.join(
+    PRAXIS_ROOT,
+    'assets',
+    'openspec',
+    'schemas',
+    'spec-super',
+    'manifest.json',
+  );
+  const blackboxTemplatePath = path.join(
+    PRAXIS_ROOT,
+    'assets',
+    'openspec',
+    'schemas',
+    'spec-super',
+    'templates',
+    'blackbox-test.md',
+  );
+  assert.ok(fs.existsSync(schemaPath));
+  assert.ok(fs.existsSync(manifestPath));
+  assert.ok(fs.existsSync(blackboxTemplatePath));
+
+  const schema = normalizeEol(fs.readFileSync(schemaPath, 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const blackboxTemplate = fs.readFileSync(blackboxTemplatePath, 'utf8');
+
+  assert.match(schema, /^name: spec-super$/m);
+  assert.match(schema, /^description: Company OpenSpec workflow - proposal -> specs -> design -> blackbox-test -> tasks$/m);
+  assert.match(schema, /\n  - id: blackbox-test\n[\s\S]*?generates: blackbox-test\.md/);
+  assert.match(schema, /\n  - id: blackbox-test\n[\s\S]*?requires:\n      - specs\n      - design/);
+  assert.match(schema, /\n  - id: tasks\n[\s\S]*?requires:\n      - specs\n      - design/);
+  assert.doesNotMatch(schema, /\n  - id: tasks\n[\s\S]*?requires:\n[\s\S]*?blackbox-test/);
+
+  assert.equal(manifest.schemaName, 'spec-super');
+  assert.equal(manifest.baselineSchemaPath, 'openspec/schemas/spec-super/schema.yaml');
+  assert.ok(typeof manifest.version === 'string' && manifest.version.length > 0);
+
+  assert.match(blackboxTemplate, /^# 黑盒测试说明$/m);
+  assert.match(blackboxTemplate, /^## 测试目标$/m);
+  assert.match(blackboxTemplate, /^## 测试范围$/m);
+  assert.match(blackboxTemplate, /^## 前置条件$/m);
+  assert.match(blackboxTemplate, /^## 操作约束$/m);
+  assert.match(blackboxTemplate, /^## 核心场景$/m);
+  assert.match(blackboxTemplate, /^## 通过标准$/m);
+  assert.match(blackboxTemplate, /^## 回归重点$/m);
+  assert.match(blackboxTemplate, /^## 自动化验证对应$/m);
+  assert.match(blackboxTemplate, /^## 测试环境待补充项$/m);
 });
 
 test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overlays', () => {
   for (const {
     projectedName,
-    upstreamDirName,
     overlayFileName,
     mustInclude,
   } of OPENSPEC_WORKFLOW_EXPECTATIONS) {
-    const upstreamContent = fs.readFileSync(
-      path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', upstreamDirName, 'SKILL.md'),
-      'utf8',
-    );
+    const upstreamContent = [
+      '---',
+      `name: ${projectedName}`,
+      'description: generated test upstream skill',
+      'metadata:',
+      '  generatedBy: "1.3.0"',
+      '---',
+      '',
+      `Generated workflow skill for test: ${projectedName}`,
+      '',
+      '---',
+      '',
+      'Upstream instructions body',
+      '',
+    ].join('\n');
     const overlayPath = path.join(
       PRAXIS_ROOT,
       'assets',
@@ -760,7 +1051,7 @@ test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overl
 
     assert.match(projected, new RegExp(`^---\\nname: ${projectedName}\\n`, 'm'));
     assert.match(projected, /generatedBy: "1\.3\.0"/);
-    assert.match(projected, /^## PRAXIS_DEVOS_OVERLAY$/m);
+    assert.match(projected, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
 
     for (const pattern of mustInclude) {
       assert.match(projected, pattern);
@@ -769,10 +1060,21 @@ test('composeProjectedSkill merges the default OpenSpec 4-flow with Praxis overl
 });
 
 test('composeProjectedSkill rewrites OpenSpec frontmatter names for CRLF upstream content', () => {
-  const upstreamContent = fs.readFileSync(
-    path.join(PRAXIS_ROOT, 'assets', 'upstream', 'openspec', 'skills', 'openspec-explore', 'SKILL.md'),
-    'utf8',
-  ).replace(/\r?\n/g, '\r\n');
+  const upstreamContent = [
+    '---',
+    'name: openspec-explore',
+    'description: generated test upstream skill',
+    'metadata:',
+    '  generatedBy: "1.3.0"',
+    '---',
+    '',
+    'Generated workflow skill for test: openspec-explore',
+    '',
+    '---',
+    '',
+    'Upstream instructions body',
+    '',
+  ].join('\n').replace(/\r?\n/g, '\r\n');
   const overlayPath = path.join(
     PRAXIS_ROOT,
     'assets',
@@ -783,13 +1085,13 @@ test('composeProjectedSkill rewrites OpenSpec frontmatter names for CRLF upstrea
   );
 
   const projected = normalizeEol(composeProjectedSkill({
-    projectedName: 'opsx-explore',
+    projectedName: 'openspec-explore',
     upstreamContent,
     overlayPath,
   }));
 
-  assert.match(projected, /^---\nname: opsx-explore\n/m);
-  assert.match(projected, /^## PRAXIS_DEVOS_OVERLAY$/m);
+  assert.match(projected, /^---\nname: openspec-explore\n/m);
+  assert.match(projected, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
 });
 
 test('devos-docs bundled skill declares supported modes', () => {
@@ -864,23 +1166,14 @@ test('devos-change-docs bundled skill declares supported modes', () => {
 
 test('collectBundledSkillSources discovers unified skill bundles by sourceDir', () => {
   const skillSources = collectBundledSkillSources();
-  const propose = skillSources.find((entry) => entry.name === 'opsx-propose');
   const docs = skillSources.find((entry) => entry.name === 'devos-docs');
   const changeDocs = skillSources.find((entry) => entry.name === 'devos-change-docs');
-  const managedOpenSpecNames = skillSources
-    .filter((entry) => entry.sourceType === 'openspec-upstream')
-    .map((entry) => entry.name)
-    .sort();
 
-  assert.ok(propose);
   assert.ok(docs);
   assert.ok(changeDocs);
-  assert.equal('sourcePath' in propose, false);
-  assert.match(normalizeSlashes(propose.sourceDir), /assets\/upstream\/openspec\/skills\/openspec-propose$/);
-  assert.match(normalizeSlashes(propose.overlayPath || ''), /assets\/overlays\/openspec\/skills\/opsx-propose\.overlay\.md$/);
   assert.match(normalizeSlashes(docs.sourceDir), /assets\/skills\/devos-docs$/);
   assert.match(normalizeSlashes(changeDocs.sourceDir), /assets\/skills\/devos-change-docs$/);
-  assert.deepEqual(managedOpenSpecNames, ['opsx-apply', 'opsx-archive', 'opsx-explore', 'opsx-propose']);
+  assert.deepEqual(skillSources.map((entry) => entry.name).sort(), ['devos-change-docs', 'devos-docs']);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-verify'), false);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-sync'), false);
 });
@@ -899,14 +1192,13 @@ test('populateOpenSpecConfig does not rewrite docs task policy into openspec/con
   });
 
   const updated = fs.readFileSync(configPath, 'utf8');
-  assert.equal(updated, 'schema: spec-driven\n\n# context:\n');
+  assert.equal(updated, 'schema: spec-super\n\n# context:\n');
   assert.doesNotMatch(updated, /praxis_devos:/);
-  assert.match(logs.join('\n'), /No stack context to populate into openspec\/config\.yaml/);
+  assert.match(logs.join('\n'), /Updated openspec\/config\.yaml to bind schema spec-super/);
 });
 
-test('projectNativeSkills projects supporting files that live alongside SKILL.md', () => {
+test('projectNativeSkills does not project removed apply sidecar files', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bundle-home-'));
-  const targetPath = path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'task-local-planning.md');
 
   withEnv('HOME', fakeHome, () => {
     projectNativeSkills({
@@ -916,7 +1208,10 @@ test('projectNativeSkills projects supporting files that live alongside SKILL.md
     });
   });
 
-  assert.match(fs.readFileSync(targetPath, 'utf8'), /^# Task-Local Planning Contract$/m);
+  assert.equal(
+    fs.existsSync(path.join(fakeHome, '.codex', 'skills', 'openspec-apply-change', 'task-local-planning.md')),
+    false,
+  );
 });
 
 test('projectNativeSkills projects host commands from the shared command asset root', () => {
@@ -942,7 +1237,7 @@ test('projectNativeSkills projects host commands from the shared command asset r
   );
 });
 
-test('projectNativeSkills writes agent-native skills under the resolved user home with valid frontmatter', () => {
+test('projectNativeSkills writes only direct agent-native skills when OpenSpec generated assets are absent', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-projection-home-'));
   const logs = [];
 
@@ -953,72 +1248,33 @@ test('projectNativeSkills writes agent-native skills under the resolved user hom
       log: (msg) => logs.push(msg),
     });
 
-    const projectedCodexSkill = normalizeEol(fs.readFileSync(
-      path.join(fakeHome, '.codex', 'skills', 'opsx-propose', 'SKILL.md'),
-      'utf8',
-    ));
     const projectedCodexDocsSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.codex', 'skills', 'devos-docs', 'SKILL.md'),
-      'utf8',
-    ));
-    const projectedClaudeSkill = normalizeEol(fs.readFileSync(
-      path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
       'utf8',
     ));
     const projectedClaudeDocsSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md'),
       'utf8',
     ));
-    const projectedOpenCodeSkill = normalizeEol(fs.readFileSync(
-      path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md'),
-      'utf8',
-    ));
-
-    assert.match(projectedCodexSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
-    assert.match(projectedCodexSkill, /^---\nname: opsx-propose\n/m);
-    assert.match(projectedCodexSkill, /generatedBy: "1\.3\.0"/);
-    assert.match(projectedCodexSkill, /## PRAXIS_DEVOS_OVERLAY/);
-    const projectedApplySkill = normalizeEol(fs.readFileSync(
-      path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'SKILL.md'),
-      'utf8',
-    ));
-    const projectedApplyPlanning = fs.readFileSync(
-      path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'task-local-planning.md'),
-      'utf8',
-    );
-    assert.match(projectedApplySkill, /task-local micro-plan/);
-    assert.match(projectedApplySkill, /Follow `\.\/task-local-planning\.md`/);
-    assert.match(projectedApplySkill, /Do not write them to `tasks\.md`/);
-    assert.doesNotMatch(projectedApplySkill, /invoke `writing-plans` internally/);
-    assert.match(projectedApplyPlanning, /^# Task-Local Planning Contract$/m);
-    assert.match(projectedApplyPlanning, /Touched files/);
-    assert.match(projectedApplyPlanning, /## File Structure First/);
-    assert.match(projectedApplyPlanning, /## Bite-Sized Step Granularity/);
-    assert.match(projectedApplyPlanning, /## No Placeholders/);
-    assert.match(projectedApplyPlanning, /Optional parallel/);
-    assert.match(projectedApplySkill, /verification-before-completion/);
     assert.match(projectedCodexDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
-    assert.match(projectedClaudeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedClaudeDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
-    assert.match(projectedOpenCodeSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'skills', 'openspec-propose', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'skills', 'openspec-apply-change', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md')), false);
     assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'commands')), false);
   });
 
-  assert.match(logs.join('\n'), /Codex: projected opsx-propose/);
   assert.match(logs.join('\n'), /Codex: projected devos-docs/);
-  assert.match(logs.join('\n'), /Claude: projected opsx-propose/);
   assert.match(logs.join('\n'), /Claude: projected devos-docs/);
-  assert.match(logs.join('\n'), /GitHub Copilot: projected opsx-propose/);
   assert.match(logs.join('\n'), /GitHub Copilot: projected devos-docs/);
-  assert.match(logs.join('\n'), /OpenCode: projected opsx-propose/);
   assert.match(logs.join('\n'), /OpenCode: projected devos-docs/);
 });
 
-test('projectNativeSkills does not overwrite user-authored same-name skills without Praxis projection markers', () => {
+test('projectNativeSkills does not overwrite user-authored direct skills without Praxis projection markers', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-safe-projection-home-'));
-  const customSkillPath = path.join(fakeHome, '.codex', 'skills', 'opsx-apply', 'SKILL.md');
+  const customSkillPath = path.join(fakeHome, '.codex', 'skills', 'devos-docs', 'SKILL.md');
   fs.mkdirSync(path.dirname(customSkillPath), { recursive: true });
-  fs.writeFileSync(customSkillPath, '# user custom apply\n', 'utf8');
+  fs.writeFileSync(customSkillPath, '# user custom docs\n', 'utf8');
   const logs = [];
 
   withEnv('HOME', fakeHome, () => {
@@ -1029,8 +1285,136 @@ test('projectNativeSkills does not overwrite user-authored same-name skills with
     });
   });
 
-  assert.equal(fs.readFileSync(customSkillPath, 'utf8'), '# user custom apply\n');
-  assert.match(logs.join('\n'), /skipped opsx-apply because .* is not a Praxis projection/);
+  assert.equal(fs.readFileSync(customSkillPath, 'utf8'), '# user custom docs\n');
+  assert.match(logs.join('\n'), /skipped devos-docs because .* is not a Praxis projection/);
+});
+
+test('projectNativeSkills adopts OpenSpec-generated Claude workflow skills and commands into user-level surfaces', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-adopt-home-'));
+  const projectDir = makeTempProject();
+  const logs = [];
+  writeProjectLocalGeneratedWorkflowAssets({ projectDir, agent: 'claude' });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: (msg) => logs.push(msg),
+    });
+  });
+
+  const adoptedSkillPath = path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md');
+  const adoptedCommandPath = path.join(fakeHome, '.claude', 'commands', 'opsx', 'propose.md');
+  const adoptedApplyCommandPath = path.join(fakeHome, '.claude', 'commands', 'opsx', 'apply.md');
+
+  assert.ok(fs.existsSync(adoptedSkillPath));
+  assert.ok(fs.existsSync(adoptedCommandPath));
+  assert.ok(fs.existsSync(adoptedApplyCommandPath));
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /owner_flow: openspec-propose/);
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /Generated workflow skill for claude: openspec-propose/);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# generated claude command for openspec-propose\n/m);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /owner_flow: openspec-propose/);
+  assert.match(fs.readFileSync(adoptedApplyCommandPath, 'utf8'), /writing-plans/);
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'skills', 'openspec-propose', 'SKILL.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'commands', 'opsx', 'propose.md')), false);
+  assert.match(logs.join('\n'), /adopted OpenSpec workflow skill openspec-propose/i);
+  assert.match(logs.join('\n'), /adopted OpenSpec workflow command openspec-propose/i);
+});
+
+test('projectNativeSkills preserves adopted OpenSpec workflow assets across repeated runs', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-repeat-home-'));
+  const projectDir = makeTempProject();
+  const firstLogs = [];
+  const secondLogs = [];
+  writeProjectLocalGeneratedWorkflowAssets({ projectDir, agent: 'claude' });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: (msg) => firstLogs.push(msg),
+    });
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: (msg) => secondLogs.push(msg),
+    });
+  });
+
+  const adoptedSkillPath = path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md');
+  const adoptedCommandPath = path.join(fakeHome, '.claude', 'commands', 'opsx', 'propose.md');
+
+  assert.ok(fs.existsSync(adoptedSkillPath));
+  assert.ok(fs.existsSync(adoptedCommandPath));
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'skills', 'openspec-propose', 'SKILL.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'commands', 'opsx', 'propose.md')), false);
+  assert.match(firstLogs.join('\n'), /adopted OpenSpec workflow skill openspec-propose/i);
+  assert.match(firstLogs.join('\n'), /adopted OpenSpec workflow command openspec-propose/i);
+  assert.doesNotMatch(secondLogs.join('\n'), /removed stale projection openspec-propose/i);
+  assert.doesNotMatch(secondLogs.join('\n'), /removed managed asset .*openspec-propose/i);
+});
+
+test('projectNativeSkills adopts OpenSpec-generated OpenCode workflow commands into the OpenCode user command surface', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-adopt-home-'));
+  const projectDir = makeTempProject();
+  const logs = [];
+  writeProjectLocalGeneratedWorkflowAssets({ projectDir, agent: 'opencode' });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['opencode'],
+      log: (msg) => logs.push(msg),
+    });
+  });
+
+  const adoptedSkillPath = path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md');
+  const adoptedCommandPath = path.join(fakeHome, '.config', 'opencode', 'commands', 'opsx-propose.md');
+  const adoptedApplyCommandPath = path.join(fakeHome, '.config', 'opencode', 'commands', 'opsx-apply.md');
+
+  assert.ok(fs.existsSync(adoptedSkillPath));
+  assert.ok(fs.existsSync(adoptedCommandPath));
+  assert.ok(fs.existsSync(adoptedApplyCommandPath));
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /Generated workflow skill for opencode: openspec-propose/);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# generated opencode command for openspec-propose\n/m);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /owner_flow: openspec-propose/);
+  assert.match(fs.readFileSync(adoptedApplyCommandPath, 'utf8'), /writing-plans/);
+  assert.equal(fs.existsSync(path.join(projectDir, '.opencode', 'skills', 'openspec-propose', 'SKILL.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, '.opencode', 'commands', 'opsx-propose.md')), false);
+  assert.match(logs.join('\n'), /adopted OpenSpec workflow command openspec-propose/i);
+});
+
+test('projectNativeSkills adopts GitHub Copilot prompts into the shared Claude-compatible command surface', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-copilot-adopt-home-'));
+  const projectDir = makeTempProject();
+  const logs = [];
+  writeProjectLocalGeneratedWorkflowAssets({ projectDir, agent: 'copilot' });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['copilot'],
+      log: (msg) => logs.push(msg),
+    });
+  });
+
+  const adoptedSkillPath = path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md');
+  const adoptedCommandPath = path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md');
+
+  assert.ok(fs.existsSync(adoptedSkillPath));
+  assert.ok(fs.existsSync(adoptedCommandPath));
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
+  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /Generated workflow skill for copilot: openspec-propose/);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# generated copilot command for openspec-propose\n/m);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
+  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /owner_flow: openspec-propose/);
+  assert.equal(fs.existsSync(path.join(projectDir, '.github', 'skills', 'openspec-propose', 'SKILL.md')), false);
+  assert.equal(fs.existsSync(path.join(projectDir, '.github', 'prompts', 'opsx-propose.prompt.md')), false);
+  assert.match(logs.join('\n'), /adopted OpenSpec workflow command openspec-propose/i);
 });
 
 test('initProject bootstraps openspec workspace through the detected runtime', () => {
@@ -1046,8 +1430,15 @@ test('initProject bootstraps openspec workspace through the detected runtime', (
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'specs')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
   assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'config.yaml')));
+  assert.equal(
+    fs.readFileSync(path.join(projectDir, 'openspec', 'config.yaml'), 'utf8'),
+    'schema: spec-super\n\n# context:\n',
+  );
   assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
   assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.codex', 'skills', 'openspec-propose', 'SKILL.md')));
+  assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'commands', 'opsx-propose.md')));
+  assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'skills', 'openspec-propose', 'SKILL.md')), false);
   assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'codemaps', 'project-overview.md')), false);
   assert.equal(fs.existsSync(path.join(projectDir, 'docs', 'surfaces.yaml')), false);
 });
@@ -1086,13 +1477,58 @@ test('statusProject reports initialized state for the selected agents', () => {
 test('bootstrapOpenSpec reports the detected runtime', () => {
   const projectDir = makeTempProject();
   installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bootstrap-openspec-home-'));
 
-  const output = withEnv('PATH', '/usr/bin:/bin', () => bootstrapOpenSpec({ projectDir }));
+  const output = withIsolatedOpenSpecEnv(fakeHome, () => withEnv('PATH', '/usr/bin:/bin', () => bootstrapOpenSpec({ projectDir })));
 
   assert.match(output, /OpenSpec already available \((global|project-local)\)/);
+  assert.match(output, /Installed bundled OpenSpec schema spec-super|Refreshed bundled OpenSpec schema spec-super/);
+  assert.match(output, /Configured OpenSpec user profile in|OpenSpec user profile already configured in/);
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
   assert.match(output, /openspec(?:\.cmd)? list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
+  assert.ok(fs.existsSync(path.join(openSpecSchemaDirForTest(fakeHome), 'schema.yaml')));
+  assert.equal(readJson(path.join(fakeHome, '.config', 'openspec', 'config.json')).profile, 'custom');
+});
+
+test('setupProject installs bundled company schema and repairs OpenSpec user config', () => {
+  const projectDir = makeTempProject();
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-home-'));
+  const openSpecConfigDir = path.join(fakeHome, '.config', 'openspec');
+  const openSpecConfigPath = path.join(openSpecConfigDir, 'config.json');
+  const schemaDir = openSpecSchemaDirForTest(fakeHome);
+
+  fs.mkdirSync(openSpecConfigDir, { recursive: true });
+  fs.writeFileSync(
+    openSpecConfigPath,
+    JSON.stringify({
+      profile: 'default',
+      workflows: ['explore'],
+      telemetry: { enabled: false },
+    }, null, 2),
+    'utf8',
+  );
+
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    const output = setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const openSpecConfig = readJson(openSpecConfigPath);
+    const backups = listBackupFiles(openSpecConfigDir, 'config.json');
+
+    assert.match(output, /Installed bundled OpenSpec schema spec-super|Refreshed bundled OpenSpec schema spec-super/);
+    assert.match(output, /Configured OpenSpec user profile in/);
+    assert.ok(fs.existsSync(path.join(schemaDir, 'schema.yaml')));
+    assert.ok(fs.existsSync(path.join(schemaDir, 'manifest.json')));
+    assert.equal(openSpecConfig.profile, 'custom');
+    assert.equal(openSpecConfig.delivery, 'both');
+    assert.deepEqual(openSpecConfig.workflows, ['propose', 'explore', 'new', 'continue', 'apply', 'ff', 'archive']);
+    assert.deepEqual(openSpecConfig.telemetry, { enabled: false });
+    assert.equal(backups.length, 1);
+  }));
 });
 
 test('bootstrapProject updates OpenCode plugins and preserves existing config', () => {
@@ -1317,7 +1753,7 @@ test('setupProject provisions GitHub Copilot through the shared Claude-compatibl
     assert.match(output, /\[OK\] superpowers:copilot/);
     assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
     assert.equal(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), false);
-    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
     assert.ok(readJson(managedAssetsPath).assets[path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')]);
   }));
@@ -1387,7 +1823,7 @@ test('doctorProject reports current dependency status for OpenCode', () => {
   const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-missing-'));
 
-  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = doctorProject({
       projectDir,
       agents: ['opencode'],
@@ -1397,6 +1833,104 @@ test('doctorProject reports current dependency status for OpenCode', () => {
     assert.match(output, /\[OK\] openspec/);
     assert.match(output, /\[MISSING\] superpowers:opencode/);
     assert.match(output, /npx praxis-devos setup --agent opencode/);
+  }));
+});
+
+test('doctorProject reports missing company schema installation and OpenSpec user config', () => {
+  const projectDir = makeTempProject();
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-doctor-missing-'));
+  const opencodeConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const openSpecProjectConfigPath = path.join(projectDir, 'openspec', 'config.yaml');
+
+  fs.mkdirSync(opencodeConfigDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(opencodeConfigDir, 'config.json'),
+    JSON.stringify({ plugin: ['superpowers@git+https://github.com/obra/superpowers.git'] }, null, 2),
+    'utf8',
+  );
+  fs.mkdirSync(path.dirname(openSpecProjectConfigPath), { recursive: true });
+  fs.writeFileSync(openSpecProjectConfigPath, 'schema: spec-super\n\n# context:\n', 'utf8');
+
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.match(output, /\[OK\] openspec —/);
+    assert.match(output, /\[MISSING\] openspec:company-schema —/);
+    assert.match(output, /\[MISSING\] openspec:user-config —/);
+    assert.match(output, /\[OK\] openspec:project-schema — Project binds schema spec-super/);
+  }));
+});
+
+test('doctorProject reports company schema mode as healthy after setup', () => {
+  const projectDir = makeTempProject();
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-doctor-ok-'));
+
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const output = doctorProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    assert.match(output, /\[OK\] openspec:company-schema — Installed spec-super schema version 0\.1\.0/);
+    assert.match(output, /\[OK\] openspec:user-config — OpenSpec user config matches profile custom/);
+    assert.match(output, /\[OK\] openspec:project-schema — Project binds schema spec-super/);
+  }));
+});
+
+test('doctorProject reports conflicting higher-precedence schema overrides', () => {
+  const projectDir = makeTempProject();
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-precedence-'));
+
+  fs.mkdirSync(path.join(projectDir, 'openspec'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, 'openspec', 'config.yaml'), 'schema: spec-super\n\n# context:\n', 'utf8');
+  fs.writeFileSync(path.join(projectDir, '.openspec.yaml'), 'schema: spec-driven\n', 'utf8');
+
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['copilot'],
+    });
+
+    assert.match(output, /\[WARN\] openspec:schema-precedence — Project default schema is spec-super, but higher-precedence overrides are active \(spec-driven via \.openspec\.yaml\)/);
+    assert.match(output, /CLI --schema would override these as well/);
+  }));
+});
+
+test('doctorProject reports pending workflow adoption and legacy opsx projections', () => {
+  const projectDir = makeTempProject();
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-migration-'));
+  const legacySkillPath = path.join(fakeHome, '.claude', 'skills', 'opsx-propose', 'SKILL.md');
+
+  fs.mkdirSync(path.dirname(legacySkillPath), { recursive: true });
+  fs.writeFileSync(
+    legacySkillPath,
+    injectMarker('---\nname: opsx-propose\n---\nlegacy projection\n', '<!-- PRAXIS_PROJECTION source=legacy version=0.5.0 -->'),
+    'utf8',
+  );
+  writeProjectLocalGeneratedWorkflowAssets({ projectDir, agent: 'copilot' });
+
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['copilot'],
+    });
+
+    assert.match(output, /\[WARN\] projection:copilot — /);
+    assert.match(output, /missing official skill projections: .*openspec-propose/);
+    assert.match(output, /OpenSpec-generated workflow assets still remain under the project \(7 project-local workflow skill source\(s\), 7 project-local workflow command source\(s\)\)/);
+    assert.match(output, /legacy opsx skill projections still installed: opsx-propose/);
   }));
 });
 

@@ -10,24 +10,27 @@ supported_agents:
 commands:
   - setup
   - init
-  - sync
+  - update
   - status
   - doctor
   - bootstrap
 bundled_skills:
   - devos-docs
   - devos-change-docs
-  - opsx-explore
-  - opsx-propose
-  - opsx-apply
-  - opsx-archive
+openspec_generated_skills:
+  note: "Generated/adopted from project-local `openspec init` output; not shipped as bundled skills and may be absent until generated."
+  items:
+    - openspec-explore
+    - openspec-propose
+    - openspec-apply-change
+    - openspec-archive-change
 bundled_commands:
   - devos-docs-init
   - devos-docs-refresh
 projection_targets:
-  claude: ~/.claude/skills/<name>/SKILL.md
+  claude: ~/.claude/skills/<name>/SKILL.md + ~/.claude/commands/**
   copilot: ~/.claude/skills/<name>/SKILL.md + ~/.claude/commands/*.md (shared Claude-compatible discovery surface)
-  codex: ~/.codex/skills/<name>/SKILL.md
+  codex: ~/.codex/skills/<name>/SKILL.md (Praxis initializes OpenSpec with delivery=skills for Codex, so prompts are not generated during init)
   opencode: ~/.claude/skills/<name>/SKILL.md + ~/.config/opencode/commands/*.md + ~/.config/opencode/config.json
 external_dependencies:
   openspec: "@fission-ai/openspec (global npm)"

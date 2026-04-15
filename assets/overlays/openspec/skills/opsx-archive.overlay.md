@@ -1,31 +1,19 @@
-## PRAXIS_DEVOS_OVERLAY
-
-Framework-specific coordination for embedded Superpowers usage:
-
-- `opsx-archive` remains the only visible flow for this stage.
-- If you use verification methods internally before archiving, do not announce `Using verification-before-completion`.
-- Archive explanations, verification results, and sync conclusions must stay attached to the current change or archive flow. Do not create `docs/superpowers/...`.
-- Internal verification methods help determine whether archiving is safe, but they do not create a second completion flow.
-- When invoking any internal Superpowers capability, pass the current flow type, current change id, current stage goal, current artifact locations, and current output constraints.
-
+<!-- PRAXIS_DEVOS_OVERLAY_START -->
 Embedded capability contract:
 
 - `mode: embedded`
-- `owner_flow: opsx-archive`
-- `visibility: internal`
+- `owner_flow: openspec-archive-change`
 - `artifact_targets: openspec/changes/<change>/...`
-- `evidence_target: user-level Praxis state directory`
 
-Internal capabilities must not:
+Framework-specific coordination for embedded Superpowers usage:
 
-- announce a second workflow
-- create `docs/superpowers/...`
-- output a second final recap
+- 当前唯一可见 flow 是 `openspec-archive-change`。
+- 计划细化、任务状态和实现备注必须保留在当前 change 的 artifacts 中；不要创建 `docs/superpowers/...`。
+- 不要输出第二份最终总结。
 
 Stage hooks:
 
-- Before saying a change is ready to archive, invoke `verification-before-completion` internally and confirm artifacts, tasks, and validation evidence are sufficient.
-- If `tasks.md` listed docs tasks (blackbox, api-doc, docs-refresh), verify they were completed. Missing docs that were never planned in `tasks.md` do not block archive.
-- If `api-doc.md` exists for an API change with compatibility or migration risk, verify that the warning/compatibility section is present before archiving or syncing stable API docs.
-- If delta specs still need syncing, provide the sync assessment first and let the user decide whether to sync before archive.
-- Task-completion checks are part of the same internal verification pass before archive.
+- 在说 change 已可归档前，内部调用 `verification-before-completion`。
+- 检查 schema 要求的正式 artifact 是否齐备；若当前 schema 要求 `blackbox-test.md`，归档前必须确认其存在且内容有效。
+- 归档前，如变更影响项目级 docs / codemap 稳定视图，调用 `devos-docs` 的 `mode=refresh` 完成联动更新。
+<!-- PRAXIS_DEVOS_OVERLAY_END -->

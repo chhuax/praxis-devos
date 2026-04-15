@@ -12,6 +12,9 @@ if (args[0] === 'init' && args[1]) {
   fs.writeFileSync(path.join(target, 'openspec', 'config.yaml'), '# context:\\n');
   process.exit(0);
 }
+if (args[0] === 'config' && args[1] === 'set' && args[2] === 'delivery' && args[3]) {
+  process.exit(0);
+}
 process.stderr.write('unsupported openspec invocation: ' + args.join(' ') + '\\n');
 process.exit(1);
 `;

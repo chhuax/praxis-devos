@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
 import { copyBundleDirectory, ensureDir } from './bundles.js';
-import { composeProjectedSkill } from './skill-sources.js';
+import { composeProjectedCommand, composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -56,7 +56,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-upstream'
+        const finalContent = sourceType === 'openspec-generated'
           ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
           : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
@@ -78,16 +78,66 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
       },
     });
-    results.push({ name, targetPath, status: 'projected' });
-    log(`✓ GitHub Copilot: projected ${name} → ${targetPath}`);
+    results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
+    if (sourceType === 'openspec-generated') {
+      log(`✓ GitHub Copilot: adopted OpenSpec workflow skill ${name} → ${targetPath}`);
+    } else {
+      log(`✓ GitHub Copilot: projected ${name} → ${targetPath}`);
+    }
   }
 
   return results;
 };
 
-export const projectCommands = ({ projectDir, version, log }) => {
+export const projectCommands = ({ projectDir, version, log, workflowCommandSources = [] }) => {
   ensureDir(copilotCommandsDir());
   const results = [];
+
+  for (const {
+    name,
+    sourcePath,
+    sourceType,
+    targetRelativePath,
+    overlayPath = null,
+    overlayAssetsDir = null,
+  } of workflowCommandSources) {
+    const targetPath = path.join(copilotCommandsDir(), targetRelativePath);
+    ensureDir(path.dirname(targetPath));
+    if (!canSafelyOverwrite({
+      assetPath: targetPath,
+      projectDir,
+      agent: 'copilot',
+      allowAnyManagedOwner: true,
+    })) {
+      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType });
+      log(`⊘ GitHub Copilot: skipped OpenSpec workflow command ${name} because ${targetPath} is not a Praxis-managed asset`);
+      continue;
+    }
+
+    const content = fs.readFileSync(sourcePath, 'utf8');
+    const finalContent = sourceType === 'openspec-generated'
+      ? composeProjectedCommand({ upstreamContent: content, overlayPath })
+      : content;
+    fs.writeFileSync(targetPath, finalContent, 'utf8');
+    if (overlayAssetsDir) {
+      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir: path.dirname(targetPath) });
+    }
+    registerManagedAsset({
+      projectDir,
+      assetPath: targetPath,
+      type: 'command',
+      version,
+      agent: 'copilot',
+      extra: {
+        commandName: name,
+        sourcePath: path.relative(process.cwd(), sourcePath),
+        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
+        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
+      },
+    });
+    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
+    log(`✓ GitHub Copilot: adopted OpenSpec workflow command ${name} → ${targetPath}`);
+  }
 
   for (const name of commandNames) {
     const templatePath = path.join(commandAssetRoot(), `${name}.md`);
@@ -98,7 +148,7 @@ export const projectCommands = ({ projectDir, version, log }) => {
       agent: 'copilot',
       allowAnyManagedOwner: true,
     })) {
-      results.push({ name, targetPath, status: 'skipped' });
+      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType: 'direct' });
       log(`⊘ GitHub Copilot: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
       continue;
     }
@@ -114,7 +164,7 @@ export const projectCommands = ({ projectDir, version, log }) => {
         commandName: name,
       },
     });
-    results.push({ name, targetPath, status: 'projected' });
+    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType: 'direct' });
     log(`✓ GitHub Copilot: projected docs command ${name} → ${targetPath}`);
   }
 
@@ -151,14 +201,18 @@ export const pruneManagedUserAssets = ({
   projectDir,
   validSkillNames,
   keepCommandNames = commandNames,
+  keepCommandPaths = [],
   log,
 }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(copilotSkillsDir(), name, 'SKILL.md'));
-  const validCommandPaths = keepCommandNames.map((name) => path.join(copilotCommandsDir(), `${name}.md`));
+  const validCommandPaths = [
+    ...keepCommandNames.map((name) => path.join(copilotCommandsDir(), `${name}.md`)),
+    ...keepCommandPaths,
+  ];
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'copilot',
-    validPaths: [...validSkillPaths, ...validCommandPaths],
+    validPaths: [...validSkillPaths, ...new Set(validCommandPaths)],
   });
 
   for (const removedPath of removed) {

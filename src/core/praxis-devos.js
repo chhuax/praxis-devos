@@ -8,7 +8,9 @@ import {
   bootstrapOpenSpec,
   bootstrapProject,
   doctorProject,
+  ensureBundledOpenSpecSchemaInstalled,
   ensureOpenSpecRuntime,
+  ensureOpenSpecUserConfig,
   ensureRuntimeDependencies,
   formatStatus,
   detectSuperpowersForAgent,
@@ -67,6 +69,9 @@ export const setupProject = ({ projectDir, agents = SUPPORTED_AGENTS, strict = f
   const outputs = [];
 
   outputs.push(ensureOpenSpecRuntime(projectDir));
+  outputs.push('');
+  outputs.push(ensureBundledOpenSpecSchemaInstalled());
+  outputs.push(ensureOpenSpecUserConfig());
   outputs.push('');
   outputs.push(ensureRuntimeDependencies({ projectDir, agents: selectedAgents }));
   outputs.push('');
@@ -186,7 +191,7 @@ export const renderHelp = () => `praxis-devos <command> [options]
 Commands:
   setup          Bootstrap dependencies, initialize framework files
   init           Initialize the framework skeleton in the current project
-  sync           Refresh agent adapters and managed blocks
+  update         Refresh agent adapters and managed blocks
   status         Show current project initialization and dependency state
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
@@ -253,8 +258,10 @@ export const runCli = (argv) => {
     });
   }
 
-  if (parsed.command === 'sync') {
+  if (parsed.command === 'update' || parsed.command === 'sync') {
     const outputParts = [];
+    outputParts.push(ensureBundledOpenSpecSchemaInstalled());
+    outputParts.push(ensureOpenSpecUserConfig());
     outputParts.push(syncProject({
       projectDir: parsed.projectDir,
       agents,

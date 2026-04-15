@@ -52,13 +52,13 @@ CLI (bin/praxis-devos.js)
 4. `initProject()` or `syncProject()` based on whether `openspec/` exists
    - `initProject()` → runs `openspec init` + `ensureFrameworkFiles()` + `syncProject()`
    - `syncProject()` → calls per-agent sync to upsert managed blocks in `AGENTS.md` / `CLAUDE.md` / `.opencode/`
-5. `projectNativeSkills()` → `projection/index.js` → per-agent projector writes bundled `assets/skills/*/SKILL.md` files to agent native dirs
-6. `populateOpenSpecConfig()` — optionally populates `openspec/config.yaml` context
+5. `projectNativeSkills()` → `projection/index.js` → per-agent projector writes bundled `assets/skills/*/SKILL.md` files to agent native dirs and adopts OpenSpec-generated workflow assets when present
+6. `populateOpenSpecConfig()` — binds `openspec/config.yaml` to `schema: spec-super`
 7. `doctorProject()` — read-only health report
 
-### `npx praxis-devos sync`
+### `npx praxis-devos update`
 
-Refresh only: `syncProject()` + `projectNativeSkills()`. No dependency install.
+Refreshes project and user-level Praxis/OpenSpec state: runs `syncProject()` + `projectNativeSkills()`, and also installs or refreshes the bundled OpenSpec schema and repairs the OpenSpec user config. It does not perform the broader dependency install flow used by `setup`.
 
 ### `npx praxis-devos doctor`
 

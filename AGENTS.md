@@ -1,12 +1,14 @@
 <!-- PRAXIS_DEVOS_START -->
-> This block is maintained by Praxis DevOS. Run `npx praxis-devos sync` to refresh it.
+> This block is maintained by Praxis DevOS. Run `npx praxis-devos update` to refresh it.
 
 ## Flow Selection
 
 - Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors, or any request with unclear requirements, unresolved `open questions`, or competing solution options.
-- In those cases, start with `opsx-propose` or `opsx-explore` and finish clarification and option comparison inside the current OpenSpec stage before implementation.
-- Use `opsx-apply` only for small, local implementation work with low ambiguity and no proposal need.
+- In those cases, start with the OpenSpec proposal or exploration stage and finish clarification and option comparison inside the current OpenSpec stage before implementation.
+- Use the OpenSpec implementation stage only for small, local implementation work with low ambiguity and no proposal need.
 - Reviews and audit-style requests should follow the review flow.
+- Routing examples — requests that REQUIRE proposal first: "帮我加一个 X"、"新增 Y 能力"、"我想做一套 Z workflow"、"add a release kit"、"implement feature X". These introduce new capabilities or cross-cutting concerns and must go through proposal first.
+- Routing examples — requests that can use the implementation stage directly: "修一下这个 bug"、"改一下这段文案"、"update the version number"、"fix the failing test". These are small, scoped fixes with no design ambiguity.
 
 ## Project Reading Order
 
@@ -16,7 +18,7 @@
 
 ## OpenSpec + Superpowers Contract
 
-- Inside OpenSpec, `opsx-explore`, `opsx-propose`, `opsx-apply`, and `opsx-archive` are the only visible workflow layer.
+- Inside OpenSpec, exploration, proposal, implementation, and archive are the only visible workflow layer.
 - Superpowers may run only as embedded capabilities inside the active OpenSpec stage.
 - Do not re-announce `Using [skill]` or `superpowers:<skill>`, and do not create a second workflow, second wrap-up, or separate document tree.
 - Keep all stage-local outputs under `openspec/changes/<change>/...`; do not write `docs/superpowers/...`.
@@ -24,9 +26,9 @@
 
 ## Stage Gates
 
-- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal flow has been executed through `opsx-propose` or `opsx-explore` plus native OpenSpec actions.
+- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal stage has been executed plus native OpenSpec actions.
 - Proposal Gate: if `open questions` or competing solution directions remain, stay in propose or explore and finish clarification before implementation.
-- Apply Gate: before implementation, check branch safety, use an isolated workspace when needed, and keep any multi-step plan under the approved OpenSpec change.
+- Apply Gate: before implementation, keep any multi-step plan under the approved OpenSpec change.
 - Execution Gate: when bugs, failed tests, exceptions, or regressions appear, perform root-cause analysis first; keep all parallel work, subtasks, outputs, and status under the current change.
 - Completion Gate: before claiming completion, opening a PR, or merging, run full verification and record the actual verification result. Verification is a pre-completion check, not a second completion workflow.
 <!-- PRAXIS_DEVOS_END -->
@@ -47,7 +49,7 @@ node --test test/praxis-devos.test.js
 # Run the CLI locally
 node bin/praxis-devos.js --help
 node bin/praxis-devos.js setup --project-dir /tmp/test-project
-node bin/praxis-devos.js sync --project-dir /tmp/test-project
+node bin/praxis-devos.js update --project-dir /tmp/test-project
 ```
 
 No build step — pure ESM, runs directly with Node >=20.19.0.
@@ -71,7 +73,7 @@ The scaffold core is now split by responsibility:
 - `src/core/project/` — project adapter sync, managed blocks, project state helpers
 - `src/core/constants/` — shared scaffold constants
 
-The current CLI surface is: `setup`, `init`, `sync`, `status`, `doctor`, `bootstrap`.
+The current CLI surface is: `setup`, `init`, `update`, `status`, `doctor`, `bootstrap`.
 
 **Boundary rule:** `src/core/praxis-devos.js` is scaffold/orchestration code. It may manage projection, installation, command routing, and deterministic checks, but it must not participate in generating human-facing content. Content generation for docs, proposals, API references, codemaps, or other narrative artifacts belongs to skills/prompts, not to JS helpers in the core scaffold.
 
@@ -85,7 +87,7 @@ Each agent has its own projector:
 - `markers.js` — injects/parses `<!-- PRAXIS_PROJECTION ... -->` markers so projections can be identified and cleaned up later
 
 ### Key design decisions
-- Skills are stamped with a version marker on write. On `sync`, stale projections (marker present but name no longer in the skill set) are removed.
+- Skills are stamped with a version marker on write. On `update`, stale projections (marker present but name no longer in the skill set) are removed.
 - `src/templates/managed-entry.md` is the template injected into a user project's `AGENTS.md`/`AGENTS.md` during `setup`. It contains the OpenSpec flow gating rules.
 - `opencode-plugin.js` is the package entry for OpenCode's plugin system.
 - When adding new capabilities, prefer skill- or prompt-driven generation. Only add JS when the work is purely mechanical, deterministic, and not itself content generation.

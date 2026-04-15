@@ -13,31 +13,30 @@ import {
 
 const WINDOWS_BATCH_EXTENSIONS = new Set(['.cmd', '.bat']);
 const PROJECTED_PRAXIS_SKILLS = [
-  'opsx-propose',
-  'opsx-explore',
-  'opsx-apply',
-  'opsx-archive',
+  'devos-change-docs',
   'devos-docs',
 ];
 
 const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
-    name: 'opsx-explore',
-    mustInclude: [/owner_flow: opsx-explore/, /## PRAXIS_DEVOS_OVERLAY/],
+    name: 'openspec-explore',
+    mustInclude: [/owner_flow: openspec-explore/, /PRAXIS_DEVOS_OVERLAY_START/],
   },
   {
-    name: 'opsx-propose',
-    mustInclude: [/owner_flow: opsx-propose/, /`Docs Impact` section/],
+    name: 'openspec-propose',
+    mustInclude: [/owner_flow: openspec-propose/, /当前唯一可见 flow 是 `openspec-propose`/],
   },
   {
-    name: 'opsx-apply',
-    mustInclude: [/owner_flow: opsx-apply/, /verification-before-completion/, /task-local-planning\.md/],
+    name: 'openspec-apply-change',
+    mustInclude: [/owner_flow: openspec-apply-change/, /verification-before-completion/, /writing-plans/],
   },
   {
-    name: 'opsx-archive',
-    mustInclude: [/owner_flow: opsx-archive/, /verification-before-completion/],
+    name: 'openspec-archive-change',
+    mustInclude: [/owner_flow: openspec-archive-change/, /verification-before-completion/],
   },
 ];
+
+const ADOPTED_OPEN_SPEC_WORKFLOW_SKILL_PATTERN = /adopted OpenSpec workflow skill/i;
 
 const quoteWindowsArg = (value) => {
   if (value.length === 0) {
@@ -193,6 +192,13 @@ const assertProjectedCodexSkills = (fakeHome) => {
 };
 
 const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
+  for (const { name } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
+    assert.ok(
+      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
+      `Expected adopted OpenSpec workflow skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
+    );
+  }
+
   for (const { name, mustInclude } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
     const skillPath = path.join(skillsRoot, name, 'SKILL.md');
     const skill = normalizeEol(fs.readFileSync(skillPath, 'utf8'));
@@ -204,6 +210,21 @@ const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
     for (const pattern of mustInclude) {
       assert.match(skill, pattern);
     }
+  }
+};
+
+const assertOpenSpecWorkflowSkillProjectionState = ({ setupStdout, skillsRoot }) => {
+  if (ADOPTED_OPEN_SPEC_WORKFLOW_SKILL_PATTERN.test(setupStdout)) {
+    assertProjectedOpenSpecSkillBodies(skillsRoot);
+    return;
+  }
+
+  for (const { name } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
+    assert.equal(
+      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
+      false,
+      `Did not expect OpenSpec workflow skill projection without project-local generated assets: ${path.join(skillsRoot, name, 'SKILL.md')}`,
+    );
   }
 };
 
@@ -460,7 +481,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(fs.existsSync(codexSkillsPath), `Expected Codex skills path at ${codexSkillsPath}`);
     assert.ok(findSkillMarkdown(codexSkillsPath), `Expected Codex SuperPowers content under ${codexSkillsPath}`);
     assertProjectedCodexSkills(fakeHome);
-    assertProjectedOpenSpecSkillBodies(path.join(fakeHome, '.codex', 'skills'));
+    assertOpenSpecWorkflowSkillProjectionState({
+      setupStdout: setupResult.stdout,
+      skillsRoot: path.join(fakeHome, '.codex', 'skills'),
+    });
     assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'commands')), false);
     assert.match(setupResult.stdout, /== codex ==/);
 
@@ -481,7 +505,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
     assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
     assertProjectedOpenCodeSkills(fakeHome);
-    assertProjectedOpenSpecSkillBodies(path.join(fakeHome, '.claude', 'skills'));
+    assertOpenSpecWorkflowSkillProjectionState({
+      setupStdout: setupResult.stdout,
+      skillsRoot: path.join(fakeHome, '.claude', 'skills'),
+    });
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md')));
 
@@ -497,6 +524,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')), `Expected AGENTS.md in ${projectDir}`);
     assert.equal(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), false);
     assertProjectedCopilotSkills(fakeHome);
+    assertOpenSpecWorkflowSkillProjectionState({
+      setupStdout: setupResult.stdout,
+      skillsRoot: path.join(fakeHome, '.claude', 'skills'),
+    });
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
     assert.match(setupResult.stdout, /== copilot ==/);
@@ -513,7 +544,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
 
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), `Expected CLAUDE.md in ${projectDir}`);
   assertProjectedClaudeSkills(fakeHome);
-  assertProjectedOpenSpecSkillBodies(path.join(fakeHome, '.claude', 'skills'));
+  assertOpenSpecWorkflowSkillProjectionState({
+    setupStdout: setupResult.stdout,
+    skillsRoot: path.join(fakeHome, '.claude', 'skills'),
+  });
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
