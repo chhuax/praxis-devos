@@ -8,7 +8,7 @@
 
 ## 它是什么
 
-`praxis-devos` 会把项目准备成一个统一的 AI 工作区，让 OpenCode、Codex、Claude Code 在同一套外层流程下工作：
+`praxis-devos` 会把项目准备成一个统一的 AI 工作区，让 OpenCode、Codex、Claude Code、GitHub Copilot 在同一套外层流程下工作：
 
 - OpenSpec 负责 propose、apply、validate、archive 等治理流程
 - SuperPowers 负责 planning、debugging、verification 等执行技能
@@ -90,10 +90,17 @@ npx praxis-devos setup --agent opencode
 npx praxis-devos doctor --strict
 ```
 
+### GitHub Copilot
+
+```bash
+npx praxis-devos setup --agent copilot
+npx praxis-devos doctor --strict
+```
+
 ### 多 Agent 项目
 
 ```bash
-npx praxis-devos setup --agents opencode,codex,claude
+npx praxis-devos setup --agents opencode,codex,claude,copilot
 npx praxis-devos doctor --strict
 ```
 
@@ -127,6 +134,7 @@ Praxis 对外给用户的是统一契约，但每个 agent 的底层接入方式
 - OpenCode：向用户 OpenCode 配置合并必须的插件声明，并投放内置资产
 - Codex：校验或安装 `~/.codex/` 下的 SuperPowers clone/link 布局
 - Claude Code：通过 Claude CLI 校验或安装官方 SuperPowers 插件
+- GitHub Copilot：作为独立 agent 接入，但默认把 skills 和 commands 投放到共享的 Claude 兼容发现面 `~/.claude/skills/` 与 `~/.claude/commands/`
 
 如果你只想做依赖修复或查看指导而不执行完整 setup，可以使用 `bootstrap`。
 
