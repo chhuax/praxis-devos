@@ -49,6 +49,33 @@ const withPrependedPath = (binDir, fn) => withEnv(
   fn,
 );
 
+const openSpecDataHomeForTest = (homeDir) => (
+  process.platform === 'win32'
+    ? path.join(homeDir, 'AppData', 'Local')
+    : path.join(homeDir, '.local', 'share')
+);
+
+const openSpecSchemaDirForTest = (homeDir) => path.join(
+  openSpecDataHomeForTest(homeDir),
+  'openspec',
+  'schemas',
+  'spec-super',
+);
+
+const withIsolatedOpenSpecEnv = (homeDir, fn) => withEnv(
+  'HOME',
+  homeDir,
+  () => withEnv(
+    'XDG_DATA_HOME',
+    path.join(homeDir, '.local', 'share'),
+    () => withEnv(
+      'LOCALAPPDATA',
+      path.join(homeDir, 'AppData', 'Local'),
+      fn,
+    ),
+  ),
+);
+
 const normalizeEol = (value) => value.replace(/\r\n/g, '\n');
 const normalizeSlashes = (value) => value.replace(/\\/g, '/');
 
@@ -785,9 +812,9 @@ test('runCli update refreshes managed user-level docs commands and skips user-ow
   const managedClaudeInitPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md');
   const userOwnedClaudeRefreshPath = path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md');
   const openSpecConfigPath = path.join(fakeHome, '.config', 'openspec', 'config.json');
-  const installedSchemaPath = path.join(fakeHome, '.local', 'share', 'openspec', 'schemas', 'spec-super', 'schema.yaml');
+  const installedSchemaPath = path.join(openSpecSchemaDirForTest(fakeHome), 'schema.yaml');
 
-  withEnv('HOME', fakeHome, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => {
     projectNativeSkills({
       projectDir,
       agents: ['claude'],
@@ -1452,7 +1479,7 @@ test('bootstrapOpenSpec reports the detected runtime', () => {
   installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-bootstrap-openspec-home-'));
 
-  const output = withEnv('HOME', fakeHome, () => withEnv('PATH', '/usr/bin:/bin', () => bootstrapOpenSpec({ projectDir })));
+  const output = withIsolatedOpenSpecEnv(fakeHome, () => withEnv('PATH', '/usr/bin:/bin', () => bootstrapOpenSpec({ projectDir })));
 
   assert.match(output, /OpenSpec already available \((global|project-local)\)/);
   assert.match(output, /Installed bundled OpenSpec schema spec-super|Refreshed bundled OpenSpec schema spec-super/);
@@ -1460,7 +1487,7 @@ test('bootstrapOpenSpec reports the detected runtime', () => {
   assert.match(output, /OpenSpec CLI directly from the same installation context/);
   assert.match(output, /openspec(?:\.cmd)? list --specs/);
   assert.doesNotMatch(output, /praxis-devos openspec/);
-  assert.ok(fs.existsSync(path.join(fakeHome, '.local', 'share', 'openspec', 'schemas', 'spec-super', 'schema.yaml')));
+  assert.ok(fs.existsSync(path.join(openSpecSchemaDirForTest(fakeHome), 'schema.yaml')));
   assert.equal(readJson(path.join(fakeHome, '.config', 'openspec', 'config.json')).profile, 'custom');
 });
 
@@ -1470,7 +1497,7 @@ test('setupProject installs bundled company schema and repairs OpenSpec user con
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-home-'));
   const openSpecConfigDir = path.join(fakeHome, '.config', 'openspec');
   const openSpecConfigPath = path.join(openSpecConfigDir, 'config.json');
-  const schemaDir = path.join(fakeHome, '.local', 'share', 'openspec', 'schemas', 'spec-super');
+  const schemaDir = openSpecSchemaDirForTest(fakeHome);
 
   fs.mkdirSync(openSpecConfigDir, { recursive: true });
   fs.writeFileSync(
@@ -1483,7 +1510,7 @@ test('setupProject installs bundled company schema and repairs OpenSpec user con
     'utf8',
   );
 
-  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = setupProject({
       projectDir,
       agents: ['opencode'],
@@ -1492,7 +1519,7 @@ test('setupProject installs bundled company schema and repairs OpenSpec user con
     const openSpecConfig = readJson(openSpecConfigPath);
     const backups = listBackupFiles(openSpecConfigDir, 'config.json');
 
-    assert.match(output, /Installed bundled OpenSpec schema spec-super/);
+    assert.match(output, /Installed bundled OpenSpec schema spec-super|Refreshed bundled OpenSpec schema spec-super/);
     assert.match(output, /Configured OpenSpec user profile in/);
     assert.ok(fs.existsSync(path.join(schemaDir, 'schema.yaml')));
     assert.ok(fs.existsSync(path.join(schemaDir, 'manifest.json')));
@@ -1796,7 +1823,7 @@ test('doctorProject reports current dependency status for OpenCode', () => {
   const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-missing-'));
 
-  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = doctorProject({
       projectDir,
       agents: ['opencode'],
@@ -1843,7 +1870,7 @@ test('doctorProject reports company schema mode as healthy after setup', () => {
   const fakeOpenSpec = installFakeOpenSpec(projectDir);
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-openspec-doctor-ok-'));
 
-  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     setupProject({
       projectDir,
       agents: ['opencode'],

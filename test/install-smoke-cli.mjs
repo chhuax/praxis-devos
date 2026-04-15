@@ -17,16 +17,6 @@ const PROJECTED_PRAXIS_SKILLS = [
   'devos-docs',
 ];
 
-const GENERATED_OPEN_SPEC_WORKFLOW_SKILLS = [
-  'openspec-explore',
-  'openspec-propose',
-  'openspec-apply-change',
-  'openspec-archive-change',
-  'openspec-new-change',
-  'openspec-continue-change',
-  'openspec-ff-change',
-];
-
 const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
     name: 'openspec-explore',
@@ -202,7 +192,7 @@ const assertProjectedCodexSkills = (fakeHome) => {
 };
 
 const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
-  for (const name of GENERATED_OPEN_SPEC_WORKFLOW_SKILLS) {
+  for (const { name } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
       `Expected adopted OpenSpec workflow skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
@@ -229,7 +219,7 @@ const assertOpenSpecWorkflowSkillProjectionState = ({ setupStdout, skillsRoot })
     return;
   }
 
-  for (const name of GENERATED_OPEN_SPEC_WORKFLOW_SKILLS) {
+  for (const { name } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
     assert.equal(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
       false,
