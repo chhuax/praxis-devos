@@ -1852,7 +1852,7 @@ test('doctorProject reports missing company schema installation and OpenSpec use
   fs.mkdirSync(path.dirname(openSpecProjectConfigPath), { recursive: true });
   fs.writeFileSync(openSpecProjectConfigPath, 'schema: spec-super\n\n# context:\n', 'utf8');
 
-  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+  withIsolatedOpenSpecEnv(fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
     const output = doctorProject({
       projectDir,
       agents: ['opencode'],

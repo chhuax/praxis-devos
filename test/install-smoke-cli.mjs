@@ -24,7 +24,7 @@ const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   },
   {
     name: 'openspec-propose',
-    mustInclude: [/owner_flow: openspec-propose/, /`Docs Impact` section/],
+    mustInclude: [/owner_flow: openspec-propose/, /当前唯一可见 flow 是 `openspec-propose`/],
   },
   {
     name: 'openspec-apply-change',
