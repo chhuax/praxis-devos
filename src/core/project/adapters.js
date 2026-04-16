@@ -64,9 +64,8 @@ const OPENCODE_ADAPTER_README = `# OpenCode Adapter Output
 This directory is a generated compatibility marker for OpenCode.
 Praxis manages project state through CLAUDE.md/AGENTS.md managed blocks and openspec/ directory.
 
-- \`.opencode/\` no longer mirrors canonical skills or rules files by default
+- \`.opencode/skills/\` is no longer used for canonical skill projections
 - If you add OpenCode-only supplemental skills, place them in \`.opencode/skills/\`
-- Re-run \`npx praxis-devos@latest update --agent opencode\` after changing canonical files
 `;
 
 // Adapter sync owns generated compatibility files and managed blocks in project
