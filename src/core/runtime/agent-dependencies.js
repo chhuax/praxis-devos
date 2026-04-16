@@ -3,7 +3,6 @@ import path from 'path';
 import { resolveUserHomeDir } from '../../support/home.js';
 import {
   CLAUDE_SUPERPOWERS_PLUGIN,
-  PRAXIS_OPENCODE_PLUGIN,
   SUPERPOWERS_DOCS,
   SUPERPOWERS_GIT_URL,
   SUPERPOWERS_OPENCODE_PLUGIN,
@@ -101,6 +100,9 @@ const backupFile = (filePath) => {
 };
 
 const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+const isLegacyPraxisOpenCodePlugin = (entry) => typeof entry === 'string' && (
+  entry.startsWith('praxis-devos@') || entry.includes('github.com/chhuax/praxis-devos')
+);
 
 const validateOpenCodeConfigShape = (configPath, config) => {
   if (!isPlainObject(config)) {
@@ -115,8 +117,7 @@ const validateOpenCodeConfigShape = (configPath, config) => {
 const mergeOpenCodePlugins = (config) => ({
   ...config,
   plugin: [...new Set([
-    ...(Array.isArray(config.plugin) ? config.plugin : []),
-    PRAXIS_OPENCODE_PLUGIN,
+    ...(Array.isArray(config.plugin) ? config.plugin : []).filter((entry) => !isLegacyPraxisOpenCodePlugin(entry)),
     SUPERPOWERS_OPENCODE_PLUGIN,
   ])],
 });
@@ -144,12 +145,15 @@ const ensureOpenCodePluginsConfigured = () => {
     validateOpenCodeConfigShape(configPath, config);
     const next = mergeOpenCodePlugins(config);
     const nextText = `${JSON.stringify(next, null, 2)}\n`;
+    const hadLegacyPraxisPlugin = Array.isArray(config.plugin)
+      && config.plugin.some((entry) => isLegacyPraxisOpenCodePlugin(entry));
 
     if (current.raw === nextText) {
       return {
         changed: false,
         configPath,
         backupPath: null,
+        removedLegacyPraxisPlugin: false,
       };
     }
 
@@ -162,6 +166,7 @@ const ensureOpenCodePluginsConfigured = () => {
       changed: true,
       configPath,
       backupPath,
+      removedLegacyPraxisPlugin: hadLegacyPraxisPlugin,
     };
   } catch (error) {
     if (tempPath && fs.existsSync(tempPath)) {
@@ -201,14 +206,18 @@ const detectOpenCodeSuperpowers = () => {
 
 const ensureOpenCodeSuperpowers = () => {
   const result = ensureOpenCodePluginsConfigured();
-  const lines = [`Configured OpenCode plugins in ${result.configPath}`];
+  const lines = [`Configured OpenCode plugin config in ${result.configPath}`];
 
   if (result.backupPath) {
     lines.push(`Backed up existing OpenCode config to ${result.backupPath}`);
   }
 
+  if (result.removedLegacyPraxisPlugin) {
+    lines.push('Removed legacy Praxis OpenCode plugin entry to avoid startup issues');
+  }
+
   if (!result.changed) {
-    lines.push('OpenCode plugin config already contained the required plugins');
+    lines.push('OpenCode plugin config already contained the required runtime plugins');
   }
 
   return lines.join('\n');
@@ -453,8 +462,7 @@ const renderBootstrapInstructions = ({ agent }) => {
     const result = ensureOpenCodePluginsConfigured();
     const lines = [
       `Updated ${result.configPath}`,
-      'Added OpenCode plugins:',
-      `- ${PRAXIS_OPENCODE_PLUGIN}`,
+      'Ensured OpenCode runtime plugins:',
       `- ${SUPERPOWERS_OPENCODE_PLUGIN}`,
     ];
 
@@ -462,8 +470,12 @@ const renderBootstrapInstructions = ({ agent }) => {
       lines.push(`Backed up existing OpenCode config to ${result.backupPath}`);
     }
 
+    if (result.removedLegacyPraxisPlugin) {
+      lines.push('Removed legacy Praxis OpenCode plugin entry.');
+    }
+
     if (!result.changed) {
-      lines.push('OpenCode plugin config already contained the required plugins.');
+      lines.push('OpenCode plugin config already contained the required runtime plugins.');
     }
 
     lines.push(

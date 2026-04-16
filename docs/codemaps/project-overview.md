@@ -109,4 +109,4 @@ Read-only: checks OpenSpec runtime, per-agent SuperPowers, and projection covera
 - **Marker-gated writes** — `canSafelyOverwrite()` in `managed-assets.js` prevents overwriting files not owned by Praxis
 - **Release safety** — never publish npm version or push release tags without explicit user confirmation (see `CLAUDE.md`)
 - **Tests** — run with `node --test`; smoke test via `test/install-smoke-cli.mjs`
-- **OpenCode plugin entrypoint** — `opencode-plugin.js` at repo root (declared as `"main"` in `package.json`)
+- **OpenCode integration** — OpenCode uses projected skills/commands plus runtime config cleanup; Praxis no longer ships an OpenCode plugin entrypoint

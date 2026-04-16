@@ -3,7 +3,6 @@ import { uniqueAgents } from '../project/state.js';
 import { resolveOpenSpecRuntime } from './commands.js';
 import {
   CLAUDE_SUPERPOWERS_PLUGIN,
-  PRAXIS_OPENCODE_PLUGIN,
   SUPERPOWERS_OPENCODE_PLUGIN,
 } from '../constants/agent-dependencies.js';
 import { PRAXIS_CLI_COMMAND } from '../constants/cli.js';
@@ -124,6 +123,5 @@ export {
   ensureRuntimeDependencies,
   formatStatus,
   OPENSPEC_PACKAGE,
-  PRAXIS_OPENCODE_PLUGIN,
   SUPERPOWERS_OPENCODE_PLUGIN,
 };

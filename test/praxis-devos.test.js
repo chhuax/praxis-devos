@@ -697,6 +697,13 @@ test('core helpers are split into focused runtime and project modules', async ()
   assert.equal(typeof state.uniqueAgents, 'function');
 });
 
+test('package metadata does not expose a Praxis OpenCode plugin entrypoint', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(PRAXIS_ROOT, 'package.json'), 'utf8'));
+  assert.equal(Object.prototype.hasOwnProperty.call(pkg, 'main'), false);
+  assert.equal(pkg.files.includes('opencode-plugin.js'), false);
+  assert.equal(fs.existsSync(path.join(PRAXIS_ROOT, 'opencode-plugin.js')), false);
+});
+
 test('syncProject refreshes adapters and preserves user-owned content', () => {
   const projectDir = makeTempProject();
   const agentsPath = path.join(projectDir, 'AGENTS.md');
@@ -1598,7 +1605,7 @@ test('bootstrapProject updates OpenCode plugins and preserves existing config', 
     assert.match(output, /== copilot ==/);
     assert.equal(config.theme, 'night');
     assert.ok(config.plugin.includes('existing-plugin'));
-    assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+    assert.equal(config.plugin.some((entry) => entry.includes('praxis-devos')), false);
     assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
     assert.equal(backups.length, 1);
   });
@@ -1619,7 +1626,7 @@ test('setupProject initializes the current structure for OpenCode without networ
     const managedAssetsPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
     assert.match(output, /== openspec ==/);
     assert.match(output, /== opencode ==/);
-    assert.match(output, /Configured OpenCode plugins in/);
+    assert.match(output, /Configured OpenCode plugin config in/);
     assert.match(output, /\[OK\] superpowers:opencode/);
     assert.ok(fs.existsSync(path.join(projectDir, 'openspec', 'changes', 'archive')));
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
@@ -1658,8 +1665,42 @@ test('setupProject preserves existing OpenCode plugins and top-level settings', 
     assert.equal(config.model, 'gpt-5');
     assert.ok(config.plugin.includes('existing-plugin'));
     assert.ok(config.plugin.includes('another-plugin'));
-    assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+    assert.equal(config.plugin.some((entry) => entry.includes('praxis-devos')), false);
     assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
+  }));
+});
+
+test('setupProject removes the legacy Praxis OpenCode plugin while preserving other config', () => {
+  const projectDir = makeTempProject();
+  const fakeOpenSpec = installFakeOpenSpec(projectDir);
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-remove-legacy-'));
+  const globalConfigDir = path.join(fakeHome, '.config', 'opencode');
+  const globalConfigPath = path.join(globalConfigDir, 'config.json');
+  fs.mkdirSync(globalConfigDir, { recursive: true });
+  fs.writeFileSync(
+    globalConfigPath,
+    JSON.stringify({
+      theme: 'night',
+      plugin: [
+        'existing-plugin',
+        'praxis-devos@git+https://github.com/chhuax/praxis-devos.git',
+        'superpowers@git+https://github.com/obra/superpowers.git',
+      ],
+    }, null, 2),
+    'utf8',
+  );
+
+  withEnv('HOME', fakeHome, () => withPrependedPath(fakeOpenSpec.globalBinDir, () => {
+    setupProject({
+      projectDir,
+      agents: ['opencode'],
+    });
+
+    const config = readJson(globalConfigPath);
+    assert.equal(config.theme, 'night');
+    assert.ok(config.plugin.includes('existing-plugin'));
+    assert.ok(config.plugin.some((entry) => entry.includes('github.com\/obra\/superpowers')));
+    assert.equal(config.plugin.some((entry) => entry.includes('praxis-devos')), false);
   }));
 });
 
