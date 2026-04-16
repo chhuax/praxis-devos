@@ -24,19 +24,21 @@ const replaceProjectedName = (frontmatter, projectedName) => frontmatter.replace
   `name: ${projectedName}`,
 );
 
+const extractMarkdownBody = (content) => {
+  const normalizedContent = normalizeLineEndings(content);
+  const frontmatterMatch = normalizedContent.match(FRONTMATTER_PATTERN);
+  return frontmatterMatch ? frontmatterMatch[2] : normalizedContent;
+};
+
 const injectOverlay = (body, overlayContent) => {
   const trimmedOverlay = overlayContent.trim();
   if (!trimmedOverlay) {
     return body;
   }
-
-  const separator = '\n---\n';
-  const separatorIndex = body.indexOf(separator);
-  if (separatorIndex === -1) {
-    return `${body.trimEnd()}\n\n${trimmedOverlay}\n`;
-  }
-
-  return `${body.slice(0, separatorIndex).trimEnd()}\n\n${trimmedOverlay}\n${body.slice(separatorIndex)}`;
+  const trimmedBody = body.trimStart();
+  return trimmedBody
+    ? `${trimmedOverlay}\n\n${trimmedBody}`
+    : `${trimmedOverlay}\n`;
 };
 
 const applyOverlayToMarkdown = ({ upstreamContent, overlayPath = null, projectedName = null }) => {
@@ -64,8 +66,21 @@ export const composeProjectedSkill = ({ projectedName, upstreamContent, overlayP
   return applyOverlayToMarkdown({ upstreamContent, overlayPath, projectedName });
 };
 
-export const composeProjectedCommand = ({ upstreamContent, overlayPath = null }) =>
-  applyOverlayToMarkdown({ upstreamContent, overlayPath });
+export const composeProjectedCommand = ({
+  upstreamContent,
+  overlayPath = null,
+  commandTitle = null,
+}) => {
+  const body = extractMarkdownBody(
+    applyOverlayToMarkdown({ upstreamContent, overlayPath }),
+  ).trim();
+
+  if (!commandTitle) {
+    return `${body}\n`;
+  }
+
+  return `# ${commandTitle}\n\n${body}\n`;
+};
 
 export const collectBundledSkillSources = () =>
   collectDirectSkillSources().sort((a, b) => a.name.localeCompare(b.name));

@@ -6,6 +6,7 @@ import {
   PRAXIS_OPENCODE_PLUGIN,
   SUPERPOWERS_OPENCODE_PLUGIN,
 } from '../constants/agent-dependencies.js';
+import { PRAXIS_CLI_COMMAND } from '../constants/cli.js';
 import {
   bootstrapProject,
   detectSuperpowersForAgent,
@@ -74,16 +75,6 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
     if (projection.missing.length > 0) {
       issues.push(`missing official skill projections: ${projection.missing.join(', ')}`);
     }
-    if (projection.pendingGeneratedSkills.length > 0 || projection.pendingGeneratedCommands.length > 0) {
-      const pending = [];
-      if (projection.pendingGeneratedSkills.length > 0) {
-        pending.push(`${projection.pendingGeneratedSkills.length} project-local workflow skill source(s)`);
-      }
-      if (projection.pendingGeneratedCommands.length > 0) {
-        pending.push(`${projection.pendingGeneratedCommands.length} project-local workflow command source(s)`);
-      }
-      issues.push(`OpenSpec-generated workflow assets still remain under the project (${pending.join(', ')})`);
-    }
     if (projection.legacy.length > 0) {
       issues.push(`legacy opsx skill projections still installed: ${projection.legacy.join(', ')}`);
     }
@@ -98,7 +89,7 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
       results.push({
         name: `projection:${agent}`,
         status: 'warning',
-        detail: `${issues.join('; ')}. Run \`npx praxis-devos setup --agent ${agent}\` to fix.`,
+        detail: `${issues.join('; ')}. Run \`${PRAXIS_CLI_COMMAND} setup --agent ${agent}\` to fix.`,
       });
     }
   }
@@ -107,17 +98,6 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
   for (const result of results) {
     lines.push(`- [${formatStatus(result.status)}] ${result.name} — ${result.detail}`);
   }
-
-  lines.push('');
-  lines.push('Recommended next step:');
-  if (selectedAgents.length === 1) {
-    lines.push(`- npx praxis-devos setup --agent ${selectedAgents[0]}`);
-  } else {
-    lines.push(`- npx praxis-devos setup --agents ${selectedAgents.join(',')}`);
-  }
-  lines.push('');
-  lines.push('Advanced repair command:');
-  lines.push(`- npx praxis-devos bootstrap --agents ${selectedAgents.join(',')}`);
 
   const hasBlockingIssue = results.some((result) =>
     result.status === 'missing' || (strict && result.status === 'unknown'));

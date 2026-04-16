@@ -27,6 +27,7 @@ import {
   readFile,
   uniqueAgents,
 } from './project/state.js';
+import { PRAXIS_CLI_COMMAND } from './constants/cli.js';
 import { commandExists, resolveOpenSpecRuntime } from './runtime/commands.js';
 import {
   initProject,
@@ -177,7 +178,7 @@ export const parseCliArgs = (argv) => {
     }
 
     if (token === '--openspec') {
-      throw new Error('`--openspec` has been removed. `bootstrap` always includes OpenSpec. Use `npx praxis-devos bootstrap --agent <name>` or `npx praxis-devos setup --agent <name>`.');
+      throw new Error(`\`--openspec\` has been removed. \`bootstrap\` always includes OpenSpec. Use \`${PRAXIS_CLI_COMMAND} bootstrap --agent <name>\` or \`${PRAXIS_CLI_COMMAND} setup --agent <name>\`.`);
     }
 
     parsed.positional.push(token);

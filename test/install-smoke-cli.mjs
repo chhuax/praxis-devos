@@ -36,8 +36,6 @@ const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   },
 ];
 
-const ADOPTED_OPEN_SPEC_WORKFLOW_SKILL_PATTERN = /adopted OpenSpec workflow skill/i;
-
 const quoteWindowsArg = (value) => {
   if (value.length === 0) {
     return '""';
@@ -195,7 +193,7 @@ const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
   for (const { name } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
     assert.ok(
       fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
-      `Expected adopted OpenSpec workflow skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
+      `Expected projected OpenSpec workflow skill at ${path.join(skillsRoot, name, 'SKILL.md')}`,
     );
   }
 
@@ -213,19 +211,8 @@ const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
   }
 };
 
-const assertOpenSpecWorkflowSkillProjectionState = ({ setupStdout, skillsRoot }) => {
-  if (ADOPTED_OPEN_SPEC_WORKFLOW_SKILL_PATTERN.test(setupStdout)) {
-    assertProjectedOpenSpecSkillBodies(skillsRoot);
-    return;
-  }
-
-  for (const { name } of PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS) {
-    assert.equal(
-      fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')),
-      false,
-      `Did not expect OpenSpec workflow skill projection without project-local generated assets: ${path.join(skillsRoot, name, 'SKILL.md')}`,
-    );
-  }
+const assertOpenSpecWorkflowSkillProjectionState = ({ skillsRoot }) => {
+  assertProjectedOpenSpecSkillBodies(skillsRoot);
 };
 
 const assertProjectedClaudeSkills = (fakeHome) => {
@@ -482,7 +469,6 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(findSkillMarkdown(codexSkillsPath), `Expected Codex SuperPowers content under ${codexSkillsPath}`);
     assertProjectedCodexSkills(fakeHome);
     assertOpenSpecWorkflowSkillProjectionState({
-      setupStdout: setupResult.stdout,
       skillsRoot: path.join(fakeHome, '.codex', 'skills'),
     });
     assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'commands')), false);
@@ -506,7 +492,6 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
     assertProjectedOpenCodeSkills(fakeHome);
     assertOpenSpecWorkflowSkillProjectionState({
-      setupStdout: setupResult.stdout,
       skillsRoot: path.join(fakeHome, '.claude', 'skills'),
     });
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')));
@@ -525,7 +510,6 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assert.equal(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), false);
     assertProjectedCopilotSkills(fakeHome);
     assertOpenSpecWorkflowSkillProjectionState({
-      setupStdout: setupResult.stdout,
       skillsRoot: path.join(fakeHome, '.claude', 'skills'),
     });
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
@@ -545,7 +529,6 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   assert.ok(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), `Expected CLAUDE.md in ${projectDir}`);
   assertProjectedClaudeSkills(fakeHome);
   assertOpenSpecWorkflowSkillProjectionState({
-    setupStdout: setupResult.stdout,
     skillsRoot: path.join(fakeHome, '.claude', 'skills'),
   });
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));

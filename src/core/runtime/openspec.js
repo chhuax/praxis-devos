@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { resolveUserHomeDir } from '../../support/home.js';
+import { PRAXIS_CLI_COMMAND } from '../constants/cli.js';
 import {
   bundledOpenSpecSchemaManifestPath,
   bundledOpenSpecSchemaRoot,
@@ -262,7 +263,7 @@ export const ensureOpenSpecRuntime = (projectDir) => {
   }
 
   if (!commandExists('npm')) {
-    throw new Error('npm is required to install OpenSpec automatically. Install npm, then rerun `npx praxis-devos setup --agent <name>`.');
+    throw new Error(`npm is required to install OpenSpec automatically. Install npm, then rerun \`${PRAXIS_CLI_COMMAND} setup --agent <name>\`.`);
   }
 
   const npmCommand = resolveCommandForExecution('npm');

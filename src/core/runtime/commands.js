@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execFileSync, execSync } from 'child_process';
+import { PRAXIS_CLI_COMMAND } from '../constants/cli.js';
 
 // Process execution helpers live here so the core orchestrator stays focused on
 // command routing instead of shell/platform details.
@@ -112,7 +113,7 @@ export const resolveOpenSpecRuntime = (projectDir) => {
     status: 'missing',
     source: 'missing',
     command: null,
-    detail: 'OpenSpec CLI is missing. Install it with `npx praxis-devos setup --agent <name>` or `npx praxis-devos bootstrap --agents <name>`.',
+    detail: `OpenSpec CLI is missing. Install it with \`${PRAXIS_CLI_COMMAND} setup --agent <name>\` or \`${PRAXIS_CLI_COMMAND} bootstrap --agents <name>\`.`,
   };
 };
 

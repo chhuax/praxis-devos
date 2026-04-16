@@ -1,48 +1,18 @@
-import path from 'path';
 import * as claude from './claude.js';
 import * as copilot from './copilot.js';
 import * as codex from './codex.js';
 import * as opencode from './opencode.js';
-import { listManagedAssets } from './managed-assets.js';
 import {
   collectBundledSkillSources,
   collectDirectSkillSources,
 } from './skill-sources.js';
 import {
-  cleanupAdoptedGeneratedAssets,
   collectGeneratedWorkflowCommandSources,
   collectGeneratedWorkflowSkillSources,
-  generatedWorkflowSkillNames,
 } from './openspec-generated.js';
 
 const adapters = { claude, copilot, codex, opencode };
 export { collectBundledSkillSources };
-
-const generatedWorkflowNameSet = new Set(generatedWorkflowSkillNames);
-
-const persistedGeneratedWorkflowAssets = ({ projectDir, agent }) => {
-  const skillNames = new Set();
-  const commandPaths = new Set();
-
-  for (const entry of listManagedAssets({ projectDir, agent })) {
-    if (entry.type === 'skill') {
-      const name = path.basename(path.dirname(entry.path));
-      if (generatedWorkflowNameSet.has(name)) {
-        skillNames.add(name);
-      }
-      continue;
-    }
-
-    if (entry.type === 'command' && generatedWorkflowNameSet.has(entry.commandName)) {
-      commandPaths.add(entry.path);
-    }
-  }
-
-  return {
-    skillNames: [...skillNames],
-    commandPaths: [...commandPaths],
-  };
-};
 
 /**
  * Project bundled Praxis user-level assets to a specific agent's native directories.
@@ -56,7 +26,6 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
 
   const generatedWorkflowSkillSources = collectGeneratedWorkflowSkillSources({ projectDir, agent });
   const generatedWorkflowCommandSources = collectGeneratedWorkflowCommandSources({ projectDir, agent });
-  const persistedGeneratedAssets = persistedGeneratedWorkflowAssets({ projectDir, agent });
   const skillSources = [
     ...collectDirectSkillSources(),
     ...generatedWorkflowSkillSources,
@@ -66,16 +35,12 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
     return [];
   }
 
-  const validNames = [...new Set([
-    ...skillSources.map((s) => s.name),
-    ...persistedGeneratedAssets.skillNames,
-  ])];
+  const validNames = [...new Set(skillSources.map((s) => s.name))];
   adapter.cleanStaleProjections({ validNames, log });
   if (typeof adapter.pruneManagedUserAssets === 'function') {
     adapter.pruneManagedUserAssets({
       projectDir,
       validSkillNames: validNames,
-      keepCommandPaths: persistedGeneratedAssets.commandPaths,
       log,
     });
   }
@@ -90,22 +55,6 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
       workflowCommandSources: generatedWorkflowCommandSources,
     }));
   }
-
-  const adoptedSkillNames = new Set(
-    results
-      .filter((entry) => entry.status === 'projected' && entry.assetType === 'skill' && entry.sourceType === 'openspec-generated')
-      .map((entry) => entry.name),
-  );
-  const adoptedCommandNames = new Set(
-    results
-      .filter((entry) => entry.status === 'projected' && entry.assetType === 'command' && entry.sourceType === 'openspec-generated')
-      .map((entry) => entry.name),
-  );
-  cleanupAdoptedGeneratedAssets({
-    skillSources: generatedWorkflowSkillSources.filter((entry) => adoptedSkillNames.has(entry.name)),
-    commandSources: generatedWorkflowCommandSources.filter((entry) => adoptedCommandNames.has(entry.name)),
-    log,
-  });
 
   return results;
 };
@@ -139,17 +88,10 @@ export const inspectProjectionHealth = ({ agent, projectDir = process.cwd() }) =
   const legacy = projections
     .map((entry) => entry.name)
     .filter((name) => name.startsWith('opsx-'));
-  const pendingGeneratedSkills = collectGeneratedWorkflowSkillSources({ projectDir, agent })
-    .map((entry) => entry.name);
-  const pendingGeneratedCommands = collectGeneratedWorkflowCommandSources({ projectDir, agent })
-    .map((entry) => entry.targetRelativePath);
-
   return {
     expected,
     found,
     missing,
     legacy,
-    pendingGeneratedSkills,
-    pendingGeneratedCommands,
   };
 };

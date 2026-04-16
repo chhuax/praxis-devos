@@ -18,7 +18,7 @@ bundled_skills:
   - devos-docs
   - devos-change-docs
 openspec_generated_skills:
-  note: "Generated/adopted from project-local `openspec init` output; not shipped as bundled skills and may be absent until generated."
+  note: "Shipped as Praxis-managed workflow sources under `assets/openspec/workflows`; projected directly by `setup`/`update` after `openspec init --tools none`."
   items:
     - openspec-explore
     - openspec-propose
