@@ -699,7 +699,22 @@ test('core helpers are split into focused runtime and project modules', async ()
 
 test('package metadata does not expose a Praxis OpenCode plugin entrypoint', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(PRAXIS_ROOT, 'package.json'), 'utf8'));
-  assert.equal(Object.prototype.hasOwnProperty.call(pkg, 'main'), false);
+
+  const pointsToOpenCodePlugin = (value) => {
+    if (typeof value === 'string') {
+      return /(^|\/)opencode-plugin\.js$/.test(value);
+    }
+    if (Array.isArray(value)) {
+      return value.some(pointsToOpenCodePlugin);
+    }
+    if (value && typeof value === 'object') {
+      return Object.values(value).some(pointsToOpenCodePlugin);
+    }
+    return false;
+  };
+
+  assert.equal(pointsToOpenCodePlugin(pkg.main), false);
+  assert.equal(pointsToOpenCodePlugin(pkg.exports), false);
   assert.equal(pkg.files.includes('opencode-plugin.js'), false);
   assert.equal(fs.existsSync(path.join(PRAXIS_ROOT, 'opencode-plugin.js')), false);
 });
