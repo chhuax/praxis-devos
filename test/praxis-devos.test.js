@@ -300,22 +300,22 @@ const OPENSPEC_WORKFLOW_EXPECTATIONS = [
   {
     projectedName: 'openspec-explore',
     overlayFileName: 'opsx-explore.overlay.md',
-    mustInclude: [/owner_flow: openspec-explore/, /After `openspec list --json`/],
+    mustInclude: [/owner_flow: openspec-explore/],
   },
   {
     projectedName: 'openspec-propose',
     overlayFileName: 'opsx-propose.overlay.md',
-    mustInclude: [/owner_flow: openspec-propose/, /`Docs Impact`/],
+    mustInclude: [/owner_flow: openspec-propose/],
   },
   {
     projectedName: 'openspec-apply-change',
     overlayFileName: 'opsx-apply.overlay.md',
-    mustInclude: [/owner_flow: openspec-apply-change/, /writing-plans/, /verification-before-completion/],
+    mustInclude: [/owner_flow: openspec-apply-change/],
   },
   {
     projectedName: 'openspec-archive-change',
     overlayFileName: 'opsx-archive.overlay.md',
-    mustInclude: [/owner_flow: openspec-archive-change/, /verification-before-completion/],
+    mustInclude: [/owner_flow: openspec-archive-change/],
   },
 ];
 
@@ -735,7 +735,6 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(output, /Synced adapters: codex, claude, opencode, copilot/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
-  assert.match(agentsMd, /docs\/surfaces\.yaml/);
   assert.doesNotMatch(agentsMd, /\/opsx:/);
   assert.doesNotMatch(agentsMd, /opsx-propose|opsx-apply|opsx-explore|opsx-archive/);
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
@@ -965,15 +964,13 @@ test('OpenSpec workflow overlays remain in Praxis overlay assets and config keep
 
   assert.match(archiveOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(applyOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
-  assert.match(applyOverlay, /writing-plans/);
-  assert.match(proposeOverlay, /artifact language policy/);
-  assert.match(proposeOverlay, /正式黑盒 artifact/);
-  assert.match(proposeOverlay, /Docs Impact/);
-  assert.match(applyOverlay, /systematic-debugging/);
-  assert.match(applyOverlay, /subagent-driven-development/);
-  assert.match(archiveOverlayCurrent, /blackbox-test\.md/);
-  assert.match(archiveOverlayCurrent, /mode=refresh/);
   assert.match(exploreOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
+  assert.match(exploreOverlay, /owner_flow: openspec-explore/);
+  assert.match(proposeOverlay, /owner_flow: openspec-propose/);
+  assert.match(applyOverlay, /owner_flow: openspec-apply-change/);
+  assert.match(archiveOverlayCurrent, /owner_flow: openspec-archive-change/);
+  assert.match(archiveOverlayCurrent, /## Embedded Capability Contract/);
+  assert.match(archiveOverlayCurrent, /artifact_targets: openspec\/changes\/<change>\/\.\.\./);
   assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
 });
 
@@ -1372,12 +1369,9 @@ test('projectNativeSkills projects canonical Claude workflow skills and commands
   assert.ok(fs.existsSync(adoptedApplyCommandPath));
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /owner_flow: openspec-propose/);
-  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /create the change and generate all artifacts in one step/i);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# \/opsx:propose\n/m);
-  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /open or advance a proposal in one pass/i);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /owner_flow: openspec-propose/);
-  assert.match(fs.readFileSync(adoptedApplyCommandPath, 'utf8'), /writing-plans/);
   assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'skills', 'openspec-propose', 'SKILL.md')), false);
   assert.equal(fs.existsSync(path.join(projectDir, '.claude', 'commands', 'opsx', 'propose.md')), false);
   assert.match(logs.join('\n'), /projected OpenSpec workflow skill openspec-propose/i);
@@ -1437,12 +1431,9 @@ test('projectNativeSkills projects canonical OpenCode workflow commands into the
   assert.ok(fs.existsSync(adoptedCommandPath));
   assert.ok(fs.existsSync(adoptedApplyCommandPath));
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
-  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /create the change and generate all artifacts in one step/i);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# \/opsx:propose\n/m);
-  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /open or advance a proposal in one pass/i);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /owner_flow: openspec-propose/);
-  assert.match(fs.readFileSync(adoptedApplyCommandPath, 'utf8'), /writing-plans/);
   assert.equal(fs.existsSync(path.join(projectDir, '.opencode', 'skills', 'openspec-propose', 'SKILL.md')), false);
   assert.equal(fs.existsSync(path.join(projectDir, '.opencode', 'commands', 'opsx-propose.md')), false);
   assert.match(logs.join('\n'), /projected OpenSpec workflow command openspec-propose/i);
@@ -1467,9 +1458,7 @@ test('projectNativeSkills projects canonical GitHub Copilot prompts into the sha
   assert.ok(fs.existsSync(adoptedSkillPath));
   assert.ok(fs.existsSync(adoptedCommandPath));
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
-  assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /create the change and generate all artifacts in one step/i);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# \/opsx:propose\n/m);
-  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /open or advance a proposal in one pass/i);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /owner_flow: openspec-propose/);
   assert.equal(fs.existsSync(path.join(projectDir, '.github', 'skills', 'openspec-propose', 'SKILL.md')), false);

@@ -2,31 +2,59 @@
 
 ## Flow Selection
 
-- Enter an OpenSpec proposal flow for medium or large changes, cross-module changes, interface or compatibility changes, architecture or process refactors, or any request with unclear requirements, unresolved `open questions`, or competing solution options.
-- In those cases, start with the OpenSpec proposal or exploration stage and finish clarification and option comparison inside the current OpenSpec stage before implementation.
-- Use the OpenSpec implementation stage only for small, local implementation work with low ambiguity and no proposal need.
-- Reviews and audit-style requests should follow the review flow.
-- Routing examples — requests that REQUIRE proposal first: "帮我加一个 X"、"新增 Y 能力"、"我想做一套 Z workflow"、"add a release kit"、"implement feature X". These introduce new capabilities or cross-cutting concerns and must go through proposal first.
-- Routing examples — requests that can use the implementation stage directly: "修一下这个 bug"、"改一下这段文案"、"update the version number"、"fix the failing test". These are small, scoped fixes with no design ambiguity.
+- 根据请求性质选择 OpenSpec flow：
 
-## Project Reading Order
+### 使用 explore / propose
 
-- On first entry, read `docs/surfaces.yaml` first.
-- Read `docs/codemaps/project-overview.md` if needed.
-- Read other `docs/codemaps/**` artifacts on demand rather than by default.
+当请求具备以下任一特征时，必须进入 OpenSpec（从 explore 或 propose 开始）：
 
-## OpenSpec + Superpowers Contract
+- 中大型改动
+- 跨模块 / 跨系统变更
+- 涉及接口、兼容性或架构调整
+- 存在不明确需求或未收敛的 open questions
+- 存在多个可选方案需要对比或决策
+- 引入新能力或新 workflow
 
-- Inside OpenSpec, exploration, proposal, implementation, and archive are the only visible workflow layer.
-- Superpowers may run only as embedded capabilities inside the active OpenSpec stage.
-- Do not re-announce `Using [skill]` or `superpowers:<skill>`, and do not create a second workflow, second wrap-up, or separate document tree.
-- Keep all stage-local outputs under `openspec/changes/<change>/...`; do not write `docs/superpowers/...`.
-- Capability execution is judged by evidence in the user-level Praxis state directory, not by user-visible announcements.
+典型示例：
 
-## Stage Gates
+- “帮我加一个 X”
+- “新增 Y 能力”
+- “我想做一套 Z workflow”
+- “implement feature X”
+- “add a release kit”
 
-- Proposal Gate: do not enter multi-step implementation until Proposal Intake has converged `change target`, `intended behavior`, `scope/risk`, and `open questions`, and the native OpenSpec proposal stage has been executed plus native OpenSpec actions.
-- Proposal Gate: if `open questions` or competing solution directions remain, stay in propose or explore and finish clarification before implementation.
-- Apply Gate: before implementation, keep any multi-step plan under the approved OpenSpec change.
-- Execution Gate: when bugs, failed tests, exceptions, or regressions appear, perform root-cause analysis first; keep all parallel work, subtasks, outputs, and status under the current change.
-- Completion Gate: before claiming completion, opening a PR, or merging, run full verification and record the actual verification result. Verification is a pre-completion check, not a second completion workflow.
+要求：
+
+- 在 explore / propose 阶段完成需求澄清与方案收敛后，才能进入实现
+
+---
+
+### 使用 apply（直接实现）
+
+仅当请求满足以下条件时，可以直接进入实现阶段：
+
+- 改动范围小且局部
+- 无设计歧义
+- 不涉及架构或接口变化
+- 不需要方案对比或前置设计
+
+典型示例：
+
+- “修一下这个 bug”
+- “改一下这段文案”
+- “update the version number”
+- “fix the failing test”
+
+---
+
+### 使用 review flow
+
+- 评审、审计、分析类请求应使用 review flow
+
+---
+
+## OpenSpec + SuperPowers Contract（简化）
+
+- OpenSpec（explore / propose / apply / archive）是唯一对用户可见的流程层
+- SuperPowers 仅作为阶段内嵌能力使用，不形成独立流程
+- 所有产物必须收敛在当前 change 下，不得创建额外目录（如 `docs/superpowers/...`）

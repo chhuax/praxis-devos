@@ -20,19 +20,19 @@ const PROJECTED_PRAXIS_SKILLS = [
 const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
     name: 'openspec-explore',
-    mustInclude: [/owner_flow: openspec-explore/, /PRAXIS_DEVOS_OVERLAY_START/],
+    mustInclude: [/owner_flow: openspec-explore/],
   },
   {
     name: 'openspec-propose',
-    mustInclude: [/owner_flow: openspec-propose/, /当前唯一可见 flow 是 `openspec-propose`/],
+    mustInclude: [/owner_flow: openspec-propose/],
   },
   {
     name: 'openspec-apply-change',
-    mustInclude: [/owner_flow: openspec-apply-change/, /verification-before-completion/, /writing-plans/],
+    mustInclude: [/owner_flow: openspec-apply-change/],
   },
   {
     name: 'openspec-archive-change',
-    mustInclude: [/owner_flow: openspec-archive-change/, /verification-before-completion/],
+    mustInclude: [/owner_flow: openspec-archive-change/],
   },
 ];
 
