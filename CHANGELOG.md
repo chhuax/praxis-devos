@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-04-17
+
+### Changed
+- Refreshed embedded OpenSpec overlay contracts for propose, explore, apply, and archive so stage guidance reflects the current Praxis DevOS workflow expectations
+- Simplified the managed OpenSpec entry template and clarified that `devos-docs-refresh` requires change context for archive / flow-driven refreshes
+
+### Fixed
+- Install smoke and projection coverage now assert stable workflow structure and contract markers instead of brittle copy-level wording
+- Archive overlay now uses the same embedded contract structure as the other OpenSpec overlays, including explicit `artifact_targets`
+
+## [0.6.5] - 2026-04-16
+
+### Added
+- Vendored the canonical OpenSpec workflow skill and command sources under `assets/openspec/workflows/` so projections no longer depend on upstream-generated workflow files
+
+### Changed
+- `setup` now runs `openspec init --tools none` for uninitialized projects, keeps bundled schema/config alignment deterministic, and projects workflow assets from Praxis-managed canonical sources
+- OpenCode integration no longer packages or installs `praxis-devos` as an OpenCode plugin; setup/bootstrap now preserve the SuperPowers plugin while removing legacy `praxis-devos` plugin entries from OpenCode runtime config
+
+### Fixed
+- Removed the redundant “next step: run setup again” hint from the OpenCode adapter README output
+- Tightened package metadata assertions so release validation checks only that no package entrypoint points to `opencode-plugin.js`
+
 ## [0.6.4] - 2026-04-16
 
 ### Added
