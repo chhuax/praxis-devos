@@ -1,4 +1,4 @@
-> This block is maintained by Praxis DevOS. Run `npx praxis-devos update` to refresh it.
+> This block is maintained by Praxis DevOS. Run `npx praxis-devos@latest update` to refresh it.
 
 ## Flow Selection
 

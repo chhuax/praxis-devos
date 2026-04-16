@@ -66,7 +66,7 @@ Praxis manages project state through CLAUDE.md/AGENTS.md managed blocks and open
 
 - \`.opencode/\` no longer mirrors canonical skills or rules files by default
 - If you add OpenCode-only supplemental skills, place them in \`.opencode/skills/\`
-- Re-run \`npx praxis-devos sync --agent opencode\` after changing canonical files
+- Re-run \`npx praxis-devos@latest update --agent opencode\` after changing canonical files
 `;
 
 // Adapter sync owns generated compatibility files and managed blocks in project
@@ -127,29 +127,6 @@ const renderClaudeManagedBlock = () => [
   '> 如需 Claude 专属补充，请只在此文件追加少量差异内容，不要复制 `AGENTS.md` 全文。',
 ].join('\n');
 
-const openSpecToolsForAgents = (agents = SUPPORTED_AGENTS) => {
-  const toolByAgent = {
-    codex: 'codex',
-    claude: 'claude',
-    opencode: 'opencode',
-    copilot: 'github-copilot',
-  };
-
-  return uniqueAgents(agents)
-    .map((agent) => toolByAgent[agent])
-    .filter(Boolean);
-};
-
-const setOpenSpecDelivery = ({ runtime, projectDir, delivery, log }) => {
-  const result = runFile(runtime.command, ['config', 'set', 'delivery', delivery], {
-    cwd: projectDir,
-  });
-  if (!result.ok) {
-    throw new Error(`OpenSpec config set delivery ${delivery} failed: ${result.stderr}`);
-  }
-  log(`✓ OpenSpec delivery set to ${delivery}`);
-};
-
 const runOpenSpecInit = ({ runtime, projectDir, tools, log }) => {
   const initResult = runFile(runtime.command, ['init', projectDir, '--tools', tools.join(',') || 'none', '--force'], {
     cwd: projectDir,
@@ -168,29 +145,8 @@ const ensureOpenSpecLayout = ({ projectDir, agents = SUPPORTED_AGENTS, log }) =>
     );
   }
 
-  const selectedAgents = uniqueAgents(agents);
-  const codexSelected = selectedAgents.includes('codex');
-  const nonCodexTools = openSpecToolsForAgents(selectedAgents.filter((agent) => agent !== 'codex'));
-
-  if (nonCodexTools.length > 0) {
-    setOpenSpecDelivery({ runtime, projectDir, delivery: 'both', log });
-    runOpenSpecInit({ runtime, projectDir, tools: nonCodexTools, log });
-  }
-
-  if (codexSelected) {
-    setOpenSpecDelivery({ runtime, projectDir, delivery: 'skills', log });
-    try {
-      runOpenSpecInit({ runtime, projectDir, tools: ['codex'], log });
-    } finally {
-      setOpenSpecDelivery({ runtime, projectDir, delivery: 'both', log });
-    }
-    return;
-  }
-
-  if (nonCodexTools.length === 0) {
-    setOpenSpecDelivery({ runtime, projectDir, delivery: 'both', log });
-    runOpenSpecInit({ runtime, projectDir, tools: ['none'], log });
-  }
+  void uniqueAgents(agents);
+  runOpenSpecInit({ runtime, projectDir, tools: ['none'], log });
 };
 
 const ensureFrameworkFiles = ({ projectDir, log }) => {

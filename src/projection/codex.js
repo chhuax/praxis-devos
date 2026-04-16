@@ -53,7 +53,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-generated'
+        const finalContent = sourceType === 'openspec-workflow'
           ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
           : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
@@ -76,8 +76,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
-    if (sourceType === 'openspec-generated') {
-      log(`✓ Codex: adopted OpenSpec workflow skill ${name} → ${targetPath}`);
+    if (sourceType === 'openspec-workflow') {
+      log(`✓ Codex: projected OpenSpec workflow skill ${name} → ${targetPath}`);
     } else {
       log(`✓ Codex: projected ${name} → ${targetPath}`);
     }

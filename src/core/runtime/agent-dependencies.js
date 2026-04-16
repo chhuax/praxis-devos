@@ -8,6 +8,7 @@ import {
   SUPERPOWERS_GIT_URL,
   SUPERPOWERS_OPENCODE_PLUGIN,
 } from '../constants/agent-dependencies.js';
+import { PRAXIS_CLI_COMMAND } from '../constants/cli.js';
 import {
   ensureDir,
   readFile,
@@ -271,7 +272,7 @@ const ensureCodexSuperpowers = () => {
   }
 
   if (!commandExists('git')) {
-    throw new Error('Git is required to install Codex SuperPowers automatically. Install Git, then rerun `npx praxis-devos setup --agent codex`.');
+    throw new Error(`Git is required to install Codex SuperPowers automatically. Install Git, then rerun \`${PRAXIS_CLI_COMMAND} setup --agent codex\`.`);
   }
 
   ensureDir(cloneParent);
@@ -354,7 +355,7 @@ const ensureClaudeSuperpowers = (projectDir) => {
   }
 
   if (!commandExists('claude')) {
-    throw new Error('Claude Code CLI is required to install Claude SuperPowers automatically. Install Claude Code, then rerun `npx praxis-devos setup --agent claude`.');
+    throw new Error(`Claude Code CLI is required to install Claude SuperPowers automatically. Install Claude Code, then rerun \`${PRAXIS_CLI_COMMAND} setup --agent claude\`.`);
   }
 
   const claudeCommand = resolveCommandForExecution('claude');

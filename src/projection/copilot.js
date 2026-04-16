@@ -56,7 +56,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-generated'
+        const finalContent = sourceType === 'openspec-workflow'
           ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
           : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
@@ -79,8 +79,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
-    if (sourceType === 'openspec-generated') {
-      log(`✓ GitHub Copilot: adopted OpenSpec workflow skill ${name} → ${targetPath}`);
+    if (sourceType === 'openspec-workflow') {
+      log(`✓ GitHub Copilot: projected OpenSpec workflow skill ${name} → ${targetPath}`);
     } else {
       log(`✓ GitHub Copilot: projected ${name} → ${targetPath}`);
     }
@@ -98,6 +98,7 @@ export const projectCommands = ({ projectDir, version, log, workflowCommandSourc
     sourcePath,
     sourceType,
     targetRelativePath,
+    commandTitle = null,
     overlayPath = null,
     overlayAssetsDir = null,
   } of workflowCommandSources) {
@@ -115,8 +116,8 @@ export const projectCommands = ({ projectDir, version, log, workflowCommandSourc
     }
 
     const content = fs.readFileSync(sourcePath, 'utf8');
-    const finalContent = sourceType === 'openspec-generated'
-      ? composeProjectedCommand({ upstreamContent: content, overlayPath })
+    const finalContent = sourceType === 'openspec-workflow'
+      ? composeProjectedCommand({ upstreamContent: content, overlayPath, commandTitle })
       : content;
     fs.writeFileSync(targetPath, finalContent, 'utf8');
     if (overlayAssetsDir) {
@@ -136,7 +137,7 @@ export const projectCommands = ({ projectDir, version, log, workflowCommandSourc
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
-    log(`✓ GitHub Copilot: adopted OpenSpec workflow command ${name} → ${targetPath}`);
+    log(`✓ GitHub Copilot: projected OpenSpec workflow command ${name} → ${targetPath}`);
   }
 
   for (const name of commandNames) {
