@@ -69,8 +69,6 @@ const generatedWorkflowDefinitions = [
   },
 ];
 
-export const generatedWorkflowSkillNames = generatedWorkflowDefinitions.map((workflow) => workflow.name);
-
 const projectSurfaceByAgent = (agent) => {
   if (agent === 'codex') {
     return {
@@ -175,5 +173,3 @@ export const collectGeneratedWorkflowCommandSources = ({ agent }) => {
     })
     .filter(Boolean);
 };
-
-export const cleanupAdoptedGeneratedAssets = () => {};

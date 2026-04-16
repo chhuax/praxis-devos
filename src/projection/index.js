@@ -24,8 +24,8 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
     return [];
   }
 
-  const generatedWorkflowSkillSources = collectGeneratedWorkflowSkillSources({ projectDir, agent });
-  const generatedWorkflowCommandSources = collectGeneratedWorkflowCommandSources({ projectDir, agent });
+  const generatedWorkflowSkillSources = collectGeneratedWorkflowSkillSources({ agent });
+  const generatedWorkflowCommandSources = collectGeneratedWorkflowCommandSources({ agent });
   const skillSources = [
     ...collectDirectSkillSources(),
     ...generatedWorkflowSkillSources,
@@ -70,18 +70,18 @@ export const detectForAgent = (agent) => {
 /**
  * Get the list of expected bundled skill names.
  */
-export const expectedSkillNames = ({ agent, projectDir = process.cwd() } = {}) => {
+export const expectedSkillNames = ({ agent } = {}) => {
   const direct = collectBundledSkillSources().map(({ name }) => name);
   if (!agent) {
     return direct;
   }
 
-  const generated = collectGeneratedWorkflowSkillSources({ projectDir, agent }).map(({ name }) => name);
+  const generated = collectGeneratedWorkflowSkillSources({ agent }).map(({ name }) => name);
   return [...new Set([...direct, ...generated])];
 };
 
-export const inspectProjectionHealth = ({ agent, projectDir = process.cwd() }) => {
-  const expected = expectedSkillNames({ agent, projectDir });
+export const inspectProjectionHealth = ({ agent }) => {
+  const expected = expectedSkillNames({ agent });
   const projections = detectForAgent(agent);
   const found = projections.map((entry) => entry.name);
   const missing = expected.filter((name) => !found.includes(name));

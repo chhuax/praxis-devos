@@ -69,7 +69,7 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
   }
 
   for (const agent of selectedAgents) {
-    const projection = inspectProjectionHealth({ agent, projectDir });
+    const projection = inspectProjectionHealth({ agent });
     const issues = [];
 
     if (projection.missing.length > 0) {
