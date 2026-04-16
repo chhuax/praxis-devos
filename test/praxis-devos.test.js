@@ -969,6 +969,8 @@ test('OpenSpec workflow overlays remain in Praxis overlay assets and config keep
   assert.match(proposeOverlay, /owner_flow: openspec-propose/);
   assert.match(applyOverlay, /owner_flow: openspec-apply-change/);
   assert.match(archiveOverlayCurrent, /owner_flow: openspec-archive-change/);
+  assert.match(archiveOverlayCurrent, /## Embedded Capability Contract/);
+  assert.match(archiveOverlayCurrent, /artifact_targets: openspec\/changes\/<change>\/\.\.\./);
   assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
 });
 

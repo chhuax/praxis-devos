@@ -46,7 +46,9 @@ The refresh MUST:
 - Detect `artifact_language`:
   - prefer `docs/surfaces.yaml`
   - fallback to `AGENTS.md` / `README.md`
-- Pass change-aware context into the skill (if available)
+- Pass change-aware context into the skill:
+  - REQUIRED for OpenSpec archive / flow-driven refreshes
+  - OPTIONAL for general refresh usage outside an active OpenSpec flow
 
 - Use stable docs routing:
   - `docs/surfaces.yaml`
