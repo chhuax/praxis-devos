@@ -735,7 +735,9 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(output, /Synced adapters: codex, claude, opencode, copilot/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
-  assert.match(agentsMd, /docs\/surfaces\.yaml/);
+  assert.match(agentsMd, /## Flow Selection/);
+  assert.match(agentsMd, /### 使用 review flow/);
+  assert.match(agentsMd, /OpenSpec \+ SuperPowers Contract/);
   assert.doesNotMatch(agentsMd, /\/opsx:/);
   assert.doesNotMatch(agentsMd, /opsx-propose|opsx-apply|opsx-explore|opsx-archive/);
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
