@@ -1,19 +1,27 @@
 <!-- PRAXIS_DEVOS_OVERLAY_START -->
-Embedded capability contract:
+归档阶段约束（含 CodeMap 更新）
 
-- `mode: embedded`
-- `owner_flow: openspec-archive-change`
-- `artifact_targets: openspec/changes/<change>/...`
+- mode: embedded
+- owner_flow: openspec-archive-change
 
-Framework-specific coordination for embedded Superpowers usage:
+规则：
+- 仅在当前 flow 内执行
+- 所有内容写入当前 change
+- 禁止创建 docs/superpowers
+- 禁止输出额外总结
 
-- 当前唯一可见 flow 是 `openspec-archive-change`。
-- 计划细化、任务状态和实现备注必须保留在当前 change 的 artifacts 中；不要创建 `docs/superpowers/...`。
-- 不要输出第二份最终总结。
+归档前必须：
 
-Stage hooks:
+1. 执行 verification-before-completion
 
-- 在说 change 已可归档前，内部调用 `verification-before-completion`。
-- 检查 schema 要求的正式 artifact 是否齐备；若当前 schema 要求 `blackbox-test.md`，归档前必须确认其存在且内容有效。
-- 归档前，如变更影响项目级 docs / codemap 稳定视图，调用 `devos-docs` 的 `mode=refresh` 完成联动更新。
+2. 文档 / CodeMap 更新（必须）
+   - 必须调用 `devos-docs-refresh`
+   - 且必须传入当前 change 上下文（proposal / design / spec / tasks / 变更路径）
+   - 用于更新：
+     - docs/surfaces.yaml
+     - docs/codemaps/**
+
+仅当以下完成才允许归档：
+- verification 完成
+- devos-docs-refresh 已执行且成功
 <!-- PRAXIS_DEVOS_OVERLAY_END -->

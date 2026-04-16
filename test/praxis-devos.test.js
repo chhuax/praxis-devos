@@ -300,12 +300,12 @@ const OPENSPEC_WORKFLOW_EXPECTATIONS = [
   {
     projectedName: 'openspec-explore',
     overlayFileName: 'opsx-explore.overlay.md',
-    mustInclude: [/owner_flow: openspec-explore/, /After `openspec list --json`/],
+    mustInclude: [/owner_flow: openspec-explore/, /在执行 `openspec list --json` 后/, /能力触发说明/],
   },
   {
     projectedName: 'openspec-propose',
     overlayFileName: 'opsx-propose.overlay.md',
-    mustInclude: [/owner_flow: openspec-propose/, /`Docs Impact`/],
+    mustInclude: [/owner_flow: openspec-propose/, /`Docs Impact`/, /Context Loading/, /能力触发说明/],
   },
   {
     projectedName: 'openspec-apply-change',
@@ -967,12 +967,12 @@ test('OpenSpec workflow overlays remain in Praxis overlay assets and config keep
   assert.match(applyOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(applyOverlay, /writing-plans/);
   assert.match(proposeOverlay, /artifact language policy/);
-  assert.match(proposeOverlay, /正式黑盒 artifact/);
+  assert.match(proposeOverlay, /Context Loading/);
   assert.match(proposeOverlay, /Docs Impact/);
   assert.match(applyOverlay, /systematic-debugging/);
   assert.match(applyOverlay, /subagent-driven-development/);
-  assert.match(archiveOverlayCurrent, /blackbox-test\.md/);
-  assert.match(archiveOverlayCurrent, /mode=refresh/);
+  assert.match(archiveOverlayCurrent, /devos-docs-refresh/);
+  assert.match(archiveOverlayCurrent, /docs\/codemaps/);
   assert.match(exploreOverlay, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
 });

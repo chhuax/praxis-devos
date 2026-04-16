@@ -10,35 +10,3 @@ context: |
   OpenSpec artifact language: zh-CN.
   Proposal, design, tasks, and spec artifacts must be written in Simplified Chinese by default.
   Keep code identifiers, commands, paths, capability names, and other technical tokens in their original form.
-
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
-
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
-#
-# Praxis DevOS docs task policy (optional for other projects)
-# Example:
-#   praxis_devos:
-#     docs_tasks:
-#       change_blackbox: true
-#       change_api: auto
-#       project_api_sync: auto
-#
-# Semantics:
-# - `change_blackbox: true` -> inject `blackbox-test.md` docs tasks during propose
-# - `change_api: auto` -> inject `api-doc.md` only when API changes are detected
-# - `project_api_sync: auto` -> inject stable API sync when API doc work is required
