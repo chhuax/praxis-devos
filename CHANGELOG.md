@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-04-16
+
+### Added
+- Vendored the canonical OpenSpec workflow skill and command sources under `assets/openspec/workflows/` so projections no longer depend on upstream-generated workflow files
+
+### Changed
+- `setup` now runs `openspec init --tools none` for uninitialized projects, keeps bundled schema/config alignment deterministic, and projects workflow assets from Praxis-managed canonical sources
+- OpenCode integration no longer packages or installs `praxis-devos` as an OpenCode plugin; setup/bootstrap now preserve the SuperPowers plugin while removing legacy `praxis-devos` plugin entries from OpenCode runtime config
+
+### Fixed
+- Removed the redundant “next step: run setup again” hint from the OpenCode adapter README output
+- Tightened package metadata assertions so release validation checks only that no package entrypoint points to `opencode-plugin.js`
+
 ## [0.6.4] - 2026-04-16
 
 ### Added
