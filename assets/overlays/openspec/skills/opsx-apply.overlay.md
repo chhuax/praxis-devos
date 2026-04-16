@@ -17,8 +17,9 @@
 - 所有计划与执行必须收敛在当前 change 内，严禁创建新的 change  
 
 - 默认使用 `writing-plans` 拆解并推进任务  
-- 仅当存在多个相互独立且可并行的子任务时，才使用 `subagent-driven-development`  
-- 必要时使用 `requesting-code-review`  
+- 仅当存在多个相互独立且可并行的子任务时，才使用 `subagent-driven-development` 
+- 默认使用 `test-driven-development` 测试驱动开发
+- 必要时使用 `requesting-code-review`
 
 - 仅允许在当前 task 下细化  
 
