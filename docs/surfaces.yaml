@@ -1,7 +1,6 @@
 primary_surface: cli
 cli_entrypoint: bin/praxis-devos.js
 npm_package: praxis-devos
-opencode_plugin_entrypoint: opencode-plugin.js
 supported_agents:
   - opencode
   - codex

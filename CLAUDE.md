@@ -52,4 +52,4 @@ Each agent has its own projector:
 ### Key design decisions
 - Skills are stamped with a version marker on write. On `sync`, stale projections (marker present but name no longer in the skill set) are removed.
 - `src/templates/managed-entry.md` is the template injected into a user project's `AGENTS.md`/`CLAUDE.md` during `setup`. It contains the OpenSpec flow gating rules.
-- `opencode-plugin.js` is the package entry for OpenCode's plugin system.
+- OpenCode integration relies on projected skills/commands plus runtime config cleanup; do not reintroduce a Praxis OpenCode plugin entrypoint.

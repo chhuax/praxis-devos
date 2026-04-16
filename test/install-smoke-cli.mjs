@@ -488,7 +488,7 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     assert.ok(fs.existsSync(path.join(projectDir, '.opencode', 'README.md')));
     assert.ok(Array.isArray(config.plugin));
-    assert.ok(config.plugin.some((entry) => entry.includes('praxis-devos')));
+    assert.equal(config.plugin.some((entry) => entry.includes('praxis-devos')), false);
     assert.ok(config.plugin.some((entry) => entry.includes('github.com/obra/superpowers')));
     assertProjectedOpenCodeSkills(fakeHome);
     assertOpenSpecWorkflowSkillProjectionState({
