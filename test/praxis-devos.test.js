@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { isWorkflowCommandFile } from '../src/projection/bundles.js';
 import { injectMarker } from '../src/projection/markers.js';
 import { collectBundledSkillSources } from '../src/projection/index.js';
 import { composeProjectedSkill } from '../src/projection/skill-sources.js';
@@ -1223,6 +1224,13 @@ test('collectBundledSkillSources discovers unified skill bundles by sourceDir', 
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-sync'), false);
 });
 
+test('isWorkflowCommandFile only matches workflow command sidecars', () => {
+  assert.equal(isWorkflowCommandFile('/tmp/COMMAND.shared.md'), true);
+  assert.equal(isWorkflowCommandFile('/tmp/COMMAND.codex.md'), true);
+  assert.equal(isWorkflowCommandFile('/tmp/SKILL.md'), false);
+  assert.equal(isWorkflowCommandFile('/tmp/commands/opsx-propose.md'), false);
+});
+
 test('populateOpenSpecConfig does not rewrite docs task policy into openspec/config.yaml', () => {
   const projectDir = makeTempProject();
   const configPath = path.join(projectDir, 'openspec', 'config.yaml');
@@ -1317,6 +1325,8 @@ test('projectNativeSkills projects canonical OpenSpec workflow skills alongside 
     assert.match(projectedClaudeWorkflowSkill, /owner_flow: openspec-propose/);
     assert.ok(fs.existsSync(path.join(fakeHome, '.codex', 'skills', 'openspec-apply-change', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-apply-change', 'SKILL.md')));
+    assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'skills', 'openspec-propose', 'COMMAND.shared.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'COMMAND.shared.md')), false);
     assert.equal(fs.existsSync(path.join(fakeHome, '.codex', 'commands')), false);
   });
 
@@ -1367,6 +1377,7 @@ test('projectNativeSkills projects canonical Claude workflow skills and commands
   assert.ok(fs.existsSync(adoptedSkillPath));
   assert.ok(fs.existsSync(adoptedCommandPath));
   assert.ok(fs.existsSync(adoptedApplyCommandPath));
+  assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'COMMAND.shared.md')), false);
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /owner_flow: openspec-propose/);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# \/opsx:propose\n/m);
@@ -1410,6 +1421,35 @@ test('projectNativeSkills preserves canonical OpenSpec workflow assets across re
   assert.doesNotMatch(secondLogs.join('\n'), /removed managed asset .*openspec-propose/i);
 });
 
+test('projectNativeSkills removes leaked workflow command files from projected skill directories on refresh', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-claude-cleanup-home-'));
+  const projectDir = makeTempProject();
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude', 'codex', 'opencode'],
+      log: () => {},
+    });
+
+    const leakedClaudePath = path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'COMMAND.shared.md');
+    const leakedCodexPath = path.join(fakeHome, '.codex', 'skills', 'openspec-propose', 'COMMAND.shared.md');
+    fs.writeFileSync(leakedClaudePath, 'leaked command\n', 'utf8');
+    fs.writeFileSync(leakedCodexPath, 'leaked command\n', 'utf8');
+
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude', 'codex', 'opencode'],
+      log: () => {},
+    });
+
+    assert.equal(fs.existsSync(leakedClaudePath), false);
+    assert.equal(fs.existsSync(leakedCodexPath), false);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'opsx', 'propose.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'opsx-propose.md')));
+  });
+});
+
 test('projectNativeSkills projects canonical OpenCode workflow commands into the OpenCode user command surface', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-opencode-adopt-home-'));
   const projectDir = makeTempProject();
@@ -1430,6 +1470,7 @@ test('projectNativeSkills projects canonical OpenCode workflow commands into the
   assert.ok(fs.existsSync(adoptedSkillPath));
   assert.ok(fs.existsSync(adoptedCommandPath));
   assert.ok(fs.existsSync(adoptedApplyCommandPath));
+  assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'COMMAND.shared.md')), false);
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# \/opsx:propose\n/m);
   assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
