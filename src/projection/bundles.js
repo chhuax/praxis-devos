@@ -5,6 +5,8 @@ export const ensureDir = (dirPath) => {
   fs.mkdirSync(dirPath, { recursive: true });
 };
 
+export const isWorkflowCommandFile = (filePath) => /^COMMAND\..+\.md$/.test(path.basename(filePath));
+
 export const copyBundleDirectory = ({
   sourceDir,
   targetDir,

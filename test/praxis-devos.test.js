@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { isWorkflowCommandFile } from '../src/projection/bundles.js';
 import { injectMarker } from '../src/projection/markers.js';
 import { collectBundledSkillSources } from '../src/projection/index.js';
 import { composeProjectedSkill } from '../src/projection/skill-sources.js';
@@ -1221,6 +1222,13 @@ test('collectBundledSkillSources discovers unified skill bundles by sourceDir', 
   assert.deepEqual(skillSources.map((entry) => entry.name).sort(), ['devos-change-docs', 'devos-docs']);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-verify'), false);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-sync'), false);
+});
+
+test('isWorkflowCommandFile only matches workflow command sidecars', () => {
+  assert.equal(isWorkflowCommandFile('/tmp/COMMAND.shared.md'), true);
+  assert.equal(isWorkflowCommandFile('/tmp/COMMAND.codex.md'), true);
+  assert.equal(isWorkflowCommandFile('/tmp/SKILL.md'), false);
+  assert.equal(isWorkflowCommandFile('/tmp/commands/opsx-propose.md'), false);
 });
 
 test('populateOpenSpecConfig does not rewrite docs task policy into openspec/config.yaml', () => {

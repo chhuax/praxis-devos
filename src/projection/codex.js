@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
-import { copyBundleDirectory, ensureDir, pruneTopLevelBundleFiles } from './bundles.js';
+import {
+  copyBundleDirectory,
+  ensureDir,
+  isWorkflowCommandFile,
+  pruneTopLevelBundleFiles,
+} from './bundles.js';
 import { composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
@@ -48,7 +53,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       pruneTopLevelBundleFiles({
         sourceDir,
         targetDir,
-        shouldPruneFile: ({ sourcePath }) => /^COMMAND\..+\.md$/.test(path.basename(sourcePath)),
+        shouldPruneFile: ({ sourcePath }) => isWorkflowCommandFile(sourcePath),
       });
     }
 
