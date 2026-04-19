@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-04-20
+
+### Added
+- Thin `/opsx:*` workflow command entrypoints for Claude Code and OpenCode so workflow commands can hand off directly into the adopted OpenSpec skills without duplicating workflow guidance
+
+### Changed
+- OpenSpec workflow projection now treats `assets/openspec/workflows/*/SKILL.md` as the canonical bundled workflow source instead of composing skill overlays at projection time
+- GitHub Copilot now stays on the shared Claude-compatible skill surface only, while workflow command projection is limited to Claude Code and OpenCode
+- Bundled `devos-docs` and `devos-change-docs` skill contracts, projection docs, and company schema templates were refreshed to match the direct-workflow projection model
+
+### Fixed
+- Workflow projection refresh now removes leaked legacy `COMMAND.shared.md` files from projected skill directories
+- Install smoke coverage now validates stable OpenSpec workflow metadata instead of relying on stale upstream-generated markers
+
 ## [0.6.4] - 2026-04-16
 
 ### Added
