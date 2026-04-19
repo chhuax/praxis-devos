@@ -7,7 +7,6 @@ import {
   isWorkflowCommandFile,
   pruneTopLevelBundleFiles,
 } from './bundles.js';
-import { composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -28,8 +27,6 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   for (const {
     name,
     sourceDir,
-    overlayPath = null,
-    overlayAssetsDir = null,
     sourceType = 'direct',
   } of skillSources) {
     const targetDir = path.join(codexSkillsDir(), name);
@@ -53,7 +50,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       pruneTopLevelBundleFiles({
         sourceDir,
         targetDir,
-        shouldPruneFile: ({ sourcePath }) => isWorkflowCommandFile(sourcePath),
+        shouldPruneFile: ({ sourcePath, targetPath }) => isWorkflowCommandFile(sourcePath ?? targetPath),
       });
     }
 
@@ -67,16 +64,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-workflow'
-          ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
-          : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
-        return injectMarker(finalContent, marker);
+        return injectMarker(content, marker);
       },
     });
-    if (overlayAssetsDir) {
-      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir });
-    }
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -85,8 +76,6 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       agent: 'codex',
       extra: {
         sourceDir: path.relative(process.cwd(), sourceDir),
-        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
-        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });

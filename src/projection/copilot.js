@@ -8,7 +8,6 @@ import {
   isWorkflowCommandFile,
   pruneTopLevelBundleFiles,
 } from './bundles.js';
-import { composeProjectedCommand, composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -18,11 +17,8 @@ import { resolveUserHomeDir } from '../support/home.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // GitHub Copilot currently shares Claude-compatible user-level discovery
-// surfaces, so Praxis projects to ~/.claude by default for both skills/commands.
+// surfaces, so Praxis projects bundled skills to ~/.claude by default.
 const copilotSkillsDir = () => path.join(resolveUserHomeDir(), '.claude', 'skills');
-const copilotCommandsDir = () => path.join(resolveUserHomeDir(), '.claude', 'commands');
-const commandAssetRoot = () => path.resolve(__dirname, '../../assets/commands');
-const commandNames = ['devos-docs-init', 'devos-docs-refresh'];
 
 export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(copilotSkillsDir());
@@ -31,8 +27,6 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   for (const {
     name,
     sourceDir,
-    overlayPath = null,
-    overlayAssetsDir = null,
     sourceType = 'direct',
   } of skillSources) {
     const targetDir = path.join(copilotSkillsDir(), name);
@@ -56,7 +50,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       pruneTopLevelBundleFiles({
         sourceDir,
         targetDir,
-        shouldPruneFile: ({ sourcePath }) => isWorkflowCommandFile(sourcePath),
+        shouldPruneFile: ({ sourcePath, targetPath }) => isWorkflowCommandFile(sourcePath ?? targetPath),
       });
     }
 
@@ -70,16 +64,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-workflow'
-          ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
-          : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
-        return injectMarker(finalContent, marker);
+        return injectMarker(content, marker);
       },
     });
-    if (overlayAssetsDir) {
-      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir });
-    }
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -88,8 +76,6 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       agent: 'copilot',
       extra: {
         sourceDir: path.relative(process.cwd(), sourceDir),
-        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
-        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
@@ -103,87 +89,11 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   return results;
 };
 
-export const projectCommands = ({ projectDir, version, log, workflowCommandSources = [] }) => {
-  ensureDir(copilotCommandsDir());
-  const results = [];
-
-  for (const {
-    name,
-    sourcePath,
-    sourceType,
-    targetRelativePath,
-    commandTitle = null,
-    overlayPath = null,
-    overlayAssetsDir = null,
-  } of workflowCommandSources) {
-    const targetPath = path.join(copilotCommandsDir(), targetRelativePath);
-    ensureDir(path.dirname(targetPath));
-    if (!canSafelyOverwrite({
-      assetPath: targetPath,
-      projectDir,
-      agent: 'copilot',
-      allowAnyManagedOwner: true,
-    })) {
-      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType });
-      log(`⊘ GitHub Copilot: skipped OpenSpec workflow command ${name} because ${targetPath} is not a Praxis-managed asset`);
-      continue;
-    }
-
-    const content = fs.readFileSync(sourcePath, 'utf8');
-    const finalContent = sourceType === 'openspec-workflow'
-      ? composeProjectedCommand({ upstreamContent: content, overlayPath, commandTitle })
-      : content;
-    fs.writeFileSync(targetPath, finalContent, 'utf8');
-    if (overlayAssetsDir) {
-      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir: path.dirname(targetPath) });
-    }
-    registerManagedAsset({
-      projectDir,
-      assetPath: targetPath,
-      type: 'command',
-      version,
-      agent: 'copilot',
-      extra: {
-        commandName: name,
-        sourcePath: path.relative(process.cwd(), sourcePath),
-        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
-        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
-      },
-    });
-    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
-    log(`✓ GitHub Copilot: projected OpenSpec workflow command ${name} → ${targetPath}`);
-  }
-
-  for (const name of commandNames) {
-    const templatePath = path.join(commandAssetRoot(), `${name}.md`);
-    const targetPath = path.join(copilotCommandsDir(), `${name}.md`);
-    if (!canSafelyOverwrite({
-      assetPath: targetPath,
-      projectDir,
-      agent: 'copilot',
-      allowAnyManagedOwner: true,
-    })) {
-      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType: 'direct' });
-      log(`⊘ GitHub Copilot: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
-      continue;
-    }
-
-    fs.writeFileSync(targetPath, fs.readFileSync(templatePath, 'utf8'), 'utf8');
-    registerManagedAsset({
-      projectDir,
-      assetPath: targetPath,
-      type: 'command',
-      version,
-      agent: 'copilot',
-      extra: {
-        commandName: name,
-      },
-    });
-    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType: 'direct' });
-    log(`✓ GitHub Copilot: projected docs command ${name} → ${targetPath}`);
-  }
-
-  return results;
+export const projectCommands = ({
+  log,
+}) => {
+  log('⊘ GitHub Copilot: command projection is not supported; projecting skills only');
+  return [];
 };
 
 export const detectProjections = () => {
@@ -215,19 +125,14 @@ export const cleanStaleProjections = ({ validNames, log }) => {
 export const pruneManagedUserAssets = ({
   projectDir,
   validSkillNames,
-  keepCommandNames = commandNames,
   keepCommandPaths = [],
   log,
 }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(copilotSkillsDir(), name, 'SKILL.md'));
-  const validCommandPaths = [
-    ...keepCommandNames.map((name) => path.join(copilotCommandsDir(), `${name}.md`)),
-    ...keepCommandPaths,
-  ];
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'copilot',
-    validPaths: [...validSkillPaths, ...new Set(validCommandPaths)],
+    validPaths: [...validSkillPaths, ...keepCommandPaths],
   });
 
   for (const removedPath of removed) {

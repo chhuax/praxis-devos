@@ -1,110 +1,128 @@
 ---
 name: openspec-propose
-description: Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.
-license: MIT
-compatibility: Requires openspec CLI.
+description: 在一次会话中创建新的 OpenSpec change，并把 proposal、specs、design、tasks 等工件推进到可进入实现的状态。适用于用户已有大致方向，希望快速得到一套可执行的变更工件。
+compatibility: Requires openspec CLI. Works best with Superpowers skills.
 metadata:
   author: openspec
-  version: "1.0"
-  generatedBy: "1.3.0"
+  version: "1.3"
 ---
 
-Propose a new change - create the change and generate all artifacts in one step.
+提出一个新的 OpenSpec change，并尽量把它推进到 **apply-ready**。
 
-I'll create a change with artifacts:
-- proposal.md (what & why)
-- design.md (how)
-- tasks.md (implementation steps)
+## 核心定位
 
-When ready to implement, run /opsx:apply
+- OpenSpec 负责：change、schema、artifact 依赖、status、instructions、readiness
+- Superpowers 负责：需求收敛、任务拆解
+- 正式结果只保留在当前 change 目录中
+- propose 阶段不实现业务代码
 
----
+## 精确 Skill 协议
 
-**Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.
+- 命中路由时，必须调用对应的**精确 skill 名**
+- 不得用相近的本地 skill、todo list、手工拆点或长段 reasoning 替代
+- 如果精确 skill 不可用，必须明确报告，并暂停当前路由
 
-**Steps**
+## 能力路由
 
-1. **If no clear input provided, ask what they want to build**
+- 如果输入仍然模糊、边界不稳、存在多个合理方案，先用 `superpowers:brainstorming`
+- 在生成 `tasks.md` 时，默认使用 `superpowers:writing-plans`
+- propose 阶段的 `writing-plans` 只服务于**整份 `tasks.md`**
+- 不要为整个 change 额外生成默认总 plan 文件
 
-   Use the **AskUserQuestion tool** (open-ended, no preset options) to ask:
-   > "What change do you want to work on? Describe what you want to build or fix."
+## 输入
 
-   From their description, derive a kebab-case name (e.g., "add user authentication" → `add-user-auth`).
+用户至少提供以下之一：
 
-   **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
+- 一个 change 名称
+- 一段“想做什么 / 想修什么”的描述
 
-2. **Create the change directory**
-   ```bash
-   openspec new change "<name>"
-   ```
-   This creates a scaffolded change at `openspec/changes/<name>/` with `.openspec.yaml`.
+如果只给了描述，从中推导 kebab-case 名称。
 
-3. **Get the artifact build order**
-   ```bash
-   openspec status --change "<name>" --json
-   ```
-   Parse the JSON to get:
-   - `applyRequires`: array of artifact IDs needed before implementation (e.g., `["tasks"]`)
-   - `artifacts`: list of all artifacts with their status and dependencies
+## 执行步骤
 
-4. **Create artifacts in sequence until apply-ready**
+### 1. 确定 change 名称
 
-   Use the **TodoWrite tool** to track progress through the artifacts.
+- 如果名称和目标都清楚，直接使用
+- 否则先判断是否需要 `superpowers:brainstorming`
+- 收敛后再确定 kebab-case change 名
 
-   Loop through artifacts in dependency order (artifacts with no pending dependencies first):
+### 2. 检查是否已存在同名 change
 
-   a. **For each artifact that is `ready` (dependencies satisfied)**:
-      - Get instructions:
-        ```bash
-        openspec instructions <artifact-id> --change "<name>" --json
-        ```
-      - The instructions JSON includes:
-        - `context`: Project background (constraints for you - do NOT include in output)
-        - `rules`: Artifact-specific rules (constraints for you - do NOT include in output)
-        - `template`: The structure to use for your output file
-        - `instruction`: Schema-specific guidance for this artifact type
-        - `outputPath`: Where to write the artifact
-        - `dependencies`: Completed artifacts to read for context
-      - Read any completed dependency files for context
-      - Create the artifact file using `template` as the structure
-      - Apply `context` and `rules` as constraints - but do NOT copy them into the file
-      - Show brief progress: "Created <artifact-id>"
+如果同名 change 已存在：
 
-   b. **Continue until all `applyRequires` artifacts are complete**
-      - After creating each artifact, re-run `openspec status --change "<name>" --json`
-      - Check if every artifact ID in `applyRequires` has `status: "done"` in the artifacts array
-      - Stop when all `applyRequires` artifacts are done
+- 不要覆盖
+- 让用户决定是继续已有 change，还是改用新名称
 
-   c. **If an artifact requires user input** (unclear context):
-      - Use **AskUserQuestion tool** to clarify
-      - Then continue with creation
+### 3. 进入隔离工作区
 
-5. **Show final status**
-   ```bash
-   openspec status --change "<name>"
-   ```
+在正式创建 change 前，优先调用 `superpowers:using-git-worktrees`。
 
-**Output**
+如果已经处于合适的隔离 worktree，可直接继续。
 
-After completing all artifacts, summarize:
-- Change name and location
-- List of artifacts created with brief descriptions
-- What's ready: "All artifacts created! Ready for implementation."
-- Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
+### 4. 创建 change 并读取状态
 
-**Artifact Creation Guidelines**
+运行：
 
-- Follow the `instruction` field from `openspec instructions` for each artifact type
-- The schema defines what each artifact should contain - follow it
-- Read dependency artifacts for context before creating new ones
-- Use `template` as the structure for your output file - fill in its sections
-- **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
-  - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
-  - These guide what you write, but should never appear in the output
+```bash
+openspec new change "<name>"
+openspec status --change "<name>" --json
+```
 
-**Guardrails**
-- Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)
-- Always read dependency artifacts before creating a new one
-- If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
-- If a change with that name already exists, ask if user wants to continue it or create a new one
-- Verify each artifact file exists after writing before proceeding to next
+读取：
+
+- `applyRequires`
+- `artifacts`
+
+目标是优先生成让 change 达到 apply-ready 所需的工件集合。
+
+### 5. 按依赖顺序生成 artifacts
+
+每次只处理依赖已满足、状态为 `ready` 的 artifact：
+
+```bash
+openspec instructions <artifact-id> --change "<name>" --json
+```
+
+对每个 artifact：
+
+1. 读取 `instruction`、`template`、`outputPath`、`dependencies`
+2. 先读已完成依赖工件
+3. 按模板写入内容
+4. 把 `context`、`rules` 当作约束使用，不要原样抄进文件
+5. 写完后确认文件已落盘，再刷新 `openspec status`
+
+达到 apply-ready 后，如果还有不阻塞 `apply` 的 `ready` artifact，默认继续生成，除非用户要求先停。
+
+### 6. 生成 `tasks.md` 时的特殊处理
+
+如果当前 artifact 是 `tasks`：
+
+1. 先基于 `specs` 与 `design` 产出任务草案
+2. 再调用 `superpowers:writing-plans`
+3. 用它把整份 `tasks.md` 收敛成可执行任务结构
+
+对 `writing-plans` 明确约束：
+
+- 只改进整份 `tasks.md`
+- 不生成额外 plan 文件
+- 默认保持简洁，不把每个 task 扩成重型计划
+- 必要时只补少量子 bullets，如 `验证`、`关联需求`
+
+### 7. 输出状态
+
+完成后总结：
+
+- change 名称与路径
+- 已生成的 artifacts
+- 当前 readiness 状态
+- 下一步动作
+
+## Guardrails
+
+- 目标是让 change 达到 apply-ready，而不是只创建空目录
+- 正式写 artifact 前，优先进入隔离 worktree
+- 生成新 artifact 前，总是先读依赖工件
+- 不要把 `context` / `rules` 块原样抄进 artifacts
+- 不要额外生成一套 Superpowers 文档体系
+- propose 阶段不要实现业务代码
+- `writing-plans` 在 propose 阶段只用于整份 `tasks.md`

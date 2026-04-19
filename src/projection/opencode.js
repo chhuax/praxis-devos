@@ -8,7 +8,6 @@ import {
   isWorkflowCommandFile,
   pruneTopLevelBundleFiles,
 } from './bundles.js';
-import { composeProjectedCommand, composeProjectedSkill } from './skill-sources.js';
 import {
   canSafelyOverwrite,
   pruneManagedAssets,
@@ -34,8 +33,6 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   for (const {
     name,
     sourceDir,
-    overlayPath = null,
-    overlayAssetsDir = null,
     sourceType = 'direct',
   } of skillSources) {
     const targetDir = path.join(openCodeSkillsDir(), name);
@@ -59,7 +56,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       pruneTopLevelBundleFiles({
         sourceDir,
         targetDir,
-        shouldPruneFile: ({ sourcePath }) => isWorkflowCommandFile(sourcePath),
+        shouldPruneFile: ({ sourcePath, targetPath }) => isWorkflowCommandFile(sourcePath ?? targetPath),
       });
     }
 
@@ -73,16 +70,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const finalContent = sourceType === 'openspec-workflow'
-          ? composeProjectedSkill({ projectedName: name, upstreamContent: content, overlayPath })
-          : content;
         const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
-        return injectMarker(finalContent, marker);
+        return injectMarker(content, marker);
       },
     });
-    if (overlayAssetsDir) {
-      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir });
-    }
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -91,8 +82,6 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       agent: 'opencode',
       extra: {
         sourceDir: path.relative(process.cwd(), sourceDir),
-        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
-        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
@@ -106,18 +95,20 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   return results;
 };
 
-export const projectCommands = ({ projectDir, version, log, workflowCommandSources = [] }) => {
+export const projectCommands = ({
+  projectDir,
+  version,
+  log,
+  workflowCommandSources = [],
+}) => {
   ensureDir(openCodeCommandsDir());
   const results = [];
 
   for (const {
     name,
-    sourcePath,
-    sourceType,
     targetRelativePath,
-    commandTitle = null,
-    overlayPath = null,
-    overlayAssetsDir = null,
+    content,
+    sourceType = 'openspec-workflow',
   } of workflowCommandSources) {
     const targetPath = path.join(openCodeCommandsDir(), targetRelativePath);
     ensureDir(path.dirname(targetPath));
@@ -132,14 +123,7 @@ export const projectCommands = ({ projectDir, version, log, workflowCommandSourc
       continue;
     }
 
-    const content = fs.readFileSync(sourcePath, 'utf8');
-    const finalContent = sourceType === 'openspec-workflow'
-      ? composeProjectedCommand({ upstreamContent: content, overlayPath, commandTitle })
-      : content;
-    fs.writeFileSync(targetPath, finalContent, 'utf8');
-    if (overlayAssetsDir) {
-      copyBundleDirectory({ sourceDir: overlayAssetsDir, targetDir: path.dirname(targetPath) });
-    }
+    fs.writeFileSync(targetPath, content, 'utf8');
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -148,9 +132,7 @@ export const projectCommands = ({ projectDir, version, log, workflowCommandSourc
       agent: 'opencode',
       extra: {
         commandName: name,
-        sourcePath: path.relative(process.cwd(), sourcePath),
-        ...(overlayPath ? { overlayPath: path.relative(process.cwd(), overlayPath) } : {}),
-        ...(overlayAssetsDir ? { overlayAssetsDir: path.relative(process.cwd(), overlayAssetsDir) } : {}),
+        sourceType,
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
@@ -225,7 +207,9 @@ export const pruneManagedUserAssets = ({
   const validSkillPaths = validSkillNames.map((name) => path.join(openCodeSkillsDir(), name, 'SKILL.md'));
   const validCommandPaths = [
     ...keepCommandNames.map((name) => path.join(openCodeCommandsDir(), `${name}.md`)),
-    ...keepCommandPaths,
+    ...keepCommandPaths.map((commandPath) => (
+      path.isAbsolute(commandPath) ? commandPath : path.join(openCodeCommandsDir(), commandPath)
+    )),
   ];
   const removed = pruneManagedAssets({
     projectDir,

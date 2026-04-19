@@ -41,6 +41,7 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
     adapter.pruneManagedUserAssets({
       projectDir,
       validSkillNames: validNames,
+      keepCommandPaths: generatedWorkflowCommandSources.map(({ targetRelativePath }) => targetRelativePath),
       log,
     });
   }

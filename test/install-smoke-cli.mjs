@@ -20,19 +20,19 @@ const PROJECTED_PRAXIS_SKILLS = [
 const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
     name: 'openspec-explore',
-    mustInclude: [/owner_flow: openspec-explore/],
+    mustInclude: [/^## 默认收敛门禁$/m],
   },
   {
     name: 'openspec-propose',
-    mustInclude: [/owner_flow: openspec-propose/],
+    mustInclude: [/^## 能力路由$/m],
   },
   {
     name: 'openspec-apply-change',
-    mustInclude: [/owner_flow: openspec-apply-change/],
+    mustInclude: [/^## 执行步骤$/m],
   },
   {
     name: 'openspec-archive-change',
-    mustInclude: [/owner_flow: openspec-archive-change/],
+    mustInclude: [/^(## 执行步骤|\*\*Steps\*\*)$/m],
   },
 ];
 
@@ -203,7 +203,9 @@ const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
 
     assert.match(skill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(skill, new RegExp(`^name: ${name}$`, 'm'));
-    assert.match(skill, /generatedBy: "1\.3\.0"/);
+    assert.match(skill, /^metadata:$/m);
+    assert.match(skill, /^  author: openspec$/m);
+    assert.match(skill, /^  version: ".+"$/m);
 
     for (const pattern of mustInclude) {
       assert.match(skill, pattern);
@@ -213,6 +215,17 @@ const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
 
 const assertOpenSpecWorkflowSkillProjectionState = ({ skillsRoot }) => {
   assertProjectedOpenSpecSkillBodies(skillsRoot);
+};
+
+const assertWorkflowCommandEntryPoint = ({ commandPath, skillName }) => {
+  assert.ok(
+    fs.existsSync(commandPath),
+    `Expected projected OpenSpec workflow command at ${commandPath}`,
+  );
+
+  const command = normalizeEol(fs.readFileSync(commandPath, 'utf8'));
+  assert.match(command, /^# \/opsx:/m);
+  assert.match(command, new RegExp(`Use the \`${skillName}\` skill as the entrypoint for this workflow command\\.`, 'm'));
 };
 
 const assertProjectedClaudeSkills = (fakeHome) => {
@@ -496,6 +509,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     });
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md')));
+    assertWorkflowCommandEntryPoint({
+      commandPath: path.join(fakeHome, '.config', 'opencode', 'commands', 'opsx-propose.md'),
+      skillName: 'openspec-propose',
+    });
 
     const doctor = runCommand(npxCmd, ['praxis-devos', 'doctor', '--strict', '--agent', 'opencode'], {
       cwd: projectDir,
@@ -512,8 +529,9 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assertOpenSpecWorkflowSkillProjectionState({
       skillsRoot: path.join(fakeHome, '.claude', 'skills'),
     });
-    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
-    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md')), false);
     assert.match(setupResult.stdout, /== copilot ==/);
     assert.match(setupResult.stdout, /no separate runtime dependency to install/i);
 
@@ -533,6 +551,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   });
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
+  assertWorkflowCommandEntryPoint({
+    commandPath: path.join(fakeHome, '.claude', 'commands', 'opsx', 'propose.md'),
+    skillName: 'openspec-propose',
+  });
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
   if (quotedWindowsWrappers) {
     const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
