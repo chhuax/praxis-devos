@@ -17,11 +17,8 @@ import { resolveUserHomeDir } from '../support/home.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // GitHub Copilot currently shares Claude-compatible user-level discovery
-// surfaces, so Praxis projects to ~/.claude by default for both skills/commands.
+// surfaces, so Praxis projects bundled skills to ~/.claude by default.
 const copilotSkillsDir = () => path.join(resolveUserHomeDir(), '.claude', 'skills');
-const copilotCommandsDir = () => path.join(resolveUserHomeDir(), '.claude', 'commands');
-const commandAssetRoot = () => path.resolve(__dirname, '../../assets/commands');
-const commandNames = ['devos-docs-init', 'devos-docs-refresh'];
 
 export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(copilotSkillsDir());
@@ -93,79 +90,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
 };
 
 export const projectCommands = ({
-  projectDir,
-  version,
   log,
-  workflowCommandSources = [],
 }) => {
-  ensureDir(copilotCommandsDir());
-  const results = [];
-
-  for (const {
-    name,
-    targetRelativePath,
-    content,
-    sourceType = 'openspec-workflow',
-  } of workflowCommandSources) {
-    const targetPath = path.join(copilotCommandsDir(), targetRelativePath);
-    ensureDir(path.dirname(targetPath));
-    if (!canSafelyOverwrite({
-      assetPath: targetPath,
-      projectDir,
-      agent: 'copilot',
-      allowAnyManagedOwner: true,
-    })) {
-      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType });
-      log(`⊘ GitHub Copilot: skipped OpenSpec workflow command ${name} because ${targetPath} is not a Praxis-managed asset`);
-      continue;
-    }
-
-    fs.writeFileSync(targetPath, content, 'utf8');
-    registerManagedAsset({
-      projectDir,
-      assetPath: targetPath,
-      type: 'command',
-      version,
-      agent: 'copilot',
-      extra: {
-        commandName: name,
-        sourceType,
-      },
-    });
-    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
-    log(`✓ GitHub Copilot: projected OpenSpec workflow command ${name} → ${targetPath}`);
-  }
-
-  for (const name of commandNames) {
-    const templatePath = path.join(commandAssetRoot(), `${name}.md`);
-    const targetPath = path.join(copilotCommandsDir(), `${name}.md`);
-    if (!canSafelyOverwrite({
-      assetPath: targetPath,
-      projectDir,
-      agent: 'copilot',
-      allowAnyManagedOwner: true,
-    })) {
-      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType: 'direct' });
-      log(`⊘ GitHub Copilot: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
-      continue;
-    }
-
-    fs.writeFileSync(targetPath, fs.readFileSync(templatePath, 'utf8'), 'utf8');
-    registerManagedAsset({
-      projectDir,
-      assetPath: targetPath,
-      type: 'command',
-      version,
-      agent: 'copilot',
-      extra: {
-        commandName: name,
-      },
-    });
-    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType: 'direct' });
-    log(`✓ GitHub Copilot: projected docs command ${name} → ${targetPath}`);
-  }
-
-  return results;
+  log('⊘ GitHub Copilot: command projection is not supported; projecting skills only');
+  return [];
 };
 
 export const detectProjections = () => {
@@ -197,21 +125,14 @@ export const cleanStaleProjections = ({ validNames, log }) => {
 export const pruneManagedUserAssets = ({
   projectDir,
   validSkillNames,
-  keepCommandNames = commandNames,
   keepCommandPaths = [],
   log,
 }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(copilotSkillsDir(), name, 'SKILL.md'));
-  const validCommandPaths = [
-    ...keepCommandNames.map((name) => path.join(copilotCommandsDir(), `${name}.md`)),
-    ...keepCommandPaths.map((commandPath) => (
-      path.isAbsolute(commandPath) ? commandPath : path.join(copilotCommandsDir(), commandPath)
-    )),
-  ];
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'copilot',
-    validPaths: [...validSkillPaths, ...new Set(validCommandPaths)],
+    validPaths: [...validSkillPaths, ...keepCommandPaths],
   });
 
   for (const removedPath of removed) {

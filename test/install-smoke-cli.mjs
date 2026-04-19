@@ -527,12 +527,9 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     assertOpenSpecWorkflowSkillProjectionState({
       skillsRoot: path.join(fakeHome, '.claude', 'skills'),
     });
-    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
-    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
-    assertWorkflowCommandEntryPoint({
-      commandPath: path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md'),
-      skillName: 'openspec-propose',
-    });
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')), false);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md')), false);
     assert.match(setupResult.stdout, /== copilot ==/);
     assert.match(setupResult.stdout, /no separate runtime dependency to install/i);
 

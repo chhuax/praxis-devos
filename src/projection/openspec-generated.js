@@ -80,9 +80,7 @@ const projectSurfaceByAgent = (agent) => {
   }
 
   if (agent === 'copilot') {
-    return {
-      targetRelativePath: (workflow) => workflow.githubPromptFileName.replace(/\.prompt\.md$/, '.md'),
-    };
+    return null;
   }
 
   return null;

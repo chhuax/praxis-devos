@@ -135,7 +135,7 @@ Praxis 对外给用户的是统一契约，但每个 agent 的底层接入方式
 - OpenCode：向用户 OpenCode 配置合并必须的插件声明，并投放内置资产
 - Codex：校验或安装 `~/.codex/` 下的 SuperPowers clone/link 布局
 - Claude Code：通过 Claude CLI 校验或安装官方 SuperPowers 插件
-- GitHub Copilot：作为独立 agent 接入，但默认把 skills 和 commands 投放到共享的 Claude 兼容发现面 `~/.claude/skills/` 与 `~/.claude/commands/`
+- GitHub Copilot：作为独立 agent 接入，但默认只把 skills 投放到共享的 Claude 兼容发现面 `~/.claude/skills/`；暂不投放 command
 
 如果你只想做依赖修复或查看指导而不执行完整 setup，可以使用 `bootstrap`。
 

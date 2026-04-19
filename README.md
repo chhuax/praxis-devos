@@ -151,7 +151,7 @@ Praxis keeps the same high-level contract across tools, but each agent has a dif
 - OpenCode: projects bundled skills and commands, and cleans legacy Praxis plugin entries from the user's OpenCode runtime config
 - Codex: validates or installs the SuperPowers clone/link layout under `~/.codex/`
 - Claude Code: validates or installs the official SuperPowers plugin through the Claude CLI
-- GitHub Copilot: projects bundled skills and commands to the shared Claude-compatible discovery surface at `~/.claude/skills/` and `~/.claude/commands/`
+- GitHub Copilot: projects bundled skills to the shared Claude-compatible discovery surface at `~/.claude/skills/`; command projection is not currently supported
 
 `bootstrap` is the lower-friction repair path when you want dependency guidance without running the full project setup flow.
 

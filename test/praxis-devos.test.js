@@ -765,7 +765,7 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.equal(manifest.assets[claudeRefreshPath]?.type, 'command');
   assert.equal(manifest.assets[opencodeInitPath]?.type, 'command');
   assert.equal(manifest.assets[opencodeRefreshPath]?.type, 'command');
-  assert.ok(manifest.assets[claudeInitPath]?.agents?.includes('copilot'));
+  assert.equal(manifest.assets[claudeInitPath]?.agents?.includes('copilot'), false);
   assert.equal(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.type, 'skill');
   assert.ok(manifest.assets[path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md')]?.agents?.includes('copilot'));
   assert.match(
@@ -774,7 +774,7 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   );
 
   assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
-  assert.match(logs.join('\n'), /GitHub Copilot: projected docs command devos-docs-init/);
+  assert.doesNotMatch(logs.join('\n'), /GitHub Copilot: projected docs command devos-docs-init/);
   assert.match(logs.join('\n'), /OpenCode: projected docs command devos-docs-refresh/);
 });
 
@@ -1378,7 +1378,7 @@ test('projectNativeSkills projects thin workflow commands into the OpenCode user
   assert.match(logs.join('\n'), /projected OpenSpec workflow command openspec-propose/i);
 });
 
-test('projectNativeSkills projects thin workflow prompts into the shared Claude-compatible command surface', () => {
+test('projectNativeSkills does not project workflow commands for GitHub Copilot', () => {
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-copilot-adopt-home-'));
   const projectDir = makeTempProject();
   const logs = [];
@@ -1395,13 +1395,11 @@ test('projectNativeSkills projects thin workflow prompts into the shared Claude-
   const adoptedCommandPath = path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md');
 
   assert.ok(fs.existsSync(adoptedSkillPath));
-  assert.ok(fs.existsSync(adoptedCommandPath));
+  assert.equal(fs.existsSync(adoptedCommandPath), false);
   assert.match(fs.readFileSync(adoptedSkillPath, 'utf8'), /^---\nname: openspec-propose\n/m);
-  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /^# \/opsx:propose\n/m);
-  assert.match(fs.readFileSync(adoptedCommandPath, 'utf8'), /Use the `openspec-propose` skill as the entrypoint for this workflow command\./);
   assert.equal(fs.existsSync(path.join(projectDir, '.github', 'skills', 'openspec-propose', 'SKILL.md')), false);
   assert.equal(fs.existsSync(path.join(projectDir, '.github', 'prompts', 'opsx-propose.prompt.md')), false);
-  assert.match(logs.join('\n'), /projected OpenSpec workflow command openspec-propose/i);
+  assert.doesNotMatch(logs.join('\n'), /projected OpenSpec workflow command openspec-propose/i);
 });
 
 test('initProject bootstraps openspec workspace through the detected runtime', () => {
@@ -1775,8 +1773,8 @@ test('setupProject provisions GitHub Copilot through the shared Claude-compatibl
     assert.ok(fs.existsSync(path.join(projectDir, 'AGENTS.md')));
     assert.equal(fs.existsSync(path.join(projectDir, 'CLAUDE.md')), false);
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'openspec-propose', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
-    assert.ok(readJson(managedAssetsPath).assets[path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')]);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')), false);
+    assert.equal(readJson(managedAssetsPath).assets[path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')], undefined);
   }));
 });
 
@@ -1978,7 +1976,7 @@ test('doctorProject reports GitHub Copilot as ready when shared projection surfa
   });
 
   assert.match(output, /\[OK\] superpowers:copilot/);
-  assert.match(output, /shared ~\/\.claude skills\/commands discovery surface/i);
+  assert.match(output, /shared ~\/\.claude skills discovery surface/i);
 });
 
 test('runCli routes help but rejects removed wrapper commands', () => {

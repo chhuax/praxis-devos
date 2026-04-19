@@ -17,7 +17,7 @@ _Scanned: 2026-04-11 | Scope: full repository_
 | `src/core/runtime/openspec.js` | OpenSpec detection, install, and bootstrap |
 | `src/projection/index.js` | Projection dispatch to agent adapters |
 | `src/projection/claude.js` | Claude skill and command projection |
-| `src/projection/copilot.js` | GitHub Copilot projection via shared Claude-compatible skills/commands surfaces |
+| `src/projection/copilot.js` | GitHub Copilot projection via shared Claude-compatible skills surface |
 | `src/core/project/state.js` | Shared paths, filesystem helpers, agent normalization |
 | `src/projection/markers.js` | `<!-- PRAXIS_PROJECTION ... -->` marker read/write |
 | `assets/` | Bundled SKILL.md files and slash command assets |
@@ -76,7 +76,7 @@ Read-only: checks OpenSpec runtime, per-agent SuperPowers, and projection covera
 |---|---|---|
 | `@fission-ai/openspec` | npm global | auto-installed by `setup`; needed for `openspec init` |
 | SuperPowers (Claude) | Claude CLI plugin | `claude plugin install <plugin> --scope user` |
-| SuperPowers (Copilot) | no extra runtime dependency | projects to `~/.claude/skills/` + `~/.claude/commands/` |
+| SuperPowers (Copilot) | no extra runtime dependency | projects to `~/.claude/skills/` |
 | SuperPowers (Codex) | git clone + symlink | `~/.codex/superpowers` + `~/.codex/skills/superpowers → ...` |
 | SuperPowers (OpenCode) | JSON config merge | `~/.config/opencode/config.json` plugin array |
 
