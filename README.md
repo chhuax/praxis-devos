@@ -61,7 +61,7 @@ Outside the project, Praxis may also:
 
 - install or refresh the bundled `spec-super` company schema in the OpenSpec user-level schema directory
 - repair the user's OpenSpec config to `profile: custom`, `delivery: both`, and workflows `propose`, `explore`, `new`, `continue`, `apply`, `ff`, `archive`
-- adopt OpenSpec-generated workflow skills and thin workflow-entry commands from the project into the selected agent's native discovery location
+- adopt OpenSpec-generated workflow skills and, on supported hosts, thin workflow-entry commands from the project into the selected agent's native discovery location
 - project Praxis-owned skills and commands into the selected agent's native discovery location
 - repair the user's OpenCode runtime config to remove legacy Praxis plugin entries and keep required runtime plugins
 - install or validate OpenSpec availability
@@ -164,15 +164,6 @@ That split keeps responsibilities clean:
 - `praxis-devos`: OpenSpec harness, SuperPowers integration, adapter management, projection, and shared workflow entrypoints
 - extension packs: company rules, stack-specific skills, hooks, and additional projection content
 
-## Maintainer-Only Experiments
-
-Some repo-local workflow boundaries exist only for maintainers and are intentionally kept outside the projection system.
-
-- `release-kit/` validates the in-repo release workflow
-- `experiments/superpowers-owned-apply/` rehearses what happens when SuperPowers owns the full apply plan in an isolated workspace and writes a change-local comparison report
-
-These boundaries do not change the default product contract for user projects.
-
 ## Repository Layout
 
 If you are working on this package itself, the important directories are:
@@ -180,7 +171,6 @@ If you are working on this package itself, the important directories are:
 ```text
 assets/              # Bundled skills, command assets, overlays, and company schema assets
 bin/                 # Published CLI entrypoint
-experiments/         # Maintainer-only validation harnesses that stay out of projection
 release-kit/         # Maintainer-only release workflow boundary
 src/core/            # Scaffold orchestration, runtime checks, adapters, constants
 src/projection/      # Agent-specific projection logic

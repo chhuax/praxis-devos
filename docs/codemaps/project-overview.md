@@ -4,7 +4,7 @@ _Scanned: 2026-04-11 | Scope: full repository_
 
 ## Project Summary
 
-`praxis-devos` is a CLI scaffold and orchestration harness (not a content generator) that connects three layers inside a user project: **OpenSpec** governance for propose/apply/validate/archive workflows, **SuperPowers** as the execution layer for skills like planning and debugging, and **agent-specific adapters** that make those rules natively discoverable in Claude Code, Codex, OpenCode, and GitHub Copilot. It installs and validates external dependencies, writes and refreshes managed blocks in project root files, and projects bundled skills/commands into each agent's native user-level discovery directories.
+`praxis-devos` is a CLI scaffold and orchestration harness (not a content generator) that connects three layers inside a user project: **OpenSpec** governance for propose/apply/validate/archive workflows, **SuperPowers** as the execution layer for skills like planning and debugging, and **agent-specific adapters** that make those rules natively discoverable in Claude Code, Codex, OpenCode, and GitHub Copilot. It installs and validates external dependencies, writes and refreshes managed blocks in project root files, and projects bundled skills plus supported host command entrypoints into each agent's native user-level discovery directories.
 
 ## First-Read Paths
 

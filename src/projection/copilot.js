@@ -50,7 +50,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       pruneTopLevelBundleFiles({
         sourceDir,
         targetDir,
-        shouldPruneFile: ({ sourcePath }) => isWorkflowCommandFile(sourcePath),
+        shouldPruneFile: ({ sourcePath, targetPath }) => isWorkflowCommandFile(sourcePath ?? targetPath),
       });
     }
 

@@ -61,7 +61,7 @@ your-project/
 
 - 在 OpenSpec 用户级 schema 目录安装或刷新内置的公司 schema `spec-super`
 - 修复用户级 OpenSpec 配置为 `profile: custom`、`delivery: both`，以及 `propose`、`explore`、`new`、`continue`、`apply`、`ff`、`archive` 这一组 workflow
-- 将项目内由 OpenSpec 生成的 workflow skills，以及仅作为入口的薄 workflow commands，adopt 到目标 agent 的原生发现位置
+- 将项目内由 OpenSpec 生成的 workflow skills，以及在支持该能力的宿主里仅作为入口的薄 workflow commands，adopt 到目标 agent 的原生发现位置
 - 向目标 agent 的原生发现位置投放 Praxis 自有 skills 和 commands
 - 在 OpenCode 支持自动化时修改用户级 OpenCode 插件配置
 - 安装或校验 OpenSpec 运行时
@@ -148,15 +148,6 @@ Praxis 应该保持在框架层尽量轻。企业 rules、skills、hooks、stack
 - `praxis-devos`：负责 OpenSpec harness、SuperPowers 集成、adapter 管理、projection 和统一工作流入口
 - extension pack：负责企业规则、stack-specific skills、hooks 和额外投放内容
 
-## 维护者专用实验
-
-仓库里也有少量只给维护者使用、并且明确不进入 projection system 的实验边界。
-
-- `release-kit/`：验证仓库内的 release workflow
-- `experiments/superpowers-owned-apply/`：在隔离 workspace 里演练“由 SuperPowers 接管完整 apply 计划”会发生什么，并把比较结论回写到当前 change 下
-
-这些边界不会改变普通用户项目的默认产品契约。
-
 ## 仓库结构
 
 如果你是在维护这个包本身，当前最重要的目录是：
@@ -164,7 +155,6 @@ Praxis 应该保持在框架层尽量轻。企业 rules、skills、hooks、stack
 ```text
 assets/              # 内置 skills、commands、overlays 和公司 schema 资产
 bin/                 # 发布后的 CLI 入口
-experiments/         # 仅维护者可用、且不参与 projection 的实验 harness
 release-kit/         # 仅维护者可用的 release workflow 边界
 src/core/            # 脚手架编排、运行时检查、adapter、共享常量
 src/projection/      # 各 agent 的 projection 逻辑

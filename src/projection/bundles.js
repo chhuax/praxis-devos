@@ -51,17 +51,17 @@ export const pruneTopLevelBundleFiles = ({
   targetDir,
   shouldPruneFile,
 }) => {
-  if (!shouldPruneFile || !fs.existsSync(sourceDir) || !fs.existsSync(targetDir)) {
+  if (!shouldPruneFile || !fs.existsSync(targetDir)) {
     return;
   }
 
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       continue;
     }
 
-    const sourcePath = path.join(sourceDir, entry.name);
     const targetPath = path.join(targetDir, entry.name);
+    const sourcePath = sourceDir ? path.join(sourceDir, entry.name) : null;
     if (shouldPruneFile({ sourcePath, targetPath })) {
       fs.rmSync(targetPath, { force: true });
     }

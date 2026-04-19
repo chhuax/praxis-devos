@@ -32,7 +32,7 @@ const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   },
   {
     name: 'openspec-archive-change',
-    mustInclude: [/^## 执行步骤$/m],
+    mustInclude: [/^(## 执行步骤|\*\*Steps\*\*)$/m],
   },
 ];
 
