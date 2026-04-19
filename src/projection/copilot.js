@@ -92,9 +92,49 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   return results;
 };
 
-export const projectCommands = ({ projectDir, version, log }) => {
+export const projectCommands = ({
+  projectDir,
+  version,
+  log,
+  workflowCommandSources = [],
+}) => {
   ensureDir(copilotCommandsDir());
   const results = [];
+
+  for (const {
+    name,
+    targetRelativePath,
+    content,
+    sourceType = 'openspec-workflow',
+  } of workflowCommandSources) {
+    const targetPath = path.join(copilotCommandsDir(), targetRelativePath);
+    ensureDir(path.dirname(targetPath));
+    if (!canSafelyOverwrite({
+      assetPath: targetPath,
+      projectDir,
+      agent: 'copilot',
+      allowAnyManagedOwner: true,
+    })) {
+      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType });
+      log(`⊘ GitHub Copilot: skipped OpenSpec workflow command ${name} because ${targetPath} is not a Praxis-managed asset`);
+      continue;
+    }
+
+    fs.writeFileSync(targetPath, content, 'utf8');
+    registerManagedAsset({
+      projectDir,
+      assetPath: targetPath,
+      type: 'command',
+      version,
+      agent: 'copilot',
+      extra: {
+        commandName: name,
+        sourceType,
+      },
+    });
+    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
+    log(`✓ GitHub Copilot: projected OpenSpec workflow command ${name} → ${targetPath}`);
+  }
 
   for (const name of commandNames) {
     const templatePath = path.join(commandAssetRoot(), `${name}.md`);
@@ -164,7 +204,9 @@ export const pruneManagedUserAssets = ({
   const validSkillPaths = validSkillNames.map((name) => path.join(copilotSkillsDir(), name, 'SKILL.md'));
   const validCommandPaths = [
     ...keepCommandNames.map((name) => path.join(copilotCommandsDir(), `${name}.md`)),
-    ...keepCommandPaths,
+    ...keepCommandPaths.map((commandPath) => (
+      path.isAbsolute(commandPath) ? commandPath : path.join(copilotCommandsDir(), commandPath)
+    )),
   ];
   const removed = pruneManagedAssets({
     projectDir,

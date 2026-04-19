@@ -215,6 +215,17 @@ const assertOpenSpecWorkflowSkillProjectionState = ({ skillsRoot }) => {
   assertProjectedOpenSpecSkillBodies(skillsRoot);
 };
 
+const assertWorkflowCommandEntryPoint = ({ commandPath, skillName }) => {
+  assert.ok(
+    fs.existsSync(commandPath),
+    `Expected projected OpenSpec workflow command at ${commandPath}`,
+  );
+
+  const command = normalizeEol(fs.readFileSync(commandPath, 'utf8'));
+  assert.match(command, /^# \/opsx:/m);
+  assert.match(command, new RegExp(`Use the \`${skillName}\` skill as the entrypoint for this workflow command\\.`, 'm'));
+};
+
 const assertProjectedClaudeSkills = (fakeHome) => {
   const skillsRoot = path.join(fakeHome, '.claude', 'skills');
   for (const name of PROJECTED_PRAXIS_SKILLS) {
@@ -496,6 +507,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     });
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-init.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.config', 'opencode', 'commands', 'devos-docs-refresh.md')));
+    assertWorkflowCommandEntryPoint({
+      commandPath: path.join(fakeHome, '.config', 'opencode', 'commands', 'opsx-propose.md'),
+      skillName: 'openspec-propose',
+    });
 
     const doctor = runCommand(npxCmd, ['praxis-devos', 'doctor', '--strict', '--agent', 'opencode'], {
       cwd: projectDir,
@@ -514,6 +529,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
     });
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
     assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
+    assertWorkflowCommandEntryPoint({
+      commandPath: path.join(fakeHome, '.claude', 'commands', 'opsx-propose.md'),
+      skillName: 'openspec-propose',
+    });
     assert.match(setupResult.stdout, /== copilot ==/);
     assert.match(setupResult.stdout, /no separate runtime dependency to install/i);
 
@@ -533,6 +552,10 @@ const runSmoke = ({ packageFile, scenario, commandPathMode }) => {
   });
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
   assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-refresh.md')));
+  assertWorkflowCommandEntryPoint({
+    commandPath: path.join(fakeHome, '.claude', 'commands', 'opsx', 'propose.md'),
+    skillName: 'openspec-propose',
+  });
   assert.match(setupResult.stdout, /Installed Claude SuperPowers with Claude Code CLI/);
   if (quotedWindowsWrappers) {
     const invocationLog = fs.readFileSync(quotedWindowsWrappers.invocationLogPath, 'utf8');
