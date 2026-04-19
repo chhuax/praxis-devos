@@ -6,10 +6,7 @@ import {
   collectBundledSkillSources,
   collectDirectSkillSources,
 } from './skill-sources.js';
-import {
-  collectGeneratedWorkflowCommandSources,
-  collectGeneratedWorkflowSkillSources,
-} from './openspec-generated.js';
+import { collectGeneratedWorkflowSkillSources } from './openspec-generated.js';
 
 const adapters = { claude, copilot, codex, opencode };
 export { collectBundledSkillSources };
@@ -25,7 +22,6 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
   }
 
   const generatedWorkflowSkillSources = collectGeneratedWorkflowSkillSources({ agent });
-  const generatedWorkflowCommandSources = collectGeneratedWorkflowCommandSources({ agent });
   const skillSources = [
     ...collectDirectSkillSources(),
     ...generatedWorkflowSkillSources,
@@ -48,12 +44,7 @@ export const projectToAgent = ({ agent, projectDir = process.cwd(), version, log
   const results = [];
   results.push(...adapter.projectSkills({ projectDir, skillSources, version, log }));
   if (typeof adapter.projectCommands === 'function') {
-    results.push(...adapter.projectCommands({
-      projectDir,
-      version,
-      log,
-      workflowCommandSources: generatedWorkflowCommandSources,
-    }));
+    results.push(...adapter.projectCommands({ projectDir, version, log }));
   }
 
   return results;

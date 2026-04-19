@@ -1,312 +1,125 @@
 name: spec-super
 version: 1
-description: Company OpenSpec workflow - proposal -> specs -> design -> blackbox-test -> tasks
+description: Company OpenSpec workflow - proposal -> specs -> design -> tasks -> blackbox-test
 artifacts:
   - id: proposal
     generates: proposal.md
-    description: Initial proposal document outlining the change
+    description: 变更提案文档，说明为什么要做这次变更
     template: proposal.md
-    instruction: >
-      Create the proposal document that establishes WHY this change is needed.
+    instruction: |
+      创建 proposal 文档，说明这次变更为什么值得做。
 
+      文档应保持简洁、稳定、便于评审，重点覆盖：
+      - 背景与动机
+      - 变更范围
+      - 新增或修改的能力
+      - 影响面
 
-      Sections:
+      其中 `Capabilities` 是 proposal 与 specs 之间的契约：
+      - 新能力写入 `New Capabilities`
+      - 需求级变更写入 `Modified Capabilities`
 
-      - **Why**: 1-2 sentences on the problem or opportunity. What problem does
-      this solve? Why now?
-
-      - **What Changes**: Bullet list of changes. Be specific about new
-      capabilities, modifications, or removals. Mark breaking changes with
-      **BREAKING**.
-
-      - **Capabilities**: Identify which specs will be created or modified:
-        - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<name>/spec.md`. Use kebab-case names (e.g., `user-auth`, `data-export`).
-        - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Check `openspec/specs/` for existing spec names. Leave empty if no requirement changes.
-      - **Impact**: Affected code, APIs, dependencies, or systems.
-
-
-      IMPORTANT: The Capabilities section is critical. It creates the contract
-      between
-
-      proposal and specs phases. Research existing specs before filling this in.
-
-      Each capability listed here will need a corresponding spec file.
-
-
-      Keep it concise (1-2 pages). Focus on the "why" not the "how" -
-
-      implementation details belong in design.md.
-
-
-      This is the foundation - specs, design, and tasks all build on this.
+      每个 capability 都应能对应到后续 `specs/<name>/spec.md`。
     requires: []
+
   - id: specs
     generates: specs/**/*.md
-    description: Detailed specifications for the change
+    description: 详细规格文档，定义系统应该做什么
     template: spec.md
-    instruction: >
-      Create specification files that define WHAT the system should do.
+    instruction: |
+      创建规格文档，定义系统“应该做什么”，而不是“内部如何实现”。
 
+      要求：
+      - 每个 capability 生成一个 spec 文件
+      - 需求优先描述外部可观察行为
+      - 每条需求必须可验证
+      - 每条需求至少包含一个 `Scenario`
 
-      Create one spec file per capability listed in the proposal's Capabilities
-      section.
+      保留 OpenSpec 兼容结构：
+      - `## ADDED Requirements`
+      - `## MODIFIED Requirements`
+      - `## REMOVED Requirements`
+      - `## RENAMED Requirements`
+      - `### Requirement: <name>`
+      - `#### Scenario: <name>`
 
-      - New capabilities: use the exact kebab-case name from the proposal
-      (specs/<capability>/spec.md).
-
-      - Modified capabilities: use the existing spec folder name from
-      openspec/specs/<capability>/ when creating the delta spec at
-      specs/<capability>/spec.md.
-
-
-      Delta operations (use ## headers):
-
-      - **ADDED Requirements**: New capabilities
-
-      - **MODIFIED Requirements**: Changed behavior - MUST include full updated
-      content
-
-      - **REMOVED Requirements**: Deprecated features - MUST include **Reason**
-      and **Migration**
-
-      - **RENAMED Requirements**: Name changes only - use FROM:/TO: format
-
-
-      Format requirements:
-
-      - Each requirement: `### Requirement: <name>` followed by description
-
-      - Use SHALL/MUST for normative requirements (avoid should/may)
-
-      - Each scenario: `#### Scenario: <name>` with WHEN/THEN format
-
-      - **CRITICAL**: Scenarios MUST use exactly 4 hashtags (`####`). Using 3
-      hashtags or bullets will fail silently.
-
-      - Every requirement MUST have at least one scenario.
-
-
-      MODIFIED requirements workflow:
-
-      1. Locate the existing requirement in openspec/specs/<capability>/spec.md
-
-      2. Copy the ENTIRE requirement block (from `### Requirement:` through all
-      scenarios)
-
-      3. Paste under `## MODIFIED Requirements` and edit to reflect new behavior
-
-      4. Ensure header text matches exactly (whitespace-insensitive)
-
-
-      Common pitfall: Using MODIFIED with partial content loses detail at
-      archive time.
-
-      If adding new concerns without changing existing behavior, use ADDED
-      instead.
-
-
-      Example:
-
-      ```
-
-      ## ADDED Requirements
-
-
-      ### Requirement: User can export data
-
-      The system SHALL allow users to export their data in CSV format.
-
-
-      #### Scenario: Successful export
-
-      - **WHEN** user clicks "Export" button
-
-      - **THEN** system downloads a CSV file with all user data
-
-
-      ## REMOVED Requirements
-
-
-      ### Requirement: Legacy export
-
-      **Reason**: Replaced by new export system
-
-      **Migration**: Use new export endpoint at /api/v2/export
-
-      ```
-
-
-      Specs should be testable - each scenario is a potential test case.
+      如果是修改已有需求，必须粘贴并修改完整 requirement block，不要只写差异摘要。
     requires:
       - proposal
+
   - id: design
     generates: design.md
-    description: Technical design document with implementation details
+    description: 技术设计文档，说明如何实现这次变更
     template: design.md
-    instruction: >
-      Create the design document that explains HOW to implement the change.
+    instruction: |
+      创建设计文档，说明这次变更“如何实现”。
 
+      设计文档应覆盖：
+      - 背景、目标与非目标
+      - 整体方案与关键流程
+      - 关键设计决策与备选方案
+      - 组件、接口、数据模型或状态流
+      - 正确性与需求映射
+      - 错误处理、验证策略、风险与回滚
 
-      When to include design.md (create only if any apply):
-
-      - Cross-cutting change (multiple services/modules) or new architectural
-      pattern
-
-      - New external dependency or significant data model changes
-
-      - Security, performance, or migration complexity
-
-      - Ambiguity that benefits from technical decisions before coding
-
-
-      Sections:
-
-      - **Context**: Background, current state, constraints, stakeholders
-
-      - **Goals / Non-Goals**: What this design achieves and explicitly excludes
-
-      - **Decisions**: Key technical choices with rationale (why X over Y?).
-      Include alternatives considered for each decision.
-
-      - **Risks / Trade-offs**: Known limitations, things that could go wrong.
-      Format: [Risk] → Mitigation
-
-      - **Migration Plan**: Steps to deploy, rollback strategy (if applicable)
-
-      - **Open Questions**: Outstanding decisions or unknowns to resolve
-
-
-      Focus on architecture and approach, not line-by-line implementation.
-
-      Reference the proposal for motivation and specs for requirements.
-
-
-      Good design docs explain the "why" behind technical decisions.
+      重点是解释为什么采用这个方案，以及如何证明它满足需求，而不是写成逐行实现说明。
     requires:
       - proposal
-  - id: blackbox-test
-    generates: blackbox-test.md
-    description: Blackbox verification plan for the change
-    template: blackbox-test.md
-    instruction: >
-      Create a blackbox verification document that explains how to validate this
-      change from the outside-in, without relying on implementation details.
-
-
-      Structure the document as a stable blackbox plan rather than a loose note.
-      It should follow this shape:
-
-      - `# 黑盒测试说明`
-      - `## 测试目标`
-      - `## 测试范围`
-      - `## 前置条件`
-      - `## 操作约束`
-      - `## 核心场景`
-      - `## 通过标准`
-      - `## 回归重点`
-      - `## 自动化验证对应`
-      - `## 测试环境待补充项`
-
-
-      Inside `核心场景`, write concrete successful and failure scenarios using:
-
-      - as many numbered scenarios as needed; do not force exactly three
-      scenarios
-      - `输入` for the trigger or request
-      - `关注点` for successful-path observations and key externally visible
-      checkpoints
-      - `预期` for failure-path blocking behavior, error semantics, rollback, or
-      non-regression expectations
-
-
-      A strong blackbox document usually includes more than one scenario. Prefer
-      a mix of:
-
-      - successful path
-      - failure or blocking path
-      - regression or compatibility path
-
-
-      Focus on:
-
-      - the end-user or operator-visible behavior that changed
-      - the shared initialization or orchestration boundaries that must not
-      regress
-      - concrete resource, environment, and compatibility expectations
-      - how automated tests map to the blackbox scenarios
-
-
-      Do not turn this file into an implementation checklist. It should help a
-      reviewer or tester validate behavior, not explain how to code it.
-
-
-      Prefer concrete scenarios over generic statements, and keep the wording
-      close to executable test intent.
-    requires:
       - specs
-      - design
+
   - id: tasks
     generates: tasks.md
-    description: Implementation checklist with trackable tasks
+    description: 可跟踪的实现任务清单
     template: tasks.md
-    instruction: >
-      Create the task list that breaks down the implementation work.
+    instruction: |
+      创建任务清单，将实现工作拆成可跟踪、可验证的 task。
 
+      重要约束：
+      - 必须使用 `- [ ] X.Y 任务描述` 的 checkbox 格式
+      - 一个 OpenSpec task 代表一个执行边界
+      - 任务应尽量小到可以在一次专注实现中完成
+      - 任务按依赖顺序组织
+      - 默认保持简洁，避免把每个 task 都写成重型计划
 
-      **IMPORTANT: Follow the template below exactly.** The apply phase parses
+      如有必要，可在 task 下按需补充子 bullets，例如：
+      - 关联需求
+      - 验证
+      - 约束
+      - 涉及文件
 
-      checkbox format to track progress. Tasks not using `- [ ]` won't be
-      tracked.
-
-
-      Guidelines:
-
-      - Group related tasks under ## numbered headings
-
-      - Each task MUST be a checkbox: `- [ ] X.Y Task description`
-
-      - Tasks should be small enough to complete in one session
-
-      - Order tasks by dependency (what must be done first?)
-
-      - Use `blackbox-test.md` as an input when deciding implementation order
-      and verification expectations, but do not duplicate its acceptance text
-      line-by-line into the task list
-
-
-      Example:
-
-      ```
-
-      ## 1. Setup
-
-
-      - [ ] 1.1 Create new module structure
-
-      - [ ] 1.2 Add dependencies to package.json
-
-
-      ## 2. Core Implementation
-
-
-      - [ ] 2.1 Implement data export function
-
-      - [ ] 2.2 Add CSV formatting utilities
-
-      ```
-
-
-      Reference specs for what needs to be built, design for how to build it,
-      and blackbox-test for what must be observable.
-
-      Each task should be verifiable - you know when it's done.
+      `tasks.md` 是默认的执行入口和任务事实来源。不要把实现计划拆到额外目录里。
     requires:
       - specs
       - design
+
+  - id: blackbox-test
+    generates: blackbox-test.md
+    description: 黑盒验证说明文档
+    template: blackbox-test.md
+    instruction: |
+      创建黑盒验证文档，从外部行为角度说明如何验证这次变更。
+
+      这个 artifact 是补充型输出，不是实现前置条件，也不是实现任务清单。
+      它应基于 specs、design 和 tasks，提炼：
+      - 成功路径
+      - 失败或阻断路径
+      - 兼容性与回归路径
+      - 自动化验证如何映射到外部场景
+
+      保持关注点在“外部可观察行为”和“验收语义”，不要写成实现步骤。
+    requires:
+      - specs
+      - design
+      - tasks
+
 apply:
   requires:
     - tasks
   tracks: tasks.md
   instruction: |
-    Read context files, work through pending tasks, mark complete as you go.
-    Pause if you hit blockers or need clarification.
+    读取上下文文件后，一次只选择一个 pending task 推进。
+    在实现前，先总结当前 task 的目标、约束和验证目标。
+    如果当前 task 过大，只细化这个 task 本身，不要顺手扩展到其他 task。
+    实现时只覆盖当前 task 的范围。
+    完成实现后先运行该 task 对应的验证，再将其勾选完成。
+    如果遇到阻塞、歧义或设计漂移，暂停并说明原因。
