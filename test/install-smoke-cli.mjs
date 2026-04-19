@@ -203,7 +203,9 @@ const assertProjectedOpenSpecSkillBodies = (skillsRoot) => {
 
     assert.match(skill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(skill, new RegExp(`^name: ${name}$`, 'm'));
-    assert.match(skill, /generatedBy: "1\.3\.0"/);
+    assert.match(skill, /^metadata:$/m);
+    assert.match(skill, /^  author: openspec$/m);
+    assert.match(skill, /^  version: ".+"$/m);
 
     for (const pattern of mustInclude) {
       assert.match(skill, pattern);
