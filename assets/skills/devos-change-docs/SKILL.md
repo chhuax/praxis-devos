@@ -1,6 +1,6 @@
 ---
 name: devos-change-docs
-description: Generate change-local blackbox and API docs, or sync stable API reference docs, using task-driven inputs and a structured result with closed writeback boundaries.
+description: "Generate blackbox test docs, API docs, or sync API references for OpenSpec changes. Use when a change needs documentation artifacts like blackbox-test.md, api-doc.md, or stable API reference updates."
 license: MIT
 compatibility: Designed for OpenSpec-linked change flows and project-level API reference sync.
 metadata:
@@ -17,6 +17,14 @@ Use this skill when a change needs:
 - `docs/reference/api.md`
 
 The caller owns final validation and writeback. This skill should return a structured result rather than directly editing repository files.
+
+## Workflow
+
+1. **Receive input** — caller provides the mode, changeId (if change-scoped), and relevant artifacts.
+2. **Select mode and gather sources** — determine which mode applies (`change-blackbox`, `change-api`, or `project-api-sync`) and collect the required source documents.
+3. **Generate content** — produce the documentation following the mode-specific requirements below.
+4. **Return structured result** — output a single JSON object with the generated content, or return `needs-clarification` if sources are insufficient.
+5. **Caller validates before writeback** — the caller checks the result against the validation expectations and writes the file only after approval.
 
 ## Modes
 

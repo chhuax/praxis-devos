@@ -1,6 +1,6 @@
 ---
 name: devos-docs
-description: Generate or refresh docs contract artifacts for a user project using AI-first orchestration with deterministic writeback boundaries.
+description: "Generate or refresh project documentation artifacts including surfaces.yaml and codemaps. Use when the user needs to initialize project docs, update codemaps after changes, or create AI-readable project overviews."
 license: MIT
 compatibility: Host command integration is external; this skill defines the repository-side contract.
 metadata:
@@ -13,6 +13,15 @@ Generate or refresh project docs contract artifacts for a user project.
 Write for AI readers first. Optimize for fast orientation during feature work and debugging, not prose elegance or exhaustive human onboarding.
 
 Treat the AI-first skill path as canonical. Do not optimize for non-AI fallback consumers when choosing content shape.
+
+## End-to-End Workflow
+
+1. Receive input (`mode`, repository context, optional `artifact_language`)
+2. Gather evidence following the Repository Interrogation Order
+3. Check Evidence Completeness checkpoints
+4. Assemble JSON result contract (see Required Outputs)
+5. Run Validation checks
+6. Return validated contract (caller writes files)
 
 ## Input
 
@@ -162,7 +171,7 @@ The global phase produces a shared context that every module batch consumes:
 
 Each module batch's output is a standalone codemap entry in the result contract. Module batches do not depend on each other's output.
 
-## Minimum Codemap Content
+## Codemap Content Requirements
 
 ### Composition Strategy
 
@@ -174,101 +183,37 @@ The allowed write-target set is intentionally narrow. Therefore each codemap sho
 
 When information would normally belong in separate files such as `architecture.md`, `backend.md`, or `dependencies.md`, fold the most decision-relevant parts into the allowed codemap targets instead of omitting them.
 
-`docs/codemaps/project-overview.md` must include:
-
-- one-paragraph system summary describing what the project is for
-- primary external surface and where it lives
-- first-read file list for orientation
-- top-level subsystem or responsibility map
-- system-level architecture summary describing the major parts and their relationship
-- external integrations, important configuration surfaces, and dependency hotspots when they can be inferred
-- key runtime or request flows that an implementation agent is likely to touch
-- problem-routing guidance telling an AI where to look for common change types
-- key constraints or repo-specific rules that strongly affect implementation behavior
-
-`docs/codemaps/module-map.md` must include:
-
-- module list
-- each module relative path
-- each module artifactId or fallback stable name
-- short responsibility summary
-- cross-module boundary hints when they can be inferred
-- dependency direction or shared-infrastructure hints when they can be inferred
-- guidance on which module to inspect first for common categories of change
-
-`docs/codemaps/modules/<artifactId>.md` must include:
-
-- module identity
-- module purpose or responsibility
-- key entry points or public interfaces
-- important in-repo dependencies
-- critical runtime or request flows inside the module when they can be inferred
-- important external integrations, background work, or persistence touchpoints when they exist
-- module-specific gotchas, change hotspots, or boundary rules that help an AI avoid the wrong edit path
-
-## Recommended Section Templates
-
-When repository context is sufficient, prefer these exact section types and keep them concise.
-
 ### `docs/codemaps/project-overview.md`
 
-- Project summary
-- First-read paths
-- System architecture
-- Main flows
-- External surfaces and dependencies
-- Problem routing
-- Constraints and repo rules
+Required content:
+
+- **Project summary**: one-paragraph system summary describing what the project is for, system type, and primary responsibility
+- **First-read paths**: file list for orientation, main entrypoints and operator entrypaths
+- **System architecture**: top-level subsystem or responsibility map describing the major parts and their relationship
+- **Main flows**: key runtime or request flows that an implementation agent is likely to touch
+- **External surfaces and dependencies**: primary external surface and where it lives, external integrations, important configuration surfaces, important contracts, and dependency hotspots when they can be inferred
+- **Problem routing**: guidance telling an AI where to look for common change types, change-routing hints
+- **Constraints and repo rules**: key constraints or repo-specific rules that strongly affect implementation behavior
 
 ### `docs/codemaps/module-map.md`
 
-- Module inventory
-- Responsibility slices
-- Dependency direction
-- Ownership hints
-- Change routing
+Required content:
+
+- **Module inventory**: module list with each module's relative path, artifactId or fallback stable name, and short responsibility summary
+- **Dependency direction**: inter-module dependency relationships, shared infrastructure modules versus feature modules, common dependency directions
+- **Ownership hints**: cross-module boundary hints when they can be inferred
+- **Change routing**: guidance on which module to inspect first for common categories of change, which module likely owns which class of change
 
 ### `docs/codemaps/modules/<artifactId>.md`
 
-- Module identity
-- Why it exists
-- Main entrypoints
-- Core flows
-- Internal and external dependencies
-- Persistence, async work, or integration touchpoints
-- Edit hazards and debugging notes
+Required content:
 
-## Preferred Information Shape
-
-When enough repository context is available, prefer content with these sections:
-
-### Project overview
-
-- System type and primary responsibility
-- Main entrypoints and operator entrypaths
-- Subsystem map
-- Key runtime flows
-- External surfaces and important contracts
-- Important dependency and configuration hotspots
-- Change-routing hints
-
-### Module map
-
-- Module inventory
-- Shared infrastructure modules versus feature modules
-- Common dependency directions
-- Which module likely owns which class of change
-
-### Module codemap
-
-- Module identity
-- Why the module exists
-- Main code entrypoints
-- Core flows or lifecycle
-- Internal dependencies
-- External dependencies
-- Persistence, async, or background work touchpoints
-- Debugging or modification tips
+- **Module identity**: module name and why the module exists
+- **Main entrypoints**: key entry points, public interfaces, or main code entrypoints
+- **Core flows**: critical runtime or request flows inside the module, core lifecycle when they can be inferred
+- **Internal and external dependencies**: important in-repo dependencies and external dependencies
+- **Persistence, async work, or integration touchpoints**: background work, persistence boundaries, or integration clients when they exist
+- **Edit hazards and debugging notes**: module-specific gotchas, change hotspots, boundary rules, or modification tips that help an AI avoid the wrong edit path
 
 ## Agent Collaboration
 
