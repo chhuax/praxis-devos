@@ -5,11 +5,11 @@ license: MIT
 compatibility: Requires openspec CLI. Works best with Superpowers skills.
 metadata:
   author: openspec
-  version: "1.3"
+  version: "1.4"
   generatedBy: "custom"
 ---
 
-实现一个 OpenSpec change 中的任务，一次只推进**一个** OpenSpec task。
+实现一个 OpenSpec change 中的任务。默认一次聚焦**一个** OpenSpec task 完成实现与验证，但在没有阻塞、风险升级或范围漂移时，可以按依赖顺序**连续推进后续 task**。
 
 ## 核心定位
 
@@ -73,7 +73,7 @@ metadata:
 
 - 勾选当前 task
 - 宣称当前 task 已完成
-- 继续推进下一个 task
+- 自动推进下一个 task
 
 ## 输入
 
@@ -119,9 +119,9 @@ openspec instructions apply --change "<name>" --json
 
 如果 `state: "blocked"`，提示先使用 `openspec-continue-change`；如果 `state: "all_done"`，提示可 archive。
 
-### 3. 选择当前单个 task
+### 3. 选择当前 task
 
-- 一次只处理一个 task
+- 一次先锁定并处理一个 task
 - 明确显示当前任务编号与文本
 - 检查是否存在未满足的前置依赖
 - 在当前 task 未锁定前，不得创建 TodoWrite 或展开执行待办
@@ -164,7 +164,7 @@ openspec instructions apply --change "<name>" --json
 
 - 涉及实现代码时，先走 `superpowers:test-driven-development`
 - 只实现当前 task
-- 不顺手推进下一个 task
+- 在当前 task 验证完成前，不要切到下一个 task
 - 如果进行并行，只能发生在当前 task 内部
 - 如果实现中发现设计与 artifacts 不一致，立即暂停并反馈
 
@@ -173,6 +173,16 @@ openspec instructions apply --change "<name>" --json
 调用 `superpowers:verification-before-completion` 后，只有在当前 task 的关键验证通过时，才允许把 `- [ ]` 改成 `- [x]`。
 
 完成后立即更新 `tasks.md`，不要先批量实现多个任务再统一勾选。
+
+### 9. 连续推进后续 task
+
+- 如果当前 task 已完成验证并勾选，且下一个 pending task 的前置依赖已满足，则默认继续推进
+- 不需要在每个 task 之间额外停下来向用户确认
+- 只有在以下情况才暂停并确认用户：
+  - 遇到阻塞、失败或不明确异常
+  - 发现需求歧义、设计漂移或 artifacts 需要回退到 propose / continue
+  - 需要扩大范围、调整优先级、跳过 task，或合并 / 拆分 task
+  - 将进入高风险动作，或验证结果不足以支撑继续推进
 
 ## Guardrails
 
@@ -185,4 +195,5 @@ openspec instructions apply --change "<name>" --json
 - 在执行模式确认前，不允许 TodoWrite、测试、patch 或编码
 - 出现不明确失败时，必须进入 `superpowers:systematic-debugging`
 - 未经 `superpowers:verification-before-completion`，不允许勾选 task
-- 不要跨 task 扩大范围
+- 可以在同一 approved change 内按依赖顺序连续推进多个 task，但必须保持“当前 task 先验证、再进入下一个 task”的节奏
+- 不要跨出当前 approved change 的范围
