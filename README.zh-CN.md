@@ -18,18 +18,6 @@
 
 ## 安装与升级
 
-### 全局 npm 安装
-
-```bash
-npm install -g praxis-devos
-```
-
-升级全局 CLI：
-
-```bash
-npm install -g praxis-devos@latest
-```
-
 ### `npx` 一次性使用
 
 ```bash

@@ -18,18 +18,6 @@
 
 ## Install and Upgrade
 
-### Global npm install
-
-```bash
-npm install -g praxis-devos
-```
-
-Upgrade the global CLI:
-
-```bash
-npm install -g praxis-devos@latest
-```
-
 ### One-off `npx` usage
 
 ```bash
