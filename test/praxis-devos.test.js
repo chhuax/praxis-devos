@@ -948,7 +948,13 @@ test('bundled OpenSpec workflow skills are final self-contained assets and confi
   assert.doesNotMatch(applySkill, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.doesNotMatch(exploreSkill, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.doesNotMatch(archiveSkill, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
-  assert.match(exploreSkill, /^## 默认收敛门禁$/m);
+  assert.match(exploreSkill, /^## Brainstorming 门禁$/m);
+  assert.match(exploreSkill, /真实加载并使用 `superpowers:brainstorming`，不得只在文字里声称“已经 brainstorm 过”/);
+  assert.match(exploreSkill, /只把它当作当前 explore 的收敛能力，不进入它自带的 spec \/ plan \/ implementation 流程/);
+  assert.match(exploreSkill, /不得产出 `docs\/superpowers\/\*\*` 或其他旁路 spec \/ plan 文档/);
+  assert.match(exploreSkill, /调用完成后必须先回到 `openspec-explore`/);
+  assert.match(exploreSkill, /^## 最小示例$/m);
+  assert.match(exploreSkill, /建议 `\/opsx:propose`/);
   assert.match(proposeSkill, /^## 能力路由$/m);
   assert.match(applySkill, /^## 执行步骤$/m);
   assert.match(archiveSkill, /^\*\*Guardrails\*\*$/m);
