@@ -957,6 +957,9 @@ test('bundled OpenSpec workflow skills are final self-contained assets and confi
   assert.match(exploreSkill, /建议 `\/opsx:propose`/);
   assert.match(proposeSkill, /^## 能力路由$/m);
   assert.match(applySkill, /^## 执行步骤$/m);
+  assert.match(applySkill, /可按 `tasks\.md` 顺序连续推进一个或多个已解锁 task/);
+  assert.match(applySkill, /一次 apply 不必限制为单个 task/);
+  assert.doesNotMatch(applySkill, /一次只推进\*\*一个\*\* OpenSpec task/);
   assert.match(archiveSkill, /^\*\*Guardrails\*\*$/m);
   assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);
 });
@@ -987,13 +990,24 @@ test('company OpenSpec schema bundle keeps blackbox-test as a formal artifact', 
     'templates',
     'blackbox-test.md',
   );
+  const tasksTemplatePath = path.join(
+    PRAXIS_ROOT,
+    'assets',
+    'openspec',
+    'schemas',
+    'spec-super',
+    'templates',
+    'tasks.md',
+  );
   assert.ok(fs.existsSync(schemaPath));
   assert.ok(fs.existsSync(manifestPath));
   assert.ok(fs.existsSync(blackboxTemplatePath));
+  assert.ok(fs.existsSync(tasksTemplatePath));
 
   const schema = normalizeEol(fs.readFileSync(schemaPath, 'utf8'));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const blackboxTemplate = fs.readFileSync(blackboxTemplatePath, 'utf8');
+  const tasksTemplate = fs.readFileSync(tasksTemplatePath, 'utf8');
 
   assert.match(schema, /^name: spec-super$/m);
   assert.match(schema, /^description: Company OpenSpec workflow - proposal -> specs -> design -> tasks -> blackbox-test$/m);
@@ -1001,6 +1015,8 @@ test('company OpenSpec schema bundle keeps blackbox-test as a formal artifact', 
   assert.match(schema, /\n  - id: blackbox-test\n[\s\S]*?requires:\n      - specs\n      - design\n      - tasks/);
   assert.match(schema, /\n  - id: tasks\n[\s\S]*?requires:\n      - specs\n      - design/);
   assert.doesNotMatch(schema, /\n  - id: tasks\n[\s\S]*?requires:\n      - blackbox-test/);
+  assert.match(schema, /必要时可连续推进多个已解锁且范围连贯的 pending task/);
+  assert.doesNotMatch(schema, /一次只选择一个 pending task 推进/);
 
   assert.equal(manifest.schemaName, 'spec-super');
   assert.equal(manifest.baselineSchemaPath, 'openspec/schemas/spec-super/schema.yaml');
@@ -1016,6 +1032,8 @@ test('company OpenSpec schema bundle keeps blackbox-test as a formal artifact', 
   assert.match(blackboxTemplate, /^## 回归重点$/m);
   assert.match(blackboxTemplate, /^## 自动化验证对应$/m);
   assert.match(blackboxTemplate, /^## 测试环境待补充项$/m);
+  assert.match(tasksTemplate, /一次 apply 可以连续完成多个已解锁 task/);
+  assert.doesNotMatch(tasksTemplate, /一次只推进一个 OpenSpec task/);
 });
 
 test('OpenSpec workflow source skills are projected unchanged apart from the Praxis marker', () => {

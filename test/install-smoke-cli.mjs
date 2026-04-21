@@ -36,7 +36,11 @@ const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   },
   {
     name: 'openspec-apply-change',
-    mustInclude: [/^## 执行步骤$/m],
+    mustInclude: [
+      /^## 执行步骤$/m,
+      /可按 `tasks\.md` 顺序连续推进一个或多个已解锁 task/,
+      /一次 apply 不必限制为单个 task/,
+    ],
   },
   {
     name: 'openspec-archive-change',
