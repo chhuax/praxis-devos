@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-04-22
+
+### Changed
+- Tightened bundled OpenSpec workflow guardrails so projected workflow skills stay aligned with the current task-execution contract
+- Refined `openspec-apply` / `openspec-explore` / `openspec-propose` workflow wording and supporting schema templates to better match the maintained OpenSpec stage model
+
+### Fixed
+- Install smoke coverage now accepts the current OpenSpec explore output shape while keeping assertions focused on stable contract evidence
+- Added regression coverage for explore-doc transcript handling so workflow guardrail refreshes stay release-safe
+
 ## [0.6.7] - 2026-04-20
 
 ### Added
