@@ -87,7 +87,7 @@ openspec instructions <artifact-id> --change "<name>" --json
 对 `writing-plans` 明确约束：
 
 - 只改进当前 change 的 `tasks.md`
-- 不要为 apply 阶段单个 task 写微计划
+- 不要为 apply 阶段预先拆成逐 task 微计划
 - 不要生成独立总 plan 文件
 - 默认保持任务清单简洁
 

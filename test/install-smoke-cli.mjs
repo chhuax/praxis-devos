@@ -20,7 +20,15 @@ const PROJECTED_PRAXIS_SKILLS = [
 const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
     name: 'openspec-explore',
-    mustInclude: [/^## 默认收敛门禁$/m],
+    mustInclude: [
+      /^## Brainstorming 门禁$/m,
+      /真实加载并使用 `superpowers:brainstorming`，不得只在文字里声称“已经 brainstorm 过”/,
+      /只把它当作当前 explore 的收敛能力，不进入它自带的 spec \/ plan \/ implementation 流程/,
+      /不得产出 `docs\/superpowers\/\*\*` 或其他旁路 spec \/ plan 文档/,
+      /调用完成后必须先回到 `openspec-explore`/,
+      /^## 最小示例$/m,
+      /建议 `\/opsx:propose`/,
+    ],
   },
   {
     name: 'openspec-propose',
@@ -28,7 +36,11 @@ const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   },
   {
     name: 'openspec-apply-change',
-    mustInclude: [/^## 执行步骤$/m],
+    mustInclude: [
+      /^## 执行步骤$/m,
+      /可按 `tasks\.md` 顺序连续推进一个或多个已解锁 task/,
+      /一次 apply 不必限制为单个 task/,
+    ],
   },
   {
     name: 'openspec-archive-change',
