@@ -32,7 +32,7 @@ npx praxis-devos@latest update --agent codex
 
 ## What `setup` Changes
 
-Running `npx praxis-devos setup ...` can touch both the project and the local user environment.
+Running `npx praxis-devos@latest setup ...` can touch both the project and the local user environment.
 
 Inside the project, Praxis may create or refresh:
 
@@ -60,36 +60,36 @@ Outside the project, Praxis may also:
 ### Codex
 
 ```bash
-npx praxis-devos setup --agent codex
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent codex
+npx praxis-devos@latest doctor --strict
 ```
 
 ### Claude Code
 
 ```bash
-npx praxis-devos setup --agent claude
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent claude
+npx praxis-devos@latest doctor --strict
 ```
 
 ### OpenCode
 
 ```bash
-npx praxis-devos setup --agent opencode
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent opencode
+npx praxis-devos@latest doctor --strict
 ```
 
 ### GitHub Copilot
 
 ```bash
-npx praxis-devos setup --agent copilot
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent copilot
+npx praxis-devos@latest doctor --strict
 ```
 
 ### Multi-Agent Project
 
 ```bash
-npx praxis-devos setup --agents opencode,codex,claude,copilot
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agents opencode,codex,claude,copilot
+npx praxis-devos@latest doctor --strict
 ```
 
 ## Commands

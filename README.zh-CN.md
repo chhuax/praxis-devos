@@ -44,7 +44,7 @@ npx praxis-devos@latest update --agent codex
 
 ## `setup` 会改什么
 
-执行 `npx praxis-devos setup ...` 时，Praxis 既可能改项目，也可能改本机用户环境。
+执行 `npx praxis-devos@latest setup ...` 时，Praxis 既可能改项目，也可能改本机用户环境。
 
 在项目内，通常会创建或刷新这些入口：
 
@@ -72,36 +72,36 @@ your-project/
 ### Codex
 
 ```bash
-npx praxis-devos setup --agent codex
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent codex
+npx praxis-devos@latest doctor --strict
 ```
 
 ### Claude Code
 
 ```bash
-npx praxis-devos setup --agent claude
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent claude
+npx praxis-devos@latest doctor --strict
 ```
 
 ### OpenCode
 
 ```bash
-npx praxis-devos setup --agent opencode
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent opencode
+npx praxis-devos@latest doctor --strict
 ```
 
 ### GitHub Copilot
 
 ```bash
-npx praxis-devos setup --agent copilot
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agent copilot
+npx praxis-devos@latest doctor --strict
 ```
 
 ### 多 Agent 项目
 
 ```bash
-npx praxis-devos setup --agents opencode,codex,claude,copilot
-npx praxis-devos doctor --strict
+npx praxis-devos@latest setup --agents opencode,codex,claude,copilot
+npx praxis-devos@latest doctor --strict
 ```
 
 ## 命令
@@ -111,20 +111,37 @@ npx praxis-devos doctor --strict
 | `setup` | 主 onboarding / 修复入口 |
 | `init` | 初始化项目骨架和托管 adapter |
 | `update` | 刷新托管 adapter 与原生投放 |
+| `install-pack <path-or-git-url>` | 安装本地或 git-backed 的扩展包到用户级支持资产中 |
 | `status` | 查看当前项目与依赖状态 |
 | `doctor` | 检查 OpenSpec、agent 依赖和投放情况 |
 | `bootstrap` | 打印或执行依赖 bootstrap 指引 |
 
 ## 文档工作流
 
-Praxis 也把 codemap 和 API 文档视为 harnessed workflow，而不是硬编码在 JS 里的内容生成。
+Praxis 也把 codemap 和 API 文档视为 harnessed workflow，而不是硬编码在 JS 里的内容生成。JS 脚手架负责路由、投放、校验和约束这些工作流，但不负责生成最终给人阅读的正文内容。
 
-- project-level 的 codemap / surface 文档通过 docs skill 流程完成
-- change-level 的黑盒文档和 API 变更文档通过 change-doc skill 流程完成
-- archive 时的 API reference 同步也是 harness 驱动的工作流
-- JS 脚手架只负责路由、投放、约束和校验，不负责生成这些给人看的正文内容
+### 项目级文档
 
-也就是说，Praxis 不只是 setup 的 harness，也是 docs workflow 的 outer harness。
+项目范围的 codemap 和 surface 文档通过 `devos-docs` skill 在 `setup` 后使用：
+
+| 模式 | 产出 |
+|---|---|
+| `init` | `docs/surfaces.yaml`、`docs/codemaps/project-overview.md` 以及相关 codemap 文件 |
+| `refresh` | 根据当前代码库状态刷新已有 codemap 文件 |
+
+通过 agent 的 skill 系统调用，例如 `/devos-docs-init` 或 `/devos-docs-refresh`。
+
+### 变更级文档
+
+在 OpenSpec change 中，使用 `devos-change-docs` skill 生成变更范围的文档：
+
+| 模式 | 产出 |
+|---|---|
+| `change-blackbox` | `openspec/changes/<change>/blackbox-test.md`，从外部可观察行为描述变更 |
+| `change-api` | `openspec/changes/<change>/api-doc.md`，记录该变更的 API 合同变化 |
+| `project-api-sync` | 变更落地后同步更新 `docs/reference/api.md` 中的稳定 API 内容 |
+
+公司 schema 现在会把 `blackbox-test.md` 作为正式变更工件输出。条件性的 API 文档和 project API sync 仍通过 `devos-change-docs` 路由，archive 检查也仍会验证 API sync 证据，或者要求明确的 API 影响豁免。
 
 ## 各 Agent 的接入方式
 
@@ -147,6 +164,90 @@ Praxis 应该保持在框架层尽量轻。企业 rules、skills、hooks、stack
 
 - `praxis-devos`：负责 OpenSpec harness、SuperPowers 集成、adapter 管理、projection 和统一工作流入口
 - extension pack：负责企业规则、stack-specific skills、hooks 和额外投放内容
+
+### 直接安装扩展包
+
+如果你想显式安装一个扩展包，而不是修改项目配置，可以使用 `install-pack`：
+
+```bash
+npx praxis-devos@latest install-pack ../company-devos-pack --agent codex
+npx praxis-devos@latest install-pack git+https://example.com/company/devos-pack.git --stack java --agent claude
+```
+
+对于采用 `common/` 加 `stacks/` 布局的扩展包，至少传入一个 stack：
+
+```bash
+npx praxis-devos@latest install-pack ../company-devos-pack --stacks java,golang --agents codex,claude
+```
+
+重复安装是可升级安全的：
+
+- git 扩展包会先刷新缓存 checkout，再进行 projection
+- 仍然存在的资源会在它们属于 Praxis 管理时被覆盖更新
+- 新资源会被安装
+- 同一个扩展包里已删除的资源会从选定 agent 上被清理
+- 其他扩展包、Praxis 内置资源，以及用户自有文件不会被误删
+
+### 项目声明的扩展包
+
+项目也可以在 `package.json` 里声明扩展包，这样 `setup`、`update` 和 `doctor` 会在正常的项目 projection 流程里一起处理：
+
+```json
+{
+  "praxis-devos": {
+    "skillPacks": [
+      "../company-devos-pack",
+      {
+        "path": "git+https://example.com/company/devos-pack.git",
+        "stacks": ["java", "golang"]
+      }
+    ]
+  }
+}
+```
+
+`install-pack` 不会写入这段配置。当扩展包本身属于项目契约时，使用项目声明方式；如果只是显式做一次用户级安装，则使用 `install-pack`。
+
+### 扩展包布局规范
+
+Praxis 只消费那些被已注册 resource projector 认领的资源目录。当前支持的资源类型是 `skills` 和 `commands`。
+
+平铺型扩展包：
+
+```text
+company-devos-pack/
+├── package.json
+├── skills/
+│   └── enterprise-standards/
+│       ├── SKILL.md
+│       └── references/
+└── commands/
+    └── devos-check.md
+```
+
+`common` 加 `stack` 的扩展包：
+
+```text
+company-devos-pack/
+├── package.json
+├── common/
+│   ├── skills/
+│   │   └── enterprise-standards/
+│   │       └── SKILL.md
+│   └── commands/
+│       └── enterprise-check.md
+└── stacks/
+    └── java/
+        ├── skills/
+        │   └── spring-delivery/
+        │       └── SKILL.md
+        └── commands/
+            └── spring-check.md
+```
+
+Rules 和 hooks 可以存在于扩展包仓库里，但在有对应 resource projector 之前，Praxis 会忽略 `rules/`、`hooks/`、`src/`、`bin/` 以及其他未注册目录。
+
+同一种资源类型下，资源名必须唯一。扩展包中的 skill 或 command 不能静默覆盖另一个扩展包或 Praxis 内置资源中同名的内容。
 
 ## 仓库结构
 
