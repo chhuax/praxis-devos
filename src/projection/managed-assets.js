@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { resolveUserHomeDir } from '../support/home.js';
 
-const MANAGED_ASSETS_VERSION = 1;
+const MANAGED_ASSETS_VERSION = 2;
 
 export const managedAssetsPath = () => path.join(
   resolveUserHomeDir(),
@@ -20,6 +20,101 @@ const defaultManifest = () => ({
   assets: {},
 });
 
+const uniqueStrings = (values = []) => [...new Set(
+  values.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim()),
+)];
+
+const inferLegacyAssetType = (assetPath, entry = {}) => {
+  if (typeof entry?.type === 'string' && entry.type.trim()) {
+    return entry.type.trim();
+  }
+
+  const normalizedPath = normalizeAssetPath(assetPath);
+  if (path.basename(normalizedPath) === 'SKILL.md') {
+    return 'skill';
+  }
+
+  if (
+    normalizedPath.endsWith('.md')
+    || normalizedPath.includes(`${path.sep}commands${path.sep}`)
+  ) {
+    return 'command';
+  }
+
+  return null;
+};
+
+const inferLegacyOwners = (entry = {}, agents = []) => {
+  const explicitOwners = uniqueStrings(entry.owners);
+  if (explicitOwners.length > 0) {
+    return explicitOwners;
+  }
+
+  const directOwner = uniqueStrings([
+    entry.owner,
+    entry.ownerRef,
+  ]);
+  if (directOwner.length > 0) {
+    return directOwner;
+  }
+
+  const legacyProjectDir = typeof entry.projectDir === 'string' && entry.projectDir.trim()
+    ? entry.projectDir.trim()
+    : typeof entry.project === 'string' && entry.project.trim()
+      ? entry.project.trim()
+      : null;
+
+  if (!legacyProjectDir) {
+    return [];
+  }
+
+  if (agents.length > 0) {
+    return agents.map((agent) => normalizeOwnerRef(legacyProjectDir, agent));
+  }
+
+  return [normalizeOwnerRef(legacyProjectDir, null)];
+};
+
+const normalizeManagedAssetEntry = (assetPath, entry = {}) => {
+  const agents = uniqueStrings([
+    ...(Array.isArray(entry?.agents) ? entry.agents : []),
+    entry?.agent,
+  ]);
+  const owners = inferLegacyOwners(entry, agents);
+  const type = inferLegacyAssetType(assetPath, entry);
+
+  return {
+    ...entry,
+    ...(type ? { type } : {}),
+    ...(agents.length > 0 ? {
+      agents,
+      agent: agents.length === 1 ? agents[0] : undefined,
+    } : {}),
+    owners,
+  };
+};
+
+const normalizeManagedManifest = (parsed) => {
+  const manifest = defaultManifest();
+  const assets = parsed && typeof parsed.assets === 'object' && parsed.assets ? parsed.assets : {};
+  let changed = parsed?.version !== MANAGED_ASSETS_VERSION;
+
+  for (const [assetPath, entry] of Object.entries(assets)) {
+    const normalizedPath = normalizeAssetPath(assetPath);
+    const normalizedEntry = normalizeManagedAssetEntry(normalizedPath, entry);
+    manifest.assets[normalizedPath] = normalizedEntry;
+
+    if (normalizedPath !== assetPath) {
+      changed = true;
+    }
+    if (JSON.stringify(normalizedEntry) !== JSON.stringify(entry || {})) {
+      changed = true;
+    }
+  }
+
+  return { manifest, changed };
+};
+
 export const readManagedAssets = () => {
   const filePath = managedAssetsPath();
   if (!fs.existsSync(filePath)) {
@@ -28,10 +123,11 @@ export const readManagedAssets = () => {
 
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    return {
-      version: parsed?.version === MANAGED_ASSETS_VERSION ? parsed.version : MANAGED_ASSETS_VERSION,
-      assets: parsed && typeof parsed.assets === 'object' && parsed.assets ? parsed.assets : {},
-    };
+    const { manifest, changed } = normalizeManagedManifest(parsed);
+    if (changed) {
+      writeManagedAssets(manifest);
+    }
+    return manifest;
   } catch {
     return defaultManifest();
   }

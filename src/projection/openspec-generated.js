@@ -66,26 +66,6 @@ const generatedWorkflowDefinitions = [
 
 const supportedAgents = new Set(['codex', 'claude', 'opencode', 'copilot']);
 
-const projectSurfaceByAgent = (agent) => {
-  if (agent === 'claude') {
-    return {
-      targetRelativePath: (workflow) => workflow.claudeCommandRelativePath,
-    };
-  }
-
-  if (agent === 'opencode') {
-    return {
-      targetRelativePath: (workflow) => workflow.opencodeCommandFileName,
-    };
-  }
-
-  if (agent === 'copilot') {
-    return null;
-  }
-
-  return null;
-};
-
 const buildThinCommandBody = ({ skillName, commandTitle }) => [
   `# ${commandTitle}`,
   '',
@@ -119,15 +99,18 @@ export const collectGeneratedWorkflowSkillSources = ({ agent }) => {
 };
 
 export const collectGeneratedWorkflowCommandSources = ({ agent }) => {
-  const surface = projectSurfaceByAgent(agent);
-  if (!surface) {
+  if (agent === 'copilot' || agent === 'codex') {
     return [];
   }
 
   return generatedWorkflowDefinitions.map((workflow) => ({
     name: workflow.name,
     sourceType: 'openspec-workflow',
-    targetRelativePath: surface.targetRelativePath(workflow),
+    sourceDir: path.join(workflowSourceRoot(), workflow.sourceSkillDirName),
+    targetRelativePaths: {
+      claude: workflow.claudeCommandRelativePath,
+      opencode: workflow.opencodeCommandFileName,
+    },
     content: buildThinCommandBody({
       skillName: workflow.name,
       commandTitle: workflow.commandTitle,

@@ -1,6 +1,6 @@
 ---
 name: openspec-continue-change
-description: 继续推进一个 OpenSpec change，创建下一个 ready artifact。适用于用户希望继续推进 proposal、specs、design、tasks 等工件，但暂不进入代码实现。
+description: Continue an OpenSpec change by creating the next ready artifact. Use when the user wants to keep advancing proposal, specs, design, tasks, or similar artifacts without entering code implementation yet.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -9,109 +9,109 @@ metadata:
   generatedBy: "custom"
 ---
 
-继续推进一个 OpenSpec change，但一次只创建**下一个 ready artifact**。
+Continue an OpenSpec change, but create only the **next ready artifact** each time.
 
-## 核心定位
+## Core Positioning
 
-- OpenSpec 负责：change 选择、artifact 依赖、status、instructions
-- Superpowers 负责：收敛需求与拆解任务
-- 每次只推进一个 artifact
-- continue 阶段不实现业务代码
+- OpenSpec owns change selection, artifact dependencies, status, and instructions
+- Superpowers owns requirement convergence and task decomposition
+- Advance only one artifact at a time
+- The continue stage does not implement business code
 
-## 精确 Skill 协议
+## Exact Skill Protocol
 
-- 命中路由时，必须调用对应的**精确 skill 名**
-- 不得用相近的本地 skill、todo list、手工拆点或长段 reasoning 替代
-- 如果精确 skill 不可用，必须明确报告，并暂停当前路由
+- When this route is matched, you must call the corresponding **exact skill name**
+- Do not substitute a similar local skill, todo list, manual breakdown, or long-form reasoning
+- If the exact skill is unavailable, report that explicitly and pause the current routing
 
-## 能力路由
+## Capability Routing
 
-- 如果当前 artifact 依赖不清晰的目标、边界或方案，先用 `superpowers:brainstorming`
-- 如果当前 artifact 是 `tasks.md`，默认调用 `superpowers:writing-plans`
-- continue 阶段的 `writing-plans` 只服务于**整份 `tasks.md`**
-- 不要生成 `docs/superpowers/plans/...` 或额外总 plan
+- If the current artifact depends on unclear goals, boundaries, or approaches, use `superpowers:brainstorming` first
+- If the current artifact is `tasks.md`, call `superpowers:writing-plans` by default
+- In the continue stage, `writing-plans` only serves the **entire `tasks.md`**
+- Do not generate `docs/superpowers/plans/...` or any extra master plan
 
-## 输入
+## Input
 
-可选指定一个 change 名称；如果未指定，先确定要继续哪个 change。
+You may specify a change name. If none is given, first determine which change should be continued.
 
-## 执行步骤
+## Execution Steps
 
-### 1. 选择 change
+### 1. Select the change
 
-- 如果用户给了 change 名称，直接使用
-- 否则运行 `openspec list --json`
-- 如果有多个候选，不要猜，让用户选择
+- If the user provided a change name, use it directly
+- Otherwise, run `openspec list --json`
+- If multiple candidates exist, do not guess; let the user choose
 
-### 2. 检查状态
+### 2. Check status
 
-运行：
+Run:
 
 ```bash
 openspec status --change "<name>" --json
 ```
 
-读取：
+Read:
 
 - `schemaName`
 - `artifacts`
 - `isComplete`
 
-如果 `isComplete: true`，展示最终状态并停止。
+If `isComplete: true`, show the final status and stop.
 
-### 3. 选择当前 ready artifact
+### 3. Choose the current ready artifact
 
-- 如果存在 `status: "ready"` 的 artifact，只创建第一个
-- 如果没有 `ready` artifact`，展示当前状态并说明无法继续推进
+- If any artifact has `status: "ready"`, create only the first one
+- If there is no `ready` artifact, show the current status and explain that progress cannot continue yet
 
-### 4. 读取指令并生成 artifact
+### 4. Read instructions and generate the artifact
 
-运行：
+Run:
 
 ```bash
 openspec instructions <artifact-id> --change "<name>" --json
 ```
 
-然后：
+Then:
 
-1. 读取依赖工件
-2. 按 `template` 结构写入文件
-3. 把 `context` 与 `rules` 当作约束使用
-4. 不要把这些约束块原样抄进 artifact
+1. Read dependency artifacts
+2. Write the file using the `template` structure
+3. Treat `context` and `rules` as constraints
+4. Do not copy those constraint blocks verbatim into the artifact
 
-### 5. 按 artifact 类型应用路由
+### 5. Apply routing based on artifact type
 
-- proposal / specs / design：如果继续写只会制造伪确定性，先调用 `superpowers:brainstorming`
-- tasks：先生成草案，再调用 `superpowers:writing-plans` 把整份 `tasks.md` 收敛成可执行任务结构
+- proposal / specs / design: if continuing to write would create false certainty, call `superpowers:brainstorming` first
+- tasks: draft it first, then call `superpowers:writing-plans` to refine the full `tasks.md` into an executable task structure
 
-对 `writing-plans` 明确约束：
+Apply these explicit constraints to `writing-plans`:
 
-- 只改进当前 change 的 `tasks.md`
-- 不要为 apply 阶段预先拆成逐 task 微计划
-- 不要生成独立总 plan 文件
-- 默认保持任务清单简洁
+- Improve only the current change's `tasks.md`
+- Do not pre-split the apply stage into per-task micro-plans
+- Do not generate a separate master plan file
+- Keep the task list concise by default
 
-### 6. 展示进度
+### 6. Show progress
 
-创建完一个 artifact 后重新运行：
+After creating one artifact, run again:
 
 ```bash
 openspec status --change "<name>"
 ```
 
-展示：
+Show:
 
-- 本次创建了哪个 artifact
-- 当前 schema
-- 当前完成进度
-- 接下来解锁了哪些 artifact
+- Which artifact was created this round
+- The current schema
+- The current completion progress
+- Which artifacts were unlocked next
 
 ## Guardrails
 
-- 每次只创建一个 artifact
-- 总是先读依赖工件，再创建新 artifact
-- 不要跳过 artifact 或乱序创建
-- 如果 context 不清楚，先收敛，不要硬写
-- 验证文件已写到正确位置后，再汇报进度
-- continue 阶段不要实现业务代码
-- `writing-plans` 在 continue 阶段只用于整份 `tasks.md`
+- Create only one artifact at a time
+- Always read dependency artifacts before creating a new artifact
+- Do not skip artifacts or create them out of order
+- If the context is unclear, converge first instead of forcing a write
+- Verify the file was written to the correct location before reporting progress
+- Do not implement business code during the continue stage
+- In the continue stage, `writing-plans` is only for the full `tasks.md`

@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { isWorkflowCommandFile } from '../src/projection/bundles.js';
+import { readManagedAssets } from '../src/projection/managed-assets.js';
 import { injectMarker } from '../src/projection/markers.js';
 import { collectBundledSkillSources } from '../src/projection/index.js';
 
@@ -13,6 +16,7 @@ import {
   bootstrapProject,
   doctorProject,
   initProject,
+  installPackProject,
   parseCliArgs,
   populateOpenSpecConfig,
   projectNativeSkills,
@@ -80,6 +84,73 @@ const normalizeEol = (value) => value.replace(/\r\n/g, '\n');
 const normalizeSlashes = (value) => value.replace(/\\/g, '/');
 const stripProjectionMarker = (value) => normalizeEol(value)
   .replace(/^<!-- PRAXIS_PROJECTION [^\n]+ -->\n/m, '');
+const writeJson = (filePath, value) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+};
+const writeText = (filePath, value) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, value, 'utf8');
+};
+const writeProjectPackageJson = (projectDir, config = null) => {
+  writeJson(path.join(projectDir, 'package.json'), {
+    name: 'test-project',
+    version: '1.0.0',
+    ...(config ? { 'praxis-devos': config } : {}),
+  });
+};
+const createExternalSkillPack = ({
+  packName = 'company-skill-pack',
+  commonSkills = [],
+  stackSkills = {},
+  flatSkills = [],
+} = {}) => {
+  const packRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-skill-pack-'));
+  writeJson(path.join(packRoot, 'package.json'), {
+    name: packName,
+    version: '0.0.1',
+  });
+
+  for (const skill of flatSkills) {
+    writeText(path.join(packRoot, 'skills', skill.name, 'SKILL.md'), skill.content);
+    for (const [relativePath, content] of Object.entries(skill.supportFiles || {})) {
+      writeText(path.join(packRoot, 'skills', skill.name, relativePath), content);
+    }
+  }
+
+  for (const skill of commonSkills) {
+    writeText(path.join(packRoot, 'common', 'skills', skill.name, 'SKILL.md'), skill.content);
+    for (const [relativePath, content] of Object.entries(skill.supportFiles || {})) {
+      writeText(path.join(packRoot, 'common', 'skills', skill.name, relativePath), content);
+    }
+  }
+
+  for (const [stack, skills] of Object.entries(stackSkills)) {
+    for (const skill of skills) {
+      writeText(path.join(packRoot, 'stacks', stack, 'skills', skill.name, 'SKILL.md'), skill.content);
+      for (const [relativePath, content] of Object.entries(skill.supportFiles || {})) {
+        writeText(path.join(packRoot, 'stacks', stack, 'skills', skill.name, relativePath), content);
+      }
+    }
+  }
+
+  return packRoot;
+};
+
+const createGitSkillPackRemote = (packRoot) => {
+  execFileSync('git', ['init'], { cwd: packRoot, stdio: 'ignore' });
+  execFileSync('git', ['checkout', '-b', 'main'], { cwd: packRoot, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Praxis DevOS Test'], { cwd: packRoot, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'praxis-devos-tests@example.com'], { cwd: packRoot, stdio: 'ignore' });
+  execFileSync('git', ['add', '.'], { cwd: packRoot, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'initial'], { cwd: packRoot, stdio: 'ignore' });
+  return pathToFileURL(packRoot).href;
+};
+
+const commitGitSkillPackChange = (packRoot, message) => {
+  execFileSync('git', ['add', '.'], { cwd: packRoot, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', message], { cwd: packRoot, stdio: 'ignore' });
+};
 
 const GENERATED_OPEN_SPEC_WORKFLOWS = [
   {
@@ -626,6 +697,7 @@ test('renderHelp reflects the current CLI surface', () => {
   assert.match(help, /setup/);
   assert.match(help, /^\s*init\s+/m);
   assert.match(help, /^\s*update\s+/m);
+  assert.match(help, /^\s*install-pack\s+/m);
   assert.doesNotMatch(help, /^\s*sync\s+/m);
   assert.match(help, /^\s*status\s+/m);
   assert.match(help, /^\s*doctor\s+/m);
@@ -646,6 +718,10 @@ test('parseCliArgs parses current flags and rejects removed --openspec', () => {
     'copilot',
     '--project-dir',
     'tmp/project',
+    '--stack',
+    'java',
+    '--stacks',
+    'golang,frontend',
     '--strict',
   ]);
 
@@ -653,6 +729,7 @@ test('parseCliArgs parses current flags and rejects removed --openspec', () => {
   assert.deepEqual(parsed.agents, ['codex', 'claude', 'opencode', 'copilot']);
   assert.equal(parsed.projectDir, path.resolve('tmp/project'));
   assert.deepEqual(parsed.positional, ['enable']);
+  assert.deepEqual(parsed.stacks, ['java', 'golang', 'frontend']);
   assert.equal(parsed.strict, true);
 
   assert.throws(
@@ -760,7 +837,7 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.match(opencodeRefresh, /^# devos-docs-refresh/m);
 
   const manifest = readJson(manifestPath);
-  assert.equal(manifest.version, 1);
+  assert.equal(manifest.version, 2);
   assert.equal(manifest.assets[claudeInitPath]?.type, 'command');
   assert.equal(manifest.assets[claudeRefreshPath]?.type, 'command');
   assert.equal(manifest.assets[opencodeInitPath]?.type, 'command');
@@ -776,6 +853,137 @@ test('projectNativeSkills writes user-level docs commands and registers managed 
   assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
   assert.doesNotMatch(logs.join('\n'), /GitHub Copilot: projected docs command devos-docs-init/);
   assert.match(logs.join('\n'), /OpenCode: projected docs command devos-docs-refresh/);
+});
+
+test('projectNativeSkills projects configured external skill packs and copies support files', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-external-pack-home-'));
+  const packRoot = createExternalSkillPack({
+    packName: 'iuap-rules-pack',
+    commonSkills: [
+      {
+        name: 'enterprise-standards',
+        content: '# enterprise-standards\n',
+        supportFiles: {
+          'references/core.md': 'enterprise rules\n',
+        },
+      },
+    ],
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+          supportFiles: {
+            'scripts/check.sh': 'echo java\n',
+          },
+        },
+      ],
+      golang: [
+        {
+          name: 'service-delivery',
+          content: '# service-delivery\n',
+        },
+      ],
+    },
+  });
+
+  writeProjectPackageJson(projectDir, {
+    skillPacks: [
+      {
+        path: packRoot,
+        stacks: ['java'],
+      },
+    ],
+  });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude', 'codex'],
+      log: () => {},
+    });
+  });
+
+  const claudeCommonSkill = path.join(fakeHome, '.claude', 'skills', 'enterprise-standards', 'SKILL.md');
+  const claudeCommonSupport = path.join(fakeHome, '.claude', 'skills', 'enterprise-standards', 'references', 'core.md');
+  const claudeJavaSkill = path.join(fakeHome, '.claude', 'skills', 'spring-delivery', 'SKILL.md');
+  const claudeJavaSupport = path.join(fakeHome, '.claude', 'skills', 'spring-delivery', 'scripts', 'check.sh');
+  const claudeGoSkill = path.join(fakeHome, '.claude', 'skills', 'service-delivery', 'SKILL.md');
+  const codexJavaSkill = path.join(fakeHome, '.codex', 'skills', 'spring-delivery', 'SKILL.md');
+  const manifest = readJson(path.join(fakeHome, '.praxis-devos', 'managed-assets.json'));
+
+  assert.ok(fs.existsSync(claudeCommonSkill));
+  assert.ok(fs.existsSync(claudeCommonSupport));
+  assert.ok(fs.existsSync(claudeJavaSkill));
+  assert.ok(fs.existsSync(claudeJavaSupport));
+  assert.equal(fs.existsSync(claudeGoSkill), false);
+  assert.ok(fs.existsSync(codexJavaSkill));
+  assert.match(fs.readFileSync(claudeJavaSkill, 'utf8'), /PRAXIS_PROJECTION source=iuap-rules-pack:stacks\/java\/skills\/spring-delivery\/SKILL\.md/);
+  assert.equal(manifest.assets[claudeJavaSkill]?.sourcePack, 'iuap-rules-pack');
+  assert.equal(normalizeSlashes(manifest.assets[claudeJavaSkill]?.sourceDir || '').includes('/stacks/java/skills/spring-delivery'), true);
+});
+
+test('projectNativeSkills removes stale projections when an external skill pack is removed from config', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-external-pack-prune-home-'));
+  const packRoot = createExternalSkillPack({
+    commonSkills: [
+      {
+        name: 'enterprise-standards',
+        content: '# enterprise-standards\n',
+      },
+    ],
+  });
+
+  writeProjectPackageJson(projectDir, {
+    skillPacks: [packRoot],
+  });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: () => {},
+    });
+
+    const projectedPath = path.join(fakeHome, '.claude', 'skills', 'enterprise-standards', 'SKILL.md');
+    assert.ok(fs.existsSync(projectedPath));
+
+    writeProjectPackageJson(projectDir, {});
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: () => {},
+    });
+
+    assert.equal(fs.existsSync(projectedPath), false);
+  });
+});
+
+test('projectNativeSkills rejects duplicate external skill names', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-external-pack-duplicate-home-'));
+  const packRoot = createExternalSkillPack({
+    flatSkills: [
+      {
+        name: 'devos-docs',
+        content: '# duplicate\n',
+      },
+    ],
+  });
+
+  writeProjectPackageJson(projectDir, {
+    skillPacks: [packRoot],
+  });
+
+  withEnv('HOME', fakeHome, () => {
+    assert.throws(() => projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: () => {},
+    }), /Duplicate skill name "devos-docs"/);
+  });
 });
 
 test('projectNativeSkills allows a second project to adopt existing Praxis-managed user-level commands', () => {
@@ -811,6 +1019,423 @@ test('projectNativeSkills allows a second project to adopt existing Praxis-manag
 
   assert.doesNotMatch(logs.join('\n'), /skipped docs command devos-docs-init/i);
   assert.match(logs.join('\n'), /Claude: projected docs command devos-docs-init/);
+});
+
+test('readManagedAssets migrates legacy manifest entries to typed resource records', () => {
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-managed-assets-migrate-home-'));
+  const legacyProjectDir = makeTempProject();
+  const legacyManifestPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
+  const legacySkillPath = path.join(fakeHome, '.claude', 'skills', 'legacy-skill', 'SKILL.md');
+  const legacyCommandPath = path.join(fakeHome, '.claude', 'commands', 'legacy-command.md');
+
+  writeJson(legacyManifestPath, {
+    version: 1,
+    assets: {
+      [legacySkillPath]: {
+        source: 'praxis-devos',
+        version: '0.9.0',
+        agent: 'claude',
+        owners: [`${path.resolve(legacyProjectDir)}::claude`],
+      },
+      [legacyCommandPath]: {
+        source: 'praxis-devos',
+        version: '0.9.0',
+        agent: 'claude',
+        projectDir: legacyProjectDir,
+      },
+    },
+  });
+
+  withEnv('HOME', fakeHome, () => {
+    const manifest = readManagedAssets();
+
+    assert.equal(manifest.version, 2);
+    assert.equal(manifest.assets[legacySkillPath].type, 'skill');
+    assert.deepEqual(manifest.assets[legacySkillPath].agents, ['claude']);
+    assert.equal(manifest.assets[legacyCommandPath].type, 'command');
+    assert.deepEqual(manifest.assets[legacyCommandPath].owners, [`${path.resolve(legacyProjectDir)}::claude`]);
+
+    const persisted = readJson(legacyManifestPath);
+    assert.equal(persisted.version, 2);
+    assert.equal(persisted.assets[legacySkillPath].type, 'skill');
+    assert.equal(persisted.assets[legacyCommandPath].type, 'command');
+  });
+});
+
+test('projectNativeSkills prunes legacy managed assets without type metadata during upgrade', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-managed-assets-upgrade-home-'));
+  const legacySkillPath = path.join(fakeHome, '.claude', 'skills', 'legacy-only', 'SKILL.md');
+  const legacyCommandPath = path.join(fakeHome, '.claude', 'commands', 'legacy-only.md');
+  const manifestPath = path.join(fakeHome, '.praxis-devos', 'managed-assets.json');
+
+  writeText(legacySkillPath, '# legacy-only\n');
+  writeText(legacyCommandPath, '# legacy-only\n');
+  writeJson(manifestPath, {
+    version: 1,
+    assets: {
+      [legacySkillPath]: {
+        source: 'praxis-devos',
+        version: '0.9.0',
+        agent: 'claude',
+        owners: [`${path.resolve(projectDir)}::claude`],
+      },
+      [legacyCommandPath]: {
+        source: 'praxis-devos',
+        version: '0.9.0',
+        agent: 'claude',
+        owners: [`${path.resolve(projectDir)}::claude`],
+      },
+    },
+  });
+
+  withEnv('HOME', fakeHome, () => {
+    projectNativeSkills({
+      projectDir,
+      agents: ['claude'],
+      log: () => {},
+    });
+
+    assert.equal(fs.existsSync(legacySkillPath), false);
+    assert.equal(fs.existsSync(legacyCommandPath), false);
+
+    const manifest = readJson(manifestPath);
+    assert.equal(manifest.assets[legacySkillPath], undefined);
+    assert.equal(manifest.assets[legacyCommandPath], undefined);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'commands', 'devos-docs-init.md')));
+  });
+});
+
+test('installPackProject projects selected stack skills without mutating project package.json', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-install-skill-pack-home-'));
+  const packRoot = createExternalSkillPack({
+    packName: 'iuap-rules-pack',
+    commonSkills: [
+      {
+        name: 'enterprise-standards',
+        content: '# enterprise-standards\n',
+      },
+    ],
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+        },
+      ],
+    },
+  });
+
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    const output = installPackProject({
+      projectDir,
+      skillPackPath: packRoot,
+      stacks: ['java'],
+      agents: ['claude'],
+    });
+
+    const pkg = readJson(path.join(projectDir, 'package.json'));
+    assert.equal(pkg['praxis-devos'], undefined);
+    assert.match(output, /Installed (local|git) pack/);
+    assert.match(output, /Selected stacks: java/);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'spring-delivery', 'SKILL.md')));
+  });
+});
+
+test('installPackProject supports installing multiple stacks in one call', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-install-pack-multi-stack-home-'));
+  const packRoot = createExternalSkillPack({
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+        },
+      ],
+      golang: [
+        {
+          name: 'service-delivery',
+          content: '# service-delivery\n',
+        },
+      ],
+    },
+  });
+
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    const output = installPackProject({
+      projectDir,
+      skillPackPath: packRoot,
+      stacks: ['golang', 'java'],
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Selected stacks: golang, java|Selected stacks: java, golang/);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'spring-delivery', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'service-delivery', 'SKILL.md')));
+  });
+});
+
+test('installPackProject normalizes stack selections before collecting resources', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-install-pack-normalize-stack-home-'));
+  const packRoot = createExternalSkillPack({
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+        },
+      ],
+      golang: [
+        {
+          name: 'service-delivery',
+          content: '# service-delivery\n',
+        },
+      ],
+    },
+  });
+
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    const output = installPackProject({
+      projectDir,
+      skillPackPath: packRoot,
+      stacks: ['java', ' golang', 'java', ' '],
+      agents: ['claude'],
+    });
+
+    assert.match(output, /Selected stacks: golang, java|Selected stacks: java, golang/);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'spring-delivery', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'service-delivery', 'SKILL.md')));
+  });
+});
+
+test('installPackProject supports git pack URLs and refreshes cached clones', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-install-pack-git-home-'));
+  const packRoot = createExternalSkillPack({
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+        },
+      ],
+    },
+  });
+  const gitUrl = createGitSkillPackRemote(packRoot);
+
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    installPackProject({
+      skillPackPath: gitUrl,
+      stacks: ['java'],
+      projectDir,
+      agents: ['claude'],
+    });
+
+    const firstSkillPath = path.join(fakeHome, '.claude', 'skills', 'spring-delivery', 'SKILL.md');
+    assert.ok(fs.existsSync(firstSkillPath));
+
+    writeText(path.join(packRoot, 'stacks', 'java', 'skills', 'java-testing', 'SKILL.md'), '# java-testing\n');
+    commitGitSkillPackChange(packRoot, 'add java-testing');
+
+    installPackProject({
+      skillPackPath: gitUrl,
+      stacks: ['java'],
+      projectDir,
+      agents: ['claude'],
+    });
+
+    const secondSkillPath = path.join(fakeHome, '.claude', 'skills', 'java-testing', 'SKILL.md');
+    assert.ok(fs.existsSync(secondSkillPath));
+
+    fs.rmSync(path.join(packRoot, 'stacks', 'java', 'skills', 'spring-delivery'), {
+      recursive: true,
+      force: true,
+    });
+    commitGitSkillPackChange(packRoot, 'remove spring-delivery');
+
+    installPackProject({
+      skillPackPath: gitUrl,
+      stacks: ['java'],
+      projectDir,
+      agents: ['claude'],
+    });
+
+    assert.equal(fs.existsSync(firstSkillPath), false);
+    assert.ok(fs.existsSync(secondSkillPath));
+  });
+});
+
+test('installPackProject prunes only the reinstalled pack owner scope', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-install-pack-prune-scope-home-'));
+  const firstPackRoot = createExternalSkillPack({
+    packName: 'first-pack',
+    flatSkills: [
+      {
+        name: 'first-stays',
+        content: '# first-stays\n',
+      },
+      {
+        name: 'first-removed',
+        content: '# first-removed\n',
+      },
+    ],
+  });
+  const secondPackRoot = createExternalSkillPack({
+    packName: 'second-pack',
+    flatSkills: [
+      {
+        name: 'second-stays',
+        content: '# second-stays\n',
+      },
+    ],
+  });
+  writeText(path.join(firstPackRoot, 'commands', 'first-command.md'), '# first-command\n');
+  writeText(path.join(secondPackRoot, 'commands', 'second-command.md'), '# second-command\n');
+
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    installPackProject({
+      projectDir,
+      skillPackPath: firstPackRoot,
+      agents: ['claude'],
+    });
+    installPackProject({
+      projectDir,
+      skillPackPath: secondPackRoot,
+      agents: ['claude'],
+    });
+
+    const firstStaysPath = path.join(fakeHome, '.claude', 'skills', 'first-stays', 'SKILL.md');
+    const firstRemovedPath = path.join(fakeHome, '.claude', 'skills', 'first-removed', 'SKILL.md');
+    const secondStaysPath = path.join(fakeHome, '.claude', 'skills', 'second-stays', 'SKILL.md');
+    const firstCommandPath = path.join(fakeHome, '.claude', 'commands', 'first-command.md');
+    const secondCommandPath = path.join(fakeHome, '.claude', 'commands', 'second-command.md');
+    assert.ok(fs.existsSync(firstStaysPath));
+    assert.ok(fs.existsSync(firstRemovedPath));
+    assert.ok(fs.existsSync(secondStaysPath));
+    assert.ok(fs.existsSync(firstCommandPath));
+    assert.ok(fs.existsSync(secondCommandPath));
+
+    fs.rmSync(path.join(firstPackRoot, 'skills', 'first-removed'), {
+      recursive: true,
+      force: true,
+    });
+    fs.rmSync(path.join(firstPackRoot, 'commands', 'first-command.md'), {
+      force: true,
+    });
+
+    installPackProject({
+      projectDir,
+      skillPackPath: firstPackRoot,
+      agents: ['claude'],
+    });
+
+    assert.ok(fs.existsSync(firstStaysPath));
+    assert.equal(fs.existsSync(firstRemovedPath), false);
+    assert.ok(fs.existsSync(secondStaysPath));
+    assert.equal(fs.existsSync(firstCommandPath), false);
+    assert.ok(fs.existsSync(secondCommandPath));
+  });
+});
+
+test('projectNativeSkills does not prune explicitly installed pack skills from other owner scopes', () => {
+  const installProjectDir = makeTempProject();
+  const refreshProjectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-install-pack-project-refresh-home-'));
+  const packRoot = createExternalSkillPack({
+    flatSkills: [
+      {
+        name: 'explicit-pack-skill',
+        content: '# explicit-pack-skill\n',
+      },
+    ],
+  });
+
+  writeProjectPackageJson(installProjectDir);
+  writeProjectPackageJson(refreshProjectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    installPackProject({
+      projectDir: installProjectDir,
+      skillPackPath: packRoot,
+      agents: ['claude'],
+    });
+
+    const installedSkillPath = path.join(fakeHome, '.claude', 'skills', 'explicit-pack-skill', 'SKILL.md');
+    assert.ok(fs.existsSync(installedSkillPath));
+
+    projectNativeSkills({
+      projectDir: refreshProjectDir,
+      agents: ['claude'],
+      log: () => {},
+    });
+
+    assert.ok(fs.existsSync(installedSkillPath));
+  });
+});
+
+test('installPackProject ignores unregistered stack resource directories when inferring layout', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-pack-unregistered-stack-home-'));
+  const packRoot = createExternalSkillPack({
+    flatSkills: [
+      {
+        name: 'flat-pack-skill',
+        content: '# flat-pack-skill\n',
+      },
+    ],
+  });
+  writeText(path.join(packRoot, 'stacks', 'java', 'rules', 'rule.md'), '# future rule\n');
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    installPackProject({
+      projectDir,
+      skillPackPath: packRoot,
+      agents: ['claude'],
+    });
+
+    assert.ok(fs.existsSync(path.join(fakeHome, '.claude', 'skills', 'flat-pack-skill', 'SKILL.md')));
+  });
+});
+
+test('installPackProject requires --stack for common-plus-stacks packs', () => {
+  const projectDir = makeTempProject();
+  const packRoot = createExternalSkillPack({
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+        },
+      ],
+    },
+  });
+
+  writeProjectPackageJson(projectDir);
+
+  assert.throws(() => installPackProject({
+    projectDir,
+    skillPackPath: packRoot,
+    stacks: [],
+    agents: ['claude'],
+  }), /requires at least one --stack/);
+
+  const pkg = readJson(path.join(projectDir, 'package.json'));
+  assert.equal(pkg['praxis-devos'], undefined);
 });
 
 test('runCli update refreshes managed user-level docs commands and skips user-owned same-name commands', () => {
@@ -852,6 +1477,89 @@ test('runCli update refreshes managed user-level docs commands and skips user-ow
     assert.equal(fs.readFileSync(userOwnedClaudeRefreshPath, 'utf8'), '# user custom refresh command\n');
     assert.ok(fs.existsSync(installedSchemaPath));
     assert.equal(readJson(openSpecConfigPath).profile, 'custom');
+  });
+});
+
+test('runCli install-pack routes through user-level projection without touching package.json', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-runcli-skill-pack-home-'));
+  const packRoot = createExternalSkillPack({
+    stackSkills: {
+      java: [
+        {
+          name: 'spring-delivery',
+          content: '# spring-delivery\n',
+        },
+      ],
+    },
+  });
+
+  writeProjectPackageJson(projectDir);
+
+  withEnv('HOME', fakeHome, () => {
+    const output = runCli([
+      'install-pack',
+      packRoot,
+      '--stack',
+      'java',
+      '--project-dir',
+      projectDir,
+      '--agent',
+      'codex',
+    ]);
+
+    assert.match(output, /Installed (local|git) pack/);
+    assert.ok(fs.existsSync(path.join(fakeHome, '.codex', 'skills', 'spring-delivery', 'SKILL.md')));
+    assert.equal(readJson(path.join(projectDir, 'package.json'))['praxis-devos'], undefined);
+  });
+});
+
+test('doctorProject reports invalid configured skill pack paths instead of throwing', () => {
+  const projectDir = makeTempProject();
+
+  writeProjectPackageJson(projectDir, {
+    skillPacks: [
+      {
+        path: '/tmp/does-not-exist-for-praxis-devos-tests',
+      },
+    ],
+  });
+
+  const output = doctorProject({
+    projectDir,
+    agents: ['codex'],
+  });
+
+  assert.match(output, /\[WARN\] projection:codex — invalid configured skill packs:/);
+  assert.match(output, /Configured skill pack path does not exist or is not a directory/);
+});
+
+test('doctorProject reports missing git pack cache without cloning during health checks', () => {
+  const projectDir = makeTempProject();
+  const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-devos-doctor-git-pack-cache-home-'));
+  const packRoot = createExternalSkillPack({
+    flatSkills: [
+      {
+        name: 'git-pack-skill',
+        content: '# git-pack-skill\n',
+      },
+    ],
+  });
+  const gitUrl = createGitSkillPackRemote(packRoot);
+
+  writeProjectPackageJson(projectDir, {
+    skillPacks: [gitUrl],
+  });
+
+  withEnv('HOME', fakeHome, () => {
+    const output = doctorProject({
+      projectDir,
+      agents: ['codex'],
+    });
+
+    assert.match(output, /invalid configured skill packs:/);
+    assert.match(output, /Git skill pack cache is missing/);
+    assert.equal(fs.existsSync(path.join(fakeHome, '.praxis-devos', 'pack-cache')), false);
   });
 });
 
@@ -948,17 +1656,17 @@ test('bundled OpenSpec workflow skills are final self-contained assets and confi
   assert.doesNotMatch(applySkill, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.doesNotMatch(exploreSkill, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
   assert.doesNotMatch(archiveSkill, /^<!-- PRAXIS_DEVOS_OVERLAY_START -->$/m);
-  assert.match(exploreSkill, /^## Brainstorming 门禁$/m);
-  assert.match(exploreSkill, /真实加载并使用 `superpowers:brainstorming`，不得只在文字里声称“已经 brainstorm 过”/);
-  assert.match(exploreSkill, /只把它当作当前 explore 的收敛能力，不进入它自带的 spec \/ plan \/ implementation 流程/);
-  assert.match(exploreSkill, /不得产出 `docs\/superpowers\/\*\*` 或其他旁路 spec \/ plan 文档/);
-  assert.match(exploreSkill, /调用完成后必须先回到 `openspec-explore`/);
-  assert.match(exploreSkill, /^## 最小示例$/m);
-  assert.match(exploreSkill, /建议 `\/opsx:propose`/);
-  assert.match(proposeSkill, /^## 能力路由$/m);
-  assert.match(applySkill, /^## 执行步骤$/m);
-  assert.match(applySkill, /可按 `tasks\.md` 顺序连续推进一个或多个已解锁 task/);
-  assert.match(applySkill, /一次 apply 不必限制为单个 task/);
+  assert.match(exploreSkill, /^## Brainstorming Gate$/m);
+  assert.match(exploreSkill, /Actually load and use `superpowers:brainstorming`; do not merely claim in text that brainstorming already happened/);
+  assert.match(exploreSkill, /Use it only as the convergence capability for the current explore stage, without entering its own spec, plan, or implementation workflow/);
+  assert.match(exploreSkill, /Do not produce `docs\/superpowers\/\*\*` or any other side-channel spec or plan documents/);
+  assert.match(exploreSkill, /After the call completes, return to `openspec-explore` first/);
+  assert.match(exploreSkill, /^## Minimal Example$/m);
+  assert.match(exploreSkill, /recommend `\/opsx:propose`/);
+  assert.match(proposeSkill, /^## Capability Routing$/m);
+  assert.match(applySkill, /^## Execution Steps$/m);
+  assert.match(applySkill, /advance through one or more unlocked tasks in `tasks\.md` order/);
+  assert.match(applySkill, /You may advance through one or more unlocked tasks/);
   assert.doesNotMatch(applySkill, /一次只推进\*\*一个\*\* OpenSpec task/);
   assert.match(archiveSkill, /^\*\*Guardrails\*\*$/m);
   assert.match(normalizeEol(currentOpenSpecConfig), /^praxis_devos:\n  docs_tasks:\n    change_blackbox: true\n    change_api: auto\n    project_api_sync: auto\n/m);

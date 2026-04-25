@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
 import {
   copyBundleDirectory,
@@ -10,15 +9,17 @@ import {
 } from './bundles.js';
 import {
   canSafelyOverwrite,
+  isManagedAsset,
   pruneManagedAssets,
   registerManagedAsset,
 } from './managed-assets.js';
 import { resolveUserHomeDir } from '../support/home.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// GitHub Copilot currently shares Claude-compatible user-level discovery
-// surfaces, so Praxis projects bundled skills to ~/.claude by default.
 const copilotSkillsDir = () => path.join(resolveUserHomeDir(), '.claude', 'skills');
+const sourcePathForManifest = (sourceDir) => {
+  const relative = path.relative(process.cwd(), sourceDir);
+  return relative && !relative.startsWith('..') ? relative : sourceDir;
+};
 
 export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(copilotSkillsDir());
@@ -28,6 +29,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
     name,
     sourceDir,
     sourceType = 'direct',
+    sourceRef,
+    sourcePack,
   } of skillSources) {
     const targetDir = path.join(copilotSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
@@ -64,7 +67,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
+        const marker = buildMarker({ source: sourceRef || path.relative(process.cwd(), sourceSkillPath), version });
         return injectMarker(content, marker);
       },
     });
@@ -75,7 +78,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       version,
       agent: 'copilot',
       extra: {
-        sourceDir: path.relative(process.cwd(), sourceDir),
+        sourceDir: sourcePathForManifest(sourceDir),
+        ...(sourcePack ? { sourcePack } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
@@ -89,14 +93,13 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   return results;
 };
 
-export const projectCommands = ({
-  log,
-}) => {
+export const resolveCommandTargetPath = () => null;
+export const projectCommands = ({ log }) => {
   log('⊘ GitHub Copilot: command projection is not supported; projecting skills only');
   return [];
 };
 
-export const detectProjections = () => {
+export const detectSkillProjections = () => {
   if (!fs.existsSync(copilotSkillsDir())) {
     return [];
   }
@@ -112,32 +115,44 @@ export const detectProjections = () => {
     .filter((entry) => entry.isProjection);
 };
 
-export const cleanStaleProjections = ({ validNames, log }) => {
-  const existing = detectProjections();
+export const detectProjections = () => detectSkillProjections();
+
+export const cleanStaleSkillProjections = ({ projectDir, validNames, log }) => {
+  const existing = detectSkillProjections();
   for (const entry of existing) {
     if (!validNames.includes(entry.name)) {
+      const managedByAnyOwner = isManagedAsset({ assetPath: entry.path });
+      const managedByCurrentOwner = isManagedAsset({ assetPath: entry.path, projectDir, agent: 'copilot' });
+      if (managedByAnyOwner && !managedByCurrentOwner) {
+        continue;
+      }
+
       fs.rmSync(path.dirname(entry.path), { recursive: true, force: true });
       log(`✓ GitHub Copilot: removed stale projection ${entry.name}`);
     }
   }
 };
 
-export const pruneManagedUserAssets = ({
+export const cleanStaleProjections = ({ validNames, log }) => cleanStaleSkillProjections({ validNames, log });
+
+export const pruneManagedSkillAssets = ({
   projectDir,
   validSkillNames,
-  keepCommandPaths = [],
   log,
 }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(copilotSkillsDir(), name, 'SKILL.md'));
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'copilot',
-    validPaths: [...validSkillPaths, ...keepCommandPaths],
+    type: 'skill',
+    validPaths: validSkillPaths,
   });
 
   for (const removedPath of removed) {
-    log(`✓ GitHub Copilot: removed managed asset ${removedPath}`);
+    log(`✓ GitHub Copilot: removed managed skill asset ${removedPath}`);
   }
 
   return removed;
 };
+
+export const pruneManagedCommandAssets = () => [];

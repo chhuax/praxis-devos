@@ -68,9 +68,12 @@ export const doctorProject = ({ projectDir, agents, strict = false }) => {
   }
 
   for (const agent of selectedAgents) {
-    const projection = inspectProjectionHealth({ agent });
+    const projection = inspectProjectionHealth({ agent, projectDir });
     const issues = [];
 
+    if (projection.configError) {
+      issues.push(`invalid configured skill packs: ${projection.configError.message}`);
+    }
     if (projection.missing.length > 0) {
       issues.push(`missing official skill projections: ${projection.missing.join(', ')}`);
     }

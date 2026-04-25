@@ -1,6 +1,6 @@
 ---
 name: openspec-apply-change
-description: 实现一个 OpenSpec change 中的任务。适用于用户希望开始实现、继续实现，或按任务推进一个 change。优先借助 Superpowers 细化并完成当前实现切片中的一个或多个已解锁 task。
+description: Implement tasks inside an OpenSpec change. Use when the user wants to start implementation, continue implementation, or advance a change task by task. Prefer using Superpowers to refine and complete one or more unlocked tasks in the current implementation slice.
 license: MIT
 compatibility: Requires openspec CLI. Works best with Superpowers skills.
 metadata:
@@ -9,183 +9,183 @@ metadata:
   generatedBy: "custom"
 ---
 
-实现一个 OpenSpec change 中的任务，可按 `tasks.md` 顺序连续推进一个或多个已解锁 task，直到完成、遇到阻塞，或用户要求暂停。
+Implement tasks within an OpenSpec change. You may advance through one or more unlocked tasks in `tasks.md` order until they are completed, blocked, or the user asks you to pause.
 
-## 核心定位
+## Core Positioning
 
-- OpenSpec 负责：选择 change、读取 `contextFiles`、识别当前实现切片、维护 `tasks.md` 状态
-- Superpowers 负责：实现切片细化、执行模式、TDD、调试、验证
-- `tasks.md` 是默认任务事实来源
-- 不为整个 change 再生成第二份总计划
+- OpenSpec owns change selection, reading `contextFiles`, identifying the current implementation slice, and maintaining `tasks.md` status
+- Superpowers owns slice refinement, execution mode, TDD, debugging, and verification
+- `tasks.md` is the default source of truth for tasks
+- Do not generate a second master plan for the entire change
 
-## 精确 Skill 协议
+## Exact Skill Protocol
 
-- 命中路由时，必须调用对应的**精确 skill 名**
-- 不得用相近的本地 skill、TodoWrite、手工拆点或长段 reasoning 替代
-- 如果精确 skill 不可用，必须明确报告，并暂停当前路由
-- 在当前 change 与当前实现切片尚未锁定前，不得创建 TodoWrite、列执行待办或进入实现规划
+- When this route is matched, you must call the corresponding **exact skill name**
+- Do not substitute a similar local skill, TodoWrite, manual task breakdown, or long-form reasoning
+- If the exact skill is unavailable, report that explicitly and pause the current routing
+- Before the current change and implementation slice are locked, do not create TodoWrite items, list execution todos, or enter implementation planning
 
-## 能力路由
+## Capability Routing
 
-### 1. 任务细化
+### 1. Task refinement
 
-默认先对**当前实现切片**调用 `superpowers:writing-plans`。
+By default, call `superpowers:writing-plans` first for the **current implementation slice**.
 
-只有在任务纯属文档文字修改、机械重命名、格式整理等极小改动时，才允许跳过。
+You may skip this only when the task is a very small change such as pure wording edits, mechanical renames, or formatting cleanup.
 
-`writing-plans` 的作用范围只限当前实现切片，不是整个 change，也不是额外 plan 文件。
+The scope of `writing-plans` is limited to the current implementation slice, not the whole change and not a separate plan file.
 
-### 2. 执行模式分流
+### 2. Execution mode routing
 
-`writing-plans` 之后，不能直接进入实现，必须二选一：
+After `writing-plans`, do not jump straight into implementation. You must choose one of these two paths:
 
-- 有可并行的独立子工作：`superpowers:subagent-driven-development`
-- 否则：`superpowers:executing-plans`
+- If there is independent sub-work that can run in parallel: `superpowers:subagent-driven-development`
+- Otherwise: `superpowers:executing-plans`
 
-除非已经明确识别出可并行的独立子工作，否则默认走 `superpowers:executing-plans`。
+Unless you have clearly identified independent sub-work that can run in parallel, default to `superpowers:executing-plans`.
 
-在执行模式确认前，不得：
+Before execution mode is confirmed, do not:
 
-- 创建 TodoWrite
-- 运行测试命令
-- 开始 patch / 编码
-- 调用实现型辅助 skill
+- Create TodoWrite entries
+- Run test commands
+- Start patching or coding
+- Call implementation-oriented helper skills
 
-开始实现前，必须先显式输出一次“执行模式确认”，至少包含：
+Before starting implementation, you must explicitly output an "execution mode confirmation" that includes at least:
 
-- 当前 task
-- 执行模式
-- 选择理由
+- The current task
+- The chosen execution mode
+- The reason for that choice
 
 ### 3. TDD
 
-如果当前实现切片里的 task 涉及功能实现、bugfix、行为变更或测试代码改动，必须在写生产代码前调用 `superpowers:test-driven-development`。
+If the current implementation slice includes feature work, a bug fix, behavior changes, or test-code changes, you must call `superpowers:test-driven-development` before writing production code.
 
-### 4. 调试
+### 4. Debugging
 
-如果实现或验证过程中出现不明确失败、反复失败或猜测式修补冲动，必须切换到 `superpowers:systematic-debugging`。
+If implementation or verification hits unclear failures, repeated failures, or the urge to patch by guessing, you must switch to `superpowers:systematic-debugging`.
 
-### 5. 完成验证
+### 5. Completion verification
 
-在宣称当前完成的 task 完成、更新 checkbox 之前，必须调用 `superpowers:verification-before-completion`。
+Before claiming the current task is complete or updating its checkbox, you must call `superpowers:verification-before-completion`.
 
-没有新鲜验证证据，就不能：
+Without fresh verification evidence, you may not:
 
-- 勾选当前完成的 task
-- 宣称当前完成的 task 已完成
-- 继续勾选更多 task
+- Check off the current completed task
+- Claim the current completed task is done
+- Continue checking off additional tasks
 
-## 输入
+## Input
 
-可选指定一个 change 名称；如果未指定：
+You may specify a change name. If none is provided:
 
-- 先尝试从对话上下文推断
-- 如果用户提到某个 task 编号或标题，先据此反查当前 change
-- 如果仓库根目录没有 active change，继续检查 worktree 中是否存在正在推进的 change
-- 如果只有一个 active change，可自动选择
-- 如果存在歧义，运行 `openspec list --json` 获取候选项
+- First try to infer it from conversation context
+- If the user mentioned a task number or title, use that to trace back to the current change first
+- If there is no active change in the repo root, keep checking whether a change is in progress inside a worktree
+- If there is only one active change, you may select it automatically
+- If ambiguity remains, run `openspec list --json` to get candidates
 
-无论如何，先明确宣布：
+In all cases, explicitly announce first:
 
 ```text
-当前使用的 change：<name>
-如需切换，可显式指定其他 change。
+Current change in use: <name>
+If you want to switch, explicitly specify another change.
 ```
 
-## 执行步骤
+## Execution Steps
 
-### 1. 识别当前 change
+### 1. Identify the current change
 
-- 如果用户给了 change 名称，直接使用
-- 如果用户提到 `3.1` 这类 task 编号，先在当前工作区及 worktree 中搜索匹配的 `tasks.md`
-- 如果 `openspec list --json` 返回空，但用户显然在继续已有 change，必须继续检查 `.worktrees/*/openspec/changes/*/tasks.md`
-- 找到唯一匹配项后，切到对应 worktree 上下文继续
+- If the user provided a change name, use it directly
+- If the user mentioned a task number like `3.1`, search matching `tasks.md` files in the current workspace and worktrees first
+- If `openspec list --json` returns empty but the user is clearly continuing an existing change, you must keep checking `.worktrees/*/openspec/changes/*/tasks.md`
+- Once a unique match is found, switch into the corresponding worktree context and continue
 
-### 2. 读取 apply 上下文
+### 2. Read apply context
 
-运行：
+Run:
 
 ```bash
 openspec status --change "<name>" --json
 openspec instructions apply --change "<name>" --json
 ```
 
-读取：
+Read:
 
 - `schemaName`
 - `contextFiles`
 - `tasks`
 - `state`
 
-如果 `state: "blocked"`，提示先使用 `openspec-continue-change`；如果 `state: "all_done"`，提示可 archive。
+If `state: "blocked"`, tell the user to use `openspec-continue-change` first. If `state: "all_done"`, tell them the change can be archived.
 
-### 3. 确定当前实现切片
+### 3. Determine the current implementation slice
 
-- 默认从下一个 pending task 开始
-- 如果后续 task 与当前工作天然连续、依赖已满足且不需要切换上下文，可在同一次 apply 中连续推进多个 task
-- 明确显示当前起始 task，以及本次实现切片准备覆盖到哪里
-- 检查切片内是否存在未满足的前置依赖
-- 在当前实现切片未锁定前，不得创建 TodoWrite 或展开执行待办
+- By default, start from the next pending task
+- If subsequent tasks are naturally continuous with the current work, dependencies are satisfied, and no context switch is needed, you may advance multiple tasks in the same apply run
+- Clearly show the starting task and how far this implementation slice is intended to cover
+- Check whether the slice contains any unmet prerequisite dependencies
+- Before the current implementation slice is locked, do not create TodoWrite or expand into execution todos
 
-### 4. 生成当前实现切片 brief
+### 4. Generate the current implementation-slice brief
 
-先生成一个只聚焦当前实现切片的 brief，至少覆盖：
+First generate a brief focused only on the current implementation slice, covering at least:
 
-- 本次准备推进哪些 task
-- 相关 spec / design / tasks 上下文
-- 主要约束
-- 每个完成 task 至少要验证什么
+- Which tasks are being advanced in this pass
+- Relevant spec, design, and task context
+- Main constraints
+- What must be verified for each completed task
 
-默认不单独落盘；必要时才按需回写到当前 task 的子 bullets。
+Do not write it to disk by default. Only write back into sub-bullets under the current task when necessary.
 
-### 5. 细化当前实现切片
+### 5. Refine the current implementation slice
 
-默认调用 `superpowers:writing-plans`，并明确约束：
+Call `superpowers:writing-plans` by default, with these explicit constraints:
 
-- 只细化当前这个实现切片
-- 不为整个 change 再写总 plan
-- 默认不生成单独 plan 文件
-- 默认保持简洁
-- 如果存在可并行的独立子工作，显式标出即可
-- 如果实现切片只包含一个 task，也不要把它膨胀成重型计划
+- Refine only the current implementation slice
+- Do not write another master plan for the whole change
+- Do not generate a separate plan file by default
+- Stay concise by default
+- If there is independent sub-work that can run in parallel, simply mark it explicitly
+- Even if the slice contains only one task, do not inflate it into a heavyweight plan
 
-### 6. 确认执行模式并进入实现
+### 6. Confirm execution mode and enter implementation
 
-完成 `writing-plans` 后，先显式输出执行模式确认，再立刻调用：
+After `writing-plans` completes, first explicitly output the execution mode confirmation, then immediately call one of:
 
-- `superpowers:subagent-driven-development`，或
+- `superpowers:subagent-driven-development`, or
 - `superpowers:executing-plans`
 
-禁止出现以下顺序：
+The following sequences are forbidden:
 
-- `writing-plans -> TodoWrite -> 实现`
-- `writing-plans -> test-driven-development -> 实现`
-- `writing-plans -> 直接测试/patch/编码`
+- `writing-plans -> TodoWrite -> implementation`
+- `writing-plans -> test-driven-development -> implementation`
+- `writing-plans -> direct testing/patching/coding`
 
-### 7. 按路由完成实现
+### 7. Complete implementation through the routed flow
 
-- 涉及实现代码时，先走 `superpowers:test-driven-development`
-- 只实现当前实现切片里的 task
-- 如果后续 task 仍在当前切片内且依赖已满足，可以继续推进
-- 不要跳到阻塞 task、无关 task，或未重新声明的新范围
-- 如果进行并行，只能发生在当前实现切片内部
-- 如果实现中发现设计与 artifacts 不一致，立即暂停并反馈
+- When implementation code is involved, go through `superpowers:test-driven-development` first
+- Implement only the tasks inside the current implementation slice
+- If later tasks are still inside the current slice and dependencies are satisfied, you may continue advancing them
+- Do not jump to blocked tasks, unrelated tasks, or a new scope that has not been restated
+- If work is parallelized, it may only happen inside the current implementation slice
+- If implementation reveals inconsistency between the design and artifacts, pause immediately and report it
 
-### 8. 验证并更新状态
+### 8. Verify and update status
 
-调用 `superpowers:verification-before-completion` 后，只有在对应 task 的关键验证通过时，才允许把 `- [ ]` 改成 `- [x]`。
+After calling `superpowers:verification-before-completion`, you may change `- [ ]` to `- [x]` only when the key verification for that task has passed.
 
-可以在一次 apply 中连续完成多个 task，但每个 task 都要在勾选前具备对应的新鲜验证证据，并在完成后及时更新 `tasks.md`。
+You may complete multiple tasks in one apply run, but each task must have fresh verification evidence before it is checked off, and `tasks.md` must be updated promptly after completion.
 
 ## Guardrails
 
-- 开始前必须读取 `contextFiles`
-- 不要假设固定 artifact 名称，必须以 CLI 输出为准
-- 若 `openspec list --json` 返回空，不得在未检查 worktree 前直接宣称“没有 active change”
-- `writing-plans` 在 apply 阶段只用于当前实现切片
-- `writing-plans` 之后必须先进入执行模式分流
-- 若没有明确并行子工作，默认走 `superpowers:executing-plans`
-- 在执行模式确认前，不允许 TodoWrite、测试、patch 或编码
-- 出现不明确失败时，必须进入 `superpowers:systematic-debugging`
-- 未经 `superpowers:verification-before-completion`，不允许勾选对应 task
-- 一次 apply 不必限制为单个 task，但不要跨到阻塞或无关 task
+- You must read `contextFiles` before starting
+- Do not assume fixed artifact names; use the CLI output as the source of truth
+- If `openspec list --json` returns empty, do not claim there is no active change until you have checked worktrees
+- In the apply stage, `writing-plans` is only for the current implementation slice
+- After `writing-plans`, you must enter execution-mode routing first
+- If there is no clearly parallel sub-work, default to `superpowers:executing-plans`
+- Before execution mode is confirmed, TodoWrite, testing, patching, and coding are not allowed
+- If failures become unclear, you must enter `superpowers:systematic-debugging`
+- Without `superpowers:verification-before-completion`, you may not check off the corresponding task
+- One apply run does not need to be limited to a single task, but do not cross into blocked or unrelated tasks

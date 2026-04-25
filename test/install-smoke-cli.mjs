@@ -21,25 +21,25 @@ const PROJECTED_OPEN_SPEC_SKILL_ASSERTIONS = [
   {
     name: 'openspec-explore',
     mustInclude: [
-      /^## Brainstorming 门禁$/m,
-      /真实加载并使用 `superpowers:brainstorming`，不得只在文字里声称“已经 brainstorm 过”/,
-      /只把它当作当前 explore 的收敛能力，不进入它自带的 spec \/ plan \/ implementation 流程/,
-      /不得产出 `docs\/superpowers\/\*\*` 或其他旁路 spec \/ plan 文档/,
-      /调用完成后必须先回到 `openspec-explore`/,
-      /^## 最小示例$/m,
-      /建议 `\/opsx:propose`/,
+      /^## Brainstorming Gate$/m,
+      /Actually load and use `superpowers:brainstorming`; do not merely claim in text that brainstorming already happened/,
+      /Use it only as the convergence capability for the current explore stage, without entering its own spec, plan, or implementation workflow/,
+      /Do not produce `docs\/superpowers\/\*\*` or any other side-channel spec or plan documents/,
+      /After the call completes, return to `openspec-explore` first/,
+      /^## Minimal Example$/m,
+      /recommend `\/opsx:propose`/,
     ],
   },
   {
     name: 'openspec-propose',
-    mustInclude: [/^## 能力路由$/m],
+    mustInclude: [/^## Capability Routing$/m],
   },
   {
     name: 'openspec-apply-change',
     mustInclude: [
-      /^## 执行步骤$/m,
-      /可按 `tasks\.md` 顺序连续推进一个或多个已解锁 task/,
-      /一次 apply 不必限制为单个 task/,
+      /^## Execution Steps$/m,
+      /advance through one or more unlocked tasks in `tasks\.md` order/,
+      /You may advance through one or more unlocked tasks/,
     ],
   },
   {
