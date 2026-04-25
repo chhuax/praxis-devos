@@ -10,12 +10,21 @@ commands:
   - setup
   - init
   - update
+  - install-pack
   - status
   - doctor
   - bootstrap
 bundled_skills:
   - devos-docs
   - devos-change-docs
+project_config:
+  package_json_field: praxis-devos.skillPacks
+  note: "Projects may declare additional external packs here for project-bound projection flows, using either local paths or git URLs. The current `install-pack` command does not write project config. Praxis projects every currently supported resource type from a pack, and the resource registry is designed to expand to future types such as rules."
+  supported_layouts:
+    - skills/<name>/SKILL.md
+    - commands/<name>.md
+    - common/skills/<name>/SKILL.md + stacks/<stack>/skills/<name>/SKILL.md
+    - common/commands/<name>.md + stacks/<stack>/commands/<name>.md
 openspec_generated_skills:
   note: "Shipped as Praxis-managed workflow sources under `assets/openspec/workflows`; projected directly by `setup`/`update` after `openspec init --tools none`."
   items:

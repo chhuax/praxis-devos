@@ -293,6 +293,7 @@ export const projectNativeSkills = ({ projectDir, agents, log }) => {
       projectToAgent({ agent, projectDir, version, log });
     } catch (err) {
       log(`⚠ Projection to ${agent} failed: ${err.message}`);
+      throw err;
     }
   }
 };

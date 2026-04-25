@@ -18,19 +18,7 @@
 
 ## Install and Upgrade
 
-### Global npm install
-
-```bash
-npm install -g praxis-devos
-```
-
-Upgrade the global CLI:
-
-```bash
-npm install -g praxis-devos@latest
-```
-
-### One-off `npx` usage
+Use `npx` so each run resolves the requested package version directly:
 
 ```bash
 npx praxis-devos@latest setup --agent codex
@@ -111,6 +99,7 @@ npx praxis-devos doctor --strict
 | `setup` | Primary onboarding and repair entrypoint |
 | `init` | Initialize the project skeleton and managed adapters |
 | `update` | Refresh managed adapters and native projections |
+| `install-pack <path-or-git-url>` | Install a local or git-backed extension pack into user-level supported assets |
 | `status` | Show current project and dependency state |
 | `doctor` | Check OpenSpec, agent dependencies, and projections |
 | `bootstrap` | Print or apply dependency bootstrap guidance |
@@ -157,12 +146,96 @@ Praxis keeps the same high-level contract across tools, but each agent has a dif
 
 ## Extension Packs
 
-Praxis is meant to stay small at the framework layer. Company-specific rules, skills, hooks, or stack conventions are better shipped as separate extension packs instead of being hardcoded into this repository.
+Praxis is meant to stay small at the framework layer. Company-specific skills, commands, stack conventions, and future resource types are better shipped as separate extension packs instead of being hardcoded into this repository.
 
 That split keeps responsibilities clean:
 
 - `praxis-devos`: OpenSpec harness, SuperPowers integration, adapter management, projection, and shared workflow entrypoints
-- extension packs: company rules, stack-specific skills, hooks, and additional projection content
+- extension packs: company rules, stack-specific skills, commands, hooks, and additional projection content
+
+### Install a pack directly
+
+Use `install-pack` when you want to install a pack explicitly without mutating project configuration:
+
+```bash
+npx praxis-devos@latest install-pack ../company-devos-pack --agent codex
+npx praxis-devos@latest install-pack git+https://example.com/company/devos-pack.git --stack java --agent claude
+```
+
+For packs that use `common/` plus `stacks/`, pass at least one stack:
+
+```bash
+npx praxis-devos@latest install-pack ../company-devos-pack --stacks java,golang --agents codex,claude
+```
+
+Repeated installs are upgrade-safe:
+
+- git packs are refreshed from the cached checkout before projection
+- resources that still exist are overwritten when they are Praxis-managed
+- new resources are installed
+- resources removed from that same pack are pruned from the selected agents
+- other packs, built-in Praxis resources, and user-owned files are left alone
+
+### Project-declared packs
+
+Projects can also declare packs in `package.json` so `setup`, `update`, and `doctor` include them in normal project projection:
+
+```json
+{
+  "praxis-devos": {
+    "skillPacks": [
+      "../company-devos-pack",
+      {
+        "path": "git+https://example.com/company/devos-pack.git",
+        "stacks": ["java", "golang"]
+      }
+    ]
+  }
+}
+```
+
+`install-pack` does not write this config. Use project-declared packs when the pack is part of the project contract; use `install-pack` for explicit user-level installation.
+
+### Pack layout standard
+
+Praxis consumes only resource directories claimed by registered resource projectors. Today the supported resource types are `skills` and `commands`.
+
+Flat packs:
+
+```text
+company-devos-pack/
+├── package.json
+├── skills/
+│   └── enterprise-standards/
+│       ├── SKILL.md
+│       └── references/
+└── commands/
+    └── devos-check.md
+```
+
+Common plus stack packs:
+
+```text
+company-devos-pack/
+├── package.json
+├── common/
+│   ├── skills/
+│   │   └── enterprise-standards/
+│   │       └── SKILL.md
+│   └── commands/
+│       └── enterprise-check.md
+└── stacks/
+    └── java/
+        ├── skills/
+        │   └── spring-delivery/
+        │       └── SKILL.md
+        └── commands/
+            └── spring-check.md
+```
+
+Rules and hooks can live in extension pack repositories, but Praxis ignores `rules/`, `hooks/`, `src/`, `bin/`, and other unregistered directories until a matching resource projector is added.
+
+Resource names must be unique per resource type. A pack skill or command cannot silently override another pack or built-in Praxis resource with the same name.
 
 ## Repository Layout
 

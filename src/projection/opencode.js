@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { buildMarker, injectMarker, isProjection } from './markers.js';
 import {
   copyBundleDirectory,
@@ -10,22 +9,19 @@ import {
 } from './bundles.js';
 import {
   canSafelyOverwrite,
+  isManagedAsset,
   pruneManagedAssets,
   registerManagedAsset,
 } from './managed-assets.js';
 import { resolveUserHomeDir } from '../support/home.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// OpenCode currently shares ~/.claude/skills/ as its native user-level skill surface.
 const openCodeSkillsDir = () => path.join(resolveUserHomeDir(), '.claude', 'skills');
 const openCodeCommandsDir = () => path.join(resolveUserHomeDir(), '.config', 'opencode', 'commands');
-const commandAssetRoot = () => path.resolve(__dirname, '../../assets/commands');
-const commandNames = ['devos-docs-init', 'devos-docs-refresh'];
+const sourcePathForManifest = (sourceDir) => {
+  const relative = path.relative(process.cwd(), sourceDir);
+  return relative && !relative.startsWith('..') ? relative : sourceDir;
+};
 
-/**
- * Project bundled Praxis skills to ~/.claude/skills/ as shared skill directories with SKILL.md.
- * This mirrors the user-home shared skill drop used by OpenCode integrations.
- */
 export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(openCodeSkillsDir());
   const results = [];
@@ -34,6 +30,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
     name,
     sourceDir,
     sourceType = 'direct',
+    sourceRef,
+    sourcePack,
   } of skillSources) {
     const targetDir = path.join(openCodeSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
@@ -70,7 +68,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
+        const marker = buildMarker({ source: sourceRef || path.relative(process.cwd(), sourceSkillPath), version });
         return injectMarker(content, marker);
       },
     });
@@ -81,7 +79,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       version,
       agent: 'opencode',
       extra: {
-        sourceDir: path.relative(process.cwd(), sourceDir),
+        sourceDir: sourcePathForManifest(sourceDir),
+        ...(sourcePack ? { sourcePack } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
@@ -95,22 +94,31 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   return results;
 };
 
+export const resolveCommandTargetPath = (source) => path.join(
+  openCodeCommandsDir(),
+  source.targetRelativePaths?.opencode || `${source.name}.md`,
+);
+
 export const projectCommands = ({
   projectDir,
   version,
   log,
-  workflowCommandSources = [],
+  commandSources = [],
 }) => {
   ensureDir(openCodeCommandsDir());
   const results = [];
 
-  for (const {
-    name,
-    targetRelativePath,
-    content,
-    sourceType = 'openspec-workflow',
-  } of workflowCommandSources) {
-    const targetPath = path.join(openCodeCommandsDir(), targetRelativePath);
+  for (const source of commandSources) {
+    const {
+      name,
+      sourcePath,
+      sourceDir,
+      content,
+      sourceRef,
+      sourcePack,
+      sourceType = 'direct',
+    } = source;
+    const targetPath = resolveCommandTargetPath(source);
     ensureDir(path.dirname(targetPath));
     if (!canSafelyOverwrite({
       assetPath: targetPath,
@@ -119,11 +127,15 @@ export const projectCommands = ({
       allowAnyManagedOwner: true,
     })) {
       results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType });
-      log(`⊘ OpenCode: skipped OpenSpec workflow command ${name} because ${targetPath} is not a Praxis-managed asset`);
+      if (sourceType === 'direct') {
+        log(`⊘ OpenCode: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
+      } else {
+        log(`⊘ OpenCode: skipped command ${name} because ${targetPath} is not a Praxis-managed asset`);
+      }
       continue;
     }
 
-    fs.writeFileSync(targetPath, content, 'utf8');
+    fs.writeFileSync(targetPath, typeof content === 'string' ? content : fs.readFileSync(sourcePath, 'utf8'), 'utf8');
     registerManagedAsset({
       projectDir,
       assetPath: targetPath,
@@ -133,45 +145,25 @@ export const projectCommands = ({
       extra: {
         commandName: name,
         sourceType,
+        ...(sourceDir ? { sourceDir: sourcePathForManifest(sourceDir) } : {}),
+        ...(sourcePack ? { sourcePack } : {}),
+        ...(sourceRef ? { sourceRef } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType });
-    log(`✓ OpenCode: projected OpenSpec workflow command ${name} → ${targetPath}`);
-  }
-
-  for (const name of commandNames) {
-    const templatePath = path.join(commandAssetRoot(), `${name}.md`);
-    const targetPath = path.join(openCodeCommandsDir(), `${name}.md`);
-    if (!canSafelyOverwrite({
-      assetPath: targetPath,
-      projectDir,
-      agent: 'opencode',
-      allowAnyManagedOwner: true,
-    })) {
-      results.push({ name, targetPath, status: 'skipped', assetType: 'command', sourceType: 'direct' });
-      log(`⊘ OpenCode: skipped docs command ${name} because ${targetPath} is not a Praxis-managed asset`);
-      continue;
+    if (sourceType === 'openspec-workflow') {
+      log(`✓ OpenCode: projected OpenSpec workflow command ${name} → ${targetPath}`);
+    } else if (sourceType === 'external-pack') {
+      log(`✓ OpenCode: projected pack command ${name} → ${targetPath}`);
+    } else {
+      log(`✓ OpenCode: projected docs command ${name} → ${targetPath}`);
     }
-
-    fs.writeFileSync(targetPath, fs.readFileSync(templatePath, 'utf8'), 'utf8');
-    registerManagedAsset({
-      projectDir,
-      assetPath: targetPath,
-      type: 'command',
-      version,
-      agent: 'opencode',
-      extra: {
-        commandName: name,
-      },
-    });
-    results.push({ name, targetPath, status: 'projected', assetType: 'command', sourceType: 'direct' });
-    log(`✓ OpenCode: projected docs command ${name} → ${targetPath}`);
   }
 
   return results;
 };
 
-export const detectProjections = () => {
+export const detectSkillProjections = () => {
   if (!fs.existsSync(openCodeSkillsDir())) {
     return [];
   }
@@ -187,38 +179,60 @@ export const detectProjections = () => {
     .filter((entry) => entry.isProjection);
 };
 
-export const cleanStaleProjections = ({ validNames, log }) => {
-  const existing = detectProjections();
+export const detectProjections = () => detectSkillProjections();
+
+export const cleanStaleSkillProjections = ({ projectDir, validNames, log }) => {
+  const existing = detectSkillProjections();
   for (const entry of existing) {
     if (!validNames.includes(entry.name)) {
+      const managedByAnyOwner = isManagedAsset({ assetPath: entry.path });
+      const managedByCurrentOwner = isManagedAsset({ assetPath: entry.path, projectDir, agent: 'opencode' });
+      if (managedByAnyOwner && !managedByCurrentOwner) {
+        continue;
+      }
+
       fs.rmSync(path.dirname(entry.path), { recursive: true, force: true });
       log(`✓ OpenCode: removed stale projection ${entry.name}`);
     }
   }
 };
 
-export const pruneManagedUserAssets = ({
+export const cleanStaleProjections = ({ validNames, log }) => cleanStaleSkillProjections({ validNames, log });
+
+export const pruneManagedSkillAssets = ({
   projectDir,
   validSkillNames,
-  keepCommandNames = commandNames,
-  keepCommandPaths = [],
   log,
 }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(openCodeSkillsDir(), name, 'SKILL.md'));
-  const validCommandPaths = [
-    ...keepCommandNames.map((name) => path.join(openCodeCommandsDir(), `${name}.md`)),
-    ...keepCommandPaths.map((commandPath) => (
-      path.isAbsolute(commandPath) ? commandPath : path.join(openCodeCommandsDir(), commandPath)
-    )),
-  ];
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'opencode',
-    validPaths: [...validSkillPaths, ...new Set(validCommandPaths)],
+    type: 'skill',
+    validPaths: validSkillPaths,
   });
 
   for (const removedPath of removed) {
-    log(`✓ OpenCode: removed managed asset ${removedPath}`);
+    log(`✓ OpenCode: removed managed skill asset ${removedPath}`);
+  }
+
+  return removed;
+};
+
+export const pruneManagedCommandAssets = ({
+  projectDir,
+  validCommandPaths,
+  log,
+}) => {
+  const removed = pruneManagedAssets({
+    projectDir,
+    agent: 'opencode',
+    type: 'command',
+    validPaths: validCommandPaths,
+  });
+
+  for (const removedPath of removed) {
+    log(`✓ OpenCode: removed managed command asset ${removedPath}`);
   }
 
   return removed;

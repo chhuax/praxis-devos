@@ -1,109 +1,109 @@
 ---
 name: openspec-explore
-description: 在 OpenSpec change 开始前或过程中进入探索模式。适用于用户想先 brainstorm、explore options、think through requirements、compare approaches，或还 not sure yet、不想立刻进入 propose/apply。
+description: Enter exploration mode before or during an OpenSpec change. Use when the user wants to brainstorm first, explore options, think through requirements, compare approaches, or is not ready to move into propose/apply yet.
 compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.9"
 ---
 
-进入探索模式。目标是把问题、边界、约束和方案收敛清楚，而不是直接实现代码。
+Enter exploration mode. The goal is to converge on the problem, boundaries, constraints, and approaches clearly rather than implementing code directly.
 
-**探索模式用于思考，不用于实现。** 你可以读文件、搜代码、调查代码库；只有在用户明确要求 capture 时，才允许把结论写回当前 change 的 OpenSpec artifact。不要写业务代码或直接实现功能。
+**Exploration mode is for thinking, not implementation.** You may read files, search code, and investigate the codebase. Only write conclusions back into the current change's OpenSpec artifact when the user explicitly asks to capture them. Do not write business code or directly implement features.
 
-## 核心定位
+## Core Positioning
 
-- OpenSpec 负责：change 上下文、artifacts、现有决策
-- Superpowers 负责：需求与方案收敛
-- `openspec-explore` 负责主导探索过程
+- OpenSpec owns change context, artifacts, and existing decisions
+- Superpowers owns requirement and solution convergence
+- `openspec-explore` leads the exploration flow
 
-## 精确 Skill 协议
+## Exact Skill Protocol
 
-- 命中路由时，必须调用对应的**精确 skill 名**
-- 不得用语义相近的本地 skill、默认 skill、手工步骤或长段 reasoning 替代
-- 如果精确 skill 不可用，必须明确报告不可用，不要静默 fallback
+- When this route is matched, you must call the corresponding **exact skill name**
+- Do not substitute a semantically similar local skill, default skill, manual steps, or long-form reasoning
+- If the exact skill is unavailable, report that explicitly and do not silently fall back
 
-## Brainstorming 门禁
+## Brainstorming Gate
 
-在 `openspec-explore` 中，`superpowers:brainstorming` 不是可选加成，而是默认的收敛能力。
+In `openspec-explore`, `superpowers:brainstorming` is not an optional enhancement. It is the default convergence capability.
 
-只要当前探索涉及以下任一情况，就必须先真实调用一次 `superpowers:brainstorming`：
+If the current exploration involves any of the following, you must actually invoke `superpowers:brainstorming` first:
 
-- 新 feature / 新能力方向
-- 方案比较与设计取舍
-- proposal / specs / design 的范围收敛
-- 需要把模糊需求拆成可落地 change
-- 已有 change 中重新回到设计层讨论
+- A new feature or capability direction
+- Option comparison and design tradeoff decisions
+- Scope convergence for proposal, specs, or design
+- Breaking vague requirements into a viable change
+- Returning to design-level discussion within an existing change
 
-这次调用可以很轻量，但必须真实发生。不得用“方向已经清楚”“可以直接写 proposal/design”“先写 artifact 后补 brainstorming”等理由跳过。
+This call can be lightweight, but it must really happen. Do not skip it with reasons such as "the direction is already clear," "we can write the proposal/design directly," or "we can draft the artifact first and brainstorm later."
 
-收敛调用必须满足这 4 条：
+The convergence call must satisfy these 4 rules:
 
-- 真实加载并使用 `superpowers:brainstorming`，不得只在文字里声称“已经 brainstorm 过”
-- 只把它当作当前 explore 的收敛能力，不进入它自带的 spec / plan / implementation 流程
-- 不得产出 `docs/superpowers/**` 或其他旁路 spec / plan 文档
-- 调用完成后必须先回到 `openspec-explore`，再决定是继续探索、建议 `/opsx:propose` / `openspec-new-change`，还是在用户明确要求 capture 时写回当前 change artifact
+- Actually load and use `superpowers:brainstorming`; do not merely claim in text that brainstorming already happened
+- Use it only as the convergence capability for the current explore stage, without entering its own spec, plan, or implementation workflow
+- Do not produce `docs/superpowers/**` or any other side-channel spec or plan documents
+- After the call completes, return to `openspec-explore` first, then decide whether to keep exploring, recommend `/opsx:propose` or `openspec-new-change`, or write back to the current change artifact only when the user explicitly asks to capture
 
-## OpenSpec 上下文
+## OpenSpec Context
 
-开始时先看当前有哪些 change：
+At the start, inspect which changes currently exist:
 
 ```bash
 openspec list --json
 ```
 
-如果用户提到了某个 change，或当前讨论明显与某个 change 强相关：
+If the user mentioned a specific change, or the discussion is clearly tied to one:
 
-- 先读相关 artifacts 获取上下文
-- 在对话里自然引用已有 proposal / design / tasks / specs
-- 当关键结论形成时，再建议是否写回 artifact
+- Read related artifacts first to get context
+- Naturally reference the existing proposal, design, tasks, or specs in the conversation
+- Once key conclusions have formed, suggest whether they should be written back into an artifact
 
-优先读取：
+Prioritize reading:
 
 - `openspec/changes/<name>/proposal.md`
 - `openspec/changes/<name>/design.md`
 - `openspec/changes/<name>/tasks.md`
-- 相关 spec
+- Related specs
 
-## 可以做什么
+## What You Can Do
 
-- 澄清问题，挑战隐藏假设
-- 调查代码结构、集成点、现有模式
-- 比较多个方案并做取舍分析
-- 用表格、ASCII 图、依赖图帮助理解
-- 指出风险、未知项和需要补充调查的问题
-- 在结论形成后，建议回写 proposal / design / spec / tasks
+- Clarify the problem and challenge hidden assumptions
+- Investigate code structure, integration points, and existing patterns
+- Compare multiple approaches and analyze tradeoffs
+- Use tables, ASCII diagrams, and dependency maps to improve understanding
+- Surface risks, unknowns, and questions that need further investigation
+- Once conclusions form, suggest writing back to proposal, design, spec, or tasks artifacts
 
-## 退出条件
+## Exit Conditions
 
-- 如果结论尚未收敛：继续探索、比较方案、补充约束
-- 如果结论已经收敛但尚无 change：停止在建议层，明确提示下一步使用 `openspec-propose` 或 `openspec-new-change`
-- 如果结论已经收敛且存在当前 change：可以建议更新对应 artifact；只有用户明确要求后，才在确认 artifact 上下文后写当前 change 下的目标文件
+- If conclusions have not converged yet: keep exploring, compare approaches, and gather more constraints
+- If conclusions have converged but no change exists yet: stop at the recommendation layer and clearly suggest `openspec-propose` or `openspec-new-change` as the next step
+- If conclusions have converged and a current change exists: suggest updating the relevant artifact, but only write the target file under the current change after the user explicitly asks and artifact context has been confirmed
 
-## 最小示例
+## Minimal Example
 
 ```text
-用户: /opsx:explore 云市场增加 fieldid
+User: /opsx:explore add fieldid to the cloud marketplace
 
-1. 读取代码和 `openspec list --json`
-2. 调用 `superpowers:brainstorming` 收敛范围、方案和风险
-3. 回到 `openspec-explore` 总结结论
-4. 输出下一步建议：
-   - 继续探索，或
-   - 建议 `/opsx:propose`，或
-   - 用户明确要求 capture 时，写回当前 change artifact
+1. Read the code and run `openspec list --json`
+2. Call `superpowers:brainstorming` to converge scope, approaches, and risks
+3. Return to `openspec-explore` and summarize the conclusions
+4. Suggest the next step:
+   - Keep exploring, or
+   - Recommend `/opsx:propose`, or
+   - If the user explicitly asks to capture, write back to the current change artifact
 ```
 
-## 常见进入方式
+## Common Entry Paths
 
-- 用户带来模糊想法：先用 `superpowers:brainstorming` 缩小问题空间
-- 用户带来复杂但混乱的现状：先读代码和 artifacts，再梳理现状与纠缠点
-- 用户在 change 中途卡住：把问题拉回设计层，再用 `superpowers:brainstorming` 收敛
+- The user brings a vague idea: use `superpowers:brainstorming` first to narrow the problem space
+- The user brings a complex but tangled situation: read the code and artifacts first, then untangle the current state and dependencies
+- The user gets stuck mid-change: pull the discussion back to the design level, then use `superpowers:brainstorming` to converge
 
 ## Guardrails
 
-- 探索阶段不实现业务代码
-- 不要把“边界清晰”当作跳过 `superpowers:brainstorming` 的理由
-- 问题还在发散时允许继续探索；没有共识前不要写死进 artifacts
-- explore 阶段默认不创建、不更新 artifact；只有用户明确要求 capture 时，才允许写回当前 change 的原生 artifact
-- 不要把 explore 的确认语句直接升级成“开始写 spec 文档”“开始实施”或其他阶段切换
+- Do not implement business code during the exploration stage
+- Do not treat "the boundaries are clear" as a reason to skip `superpowers:brainstorming`
+- If the problem is still diverging, continue exploring; do not lock conclusions into artifacts before consensus exists
+- By default, the explore stage does not create or update artifacts; only write back to native artifacts under the current change when the user explicitly asks to capture
+- Do not escalate an explore-stage confirmation directly into "start writing the spec" or "start implementation" or any other stage transition

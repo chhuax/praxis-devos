@@ -28,6 +28,26 @@ import {
 } from './project/state.js';
 import { PRAXIS_CLI_COMMAND } from './constants/cli.js';
 import { commandExists, resolveOpenSpecRuntime } from './runtime/commands.js';
+import { collectDirectSkillSources } from '../projection/skill-sources.js';
+import { collectDirectCommandSources } from '../projection/command-sources.js';
+import {
+  collectGeneratedWorkflowCommandSources,
+  collectGeneratedWorkflowSkillSources,
+} from '../projection/openspec-generated.js';
+import {
+  assertUniqueSkillNames,
+  buildProjectionPlan,
+  executeProjectionPlan,
+} from '../projection/index.js';
+import { assertUniqueResourceNames as assertUniqueCommandNames } from '../projection/resources/commands.js';
+import {
+  collectPackResourceSources,
+  installedPackOwnerDir,
+} from '../projection/pack-resources.js';
+import {
+  collectSkillPackSourcesFromEntries,
+  inspectSkillPack,
+} from '../projection/skill-packs.js';
 import {
   initProject,
   populateOpenSpecConfig,
@@ -140,11 +160,103 @@ export const statusProject = ({ projectDir, agents = SUPPORTED_AGENTS }) => {
   return lines.join('\n');
 };
 
+export const installPackProject = ({
+  skillPackPath,
+  projectDir = process.cwd(),
+  stacks = [],
+  agents = SUPPORTED_AGENTS,
+}) => {
+  if (!skillPackPath) {
+    throw new Error('install-pack requires a pack path argument');
+  }
+
+  const selectedAgents = uniqueAgents(agents);
+  const baseDir = projectDir;
+  const selectedStacks = [...new Set(
+    stacks.map((value) => String(value || '').trim()).filter(Boolean),
+  )].sort((a, b) => a.localeCompare(b));
+  const inspection = inspectSkillPack({
+    projectDir: baseDir,
+    skillPackPath,
+  });
+  const ownerProjectDir = installedPackOwnerDir({ inspection });
+  if (inspection.layout === 'common-stacks' && selectedStacks.length === 0) {
+    throw new Error(`Pack ${skillPackPath} requires at least one --stack`);
+  }
+  const skillSources = collectSkillPackSourcesFromEntries({
+    projectDir: baseDir,
+    entries: [{
+      path: skillPackPath,
+      stacks: selectedStacks,
+    }],
+  });
+  const commandSources = collectPackResourceSources({
+    projectDir: baseDir,
+    entries: [{
+      path: skillPackPath,
+      stacks: selectedStacks,
+    }],
+    resourceType: 'commands',
+  });
+  const reservedNames = [
+    ...collectDirectSkillSources(),
+    ...collectGeneratedWorkflowSkillSources({ agent: 'codex' }),
+    ...skillSources,
+  ];
+  assertUniqueSkillNames(reservedNames);
+  const reservedCommandNames = [
+    ...collectDirectCommandSources(),
+    ...collectGeneratedWorkflowCommandSources({ agent: 'claude' }),
+    ...commandSources,
+  ];
+  assertUniqueCommandNames(reservedCommandNames);
+  const outputs = [];
+  const sourceLabel = inspection.sourceKind === 'git' ? 'git pack' : 'local pack';
+
+  outputs.push('== pack ==');
+  outputs.push(`Installed ${sourceLabel} ${skillPackPath} to user-level skills`);
+  if (selectedStacks.length > 0) {
+    outputs.push(`Selected stacks: ${selectedStacks.join(', ')}`);
+  } else {
+    outputs.push('Selected layout: flat skills');
+  }
+
+  const projectionLogs = [];
+  for (const agent of selectedAgents) {
+    executeProjectionPlan({
+      agent,
+      projectDir: ownerProjectDir,
+      version: getPackageVersion(),
+      log: (msg) => projectionLogs.push(msg),
+      plan: buildProjectionPlan({
+        agent,
+        projectDir: ownerProjectDir,
+        explicitSources: {
+          skills: skillSources,
+          commands: commandSources,
+        },
+        manageExisting: true,
+        cleanStaleProjections: false,
+      }),
+    });
+  }
+  if (projectionLogs.length > 0) {
+    outputs.push('');
+    outputs.push('== native projection ==');
+    outputs.push(projectionLogs.join('\n'));
+  }
+
+  return outputs.filter(Boolean).join('\n');
+};
+
+export const installSkillPackProject = (options) => installPackProject(options);
+
 export const parseCliArgs = (argv) => {
   const args = [...argv];
   const parsed = {
     command: args.shift() || 'help',
     agents: [],
+    stacks: [],
     positional: [],
     projectDir: process.cwd(),
     strict: false,
@@ -170,6 +282,18 @@ export const parseCliArgs = (argv) => {
       continue;
     }
 
+    if (token === '--stack') {
+      const stack = args.shift();
+      if (stack) parsed.stacks.push(stack);
+      continue;
+    }
+
+    if (token === '--stacks') {
+      const value = args.shift();
+      if (value) parsed.stacks.push(...value.split(','));
+      continue;
+    }
+
     if (token === '--strict') {
       parsed.strict = true;
       continue;
@@ -191,6 +315,7 @@ Commands:
   setup          Bootstrap dependencies, initialize framework files
   init           Initialize the framework skeleton in the current project
   update         Refresh agent adapters and managed blocks
+  install-pack   Install a local path or git URL pack into user-level supported assets
   status         Show current project initialization and dependency state
   doctor         Check required openspec/superpowers dependencies
   bootstrap      Print or apply dependency bootstrap steps for each agent
@@ -199,6 +324,8 @@ Commands:
 Options:
   --agent <name>         Sync one agent adapter (repeatable)
   --agents a,b,c         Sync multiple agent adapters
+  --stack <name>         Select one stack when installing a pack (repeatable)
+  --stacks a,b,c         Select multiple stacks when installing a pack
   --project-dir <path>   Project directory (defaults to cwd)
   --strict               Fail doctor if required dependencies are missing
 
@@ -253,6 +380,15 @@ export const runCli = (argv) => {
   if (parsed.command === 'init') {
     return initProject({
       projectDir: parsed.projectDir,
+      agents,
+    });
+  }
+
+  if (parsed.command === 'install-pack' || parsed.command === 'install-skill-pack') {
+    return installPackProject({
+      skillPackPath: parsed.positional[0],
+      projectDir: parsed.projectDir,
+      stacks: parsed.stacks,
       agents,
     });
   }

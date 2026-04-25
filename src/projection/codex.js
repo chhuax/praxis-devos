@@ -9,17 +9,18 @@ import {
 } from './bundles.js';
 import {
   canSafelyOverwrite,
+  isManagedAsset,
   pruneManagedAssets,
   registerManagedAsset,
 } from './managed-assets.js';
 import { resolveUserHomeDir } from '../support/home.js';
 
 const codexSkillsDir = () => path.join(resolveUserHomeDir(), '.codex', 'skills');
+const sourcePathForManifest = (sourceDir) => {
+  const relative = path.relative(process.cwd(), sourceDir);
+  return relative && !relative.startsWith('..') ? relative : sourceDir;
+};
 
-/**
- * Project bundled Praxis skills to ~/.codex/skills/ as directories with SKILL.md.
- * Codex discovers these as native skills.
- */
 export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   ensureDir(codexSkillsDir());
   const results = [];
@@ -28,6 +29,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
     name,
     sourceDir,
     sourceType = 'direct',
+    sourceRef,
+    sourcePack,
   } of skillSources) {
     const targetDir = path.join(codexSkillsDir(), name);
     const targetPath = path.join(targetDir, 'SKILL.md');
@@ -64,7 +67,7 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
         }
 
         const content = fs.readFileSync(sourceSkillPath, 'utf8');
-        const marker = buildMarker({ source: path.relative(process.cwd(), sourceSkillPath), version });
+        const marker = buildMarker({ source: sourceRef || path.relative(process.cwd(), sourceSkillPath), version });
         return injectMarker(content, marker);
       },
     });
@@ -75,7 +78,8 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
       version,
       agent: 'codex',
       extra: {
-        sourceDir: path.relative(process.cwd(), sourceDir),
+        sourceDir: sourcePathForManifest(sourceDir),
+        ...(sourcePack ? { sourcePack } : {}),
       },
     });
     results.push({ name, targetPath, status: 'projected', assetType: 'skill', sourceType });
@@ -89,7 +93,10 @@ export const projectSkills = ({ projectDir, skillSources, version, log }) => {
   return results;
 };
 
-export const detectProjections = () => {
+export const resolveCommandTargetPath = () => null;
+export const projectCommands = () => [];
+
+export const detectSkillProjections = () => {
   if (!fs.existsSync(codexSkillsDir())) {
     return [];
   }
@@ -104,30 +111,40 @@ export const detectProjections = () => {
     .filter((entry) => entry.isProjection);
 };
 
-/**
- * Remove stale projections that no longer have a matching source.
- */
-export const cleanStaleProjections = ({ validNames, log }) => {
-  const existing = detectProjections();
+export const detectProjections = () => detectSkillProjections();
+
+export const cleanStaleSkillProjections = ({ projectDir, validNames, log }) => {
+  const existing = detectSkillProjections();
   for (const entry of existing) {
     if (!validNames.includes(entry.name)) {
+      const managedByAnyOwner = isManagedAsset({ assetPath: entry.path });
+      const managedByCurrentOwner = isManagedAsset({ assetPath: entry.path, projectDir, agent: 'codex' });
+      if (managedByAnyOwner && !managedByCurrentOwner) {
+        continue;
+      }
+
       fs.rmSync(path.dirname(entry.path), { recursive: true, force: true });
       log(`✓ Codex: removed stale projection ${entry.name}`);
     }
   }
 };
 
-export const pruneManagedUserAssets = ({ projectDir, validSkillNames, log }) => {
+export const cleanStaleProjections = ({ validNames, log }) => cleanStaleSkillProjections({ validNames, log });
+
+export const pruneManagedSkillAssets = ({ projectDir, validSkillNames, log }) => {
   const validSkillPaths = validSkillNames.map((name) => path.join(codexSkillsDir(), name, 'SKILL.md'));
   const removed = pruneManagedAssets({
     projectDir,
     agent: 'codex',
+    type: 'skill',
     validPaths: validSkillPaths,
   });
 
   for (const removedPath of removed) {
-    log(`✓ Codex: removed managed asset ${removedPath}`);
+    log(`✓ Codex: removed managed skill asset ${removedPath}`);
   }
 
   return removed;
 };
+
+export const pruneManagedCommandAssets = () => [];
