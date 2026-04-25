@@ -92,17 +92,15 @@ npx praxis-devos@latest setup --agents opencode,codex,claude,copilot
 npx praxis-devos@latest doctor --strict
 ```
 
-## Commands
+## Core Commands
+
+Most users only need these entrypoints:
 
 | Command | Purpose |
 |---|---|
 | `setup` | Primary onboarding and repair entrypoint |
-| `init` | Initialize the project skeleton and managed adapters |
-| `update` | Refresh managed adapters and native projections |
-| `install-pack <path-or-git-url>` | Install a local or git-backed extension pack into user-level supported assets |
-| `status` | Show current project and dependency state |
 | `doctor` | Check OpenSpec, agent dependencies, and projections |
-| `bootstrap` | Print or apply dependency bootstrap guidance |
+| `install-pack <path-or-git-url>` | Install a local or git-backed extension pack into user-level supported assets |
 
 ## Docs Workflows
 

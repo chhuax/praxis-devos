@@ -104,17 +104,15 @@ npx praxis-devos@latest setup --agents opencode,codex,claude,copilot
 npx praxis-devos@latest doctor --strict
 ```
 
-## 命令
+## 核心命令
+
+大多数用户只需要这几个入口：
 
 | 命令 | 用途 |
 |---|---|
 | `setup` | 主 onboarding / 修复入口 |
-| `init` | 初始化项目骨架和托管 adapter |
-| `update` | 刷新托管 adapter 与原生投放 |
-| `install-pack <path-or-git-url>` | 安装本地或 git-backed 的扩展包到用户级支持资产中 |
-| `status` | 查看当前项目与依赖状态 |
 | `doctor` | 检查 OpenSpec、agent 依赖和投放情况 |
-| `bootstrap` | 打印或执行依赖 bootstrap 指引 |
+| `install-pack <path-or-git-url>` | 安装本地或 git-backed 的扩展包到用户级支持资产中 |
 
 ## 文档工作流
 
