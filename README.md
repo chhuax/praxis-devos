@@ -24,12 +24,6 @@ Use `npx` so each run resolves the requested package version directly:
 npx praxis-devos@latest setup --agent codex
 ```
 
-Run a one-off command against the latest package:
-
-```bash
-npx praxis-devos@latest update --agent codex
-```
-
 ## What `setup` Changes
 
 Running `npx praxis-devos@latest setup ...` can touch both the project and the local user environment.

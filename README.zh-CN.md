@@ -36,12 +36,6 @@ npm install -g praxis-devos@latest
 npx praxis-devos@latest setup --agent codex
 ```
 
-一次性执行最新版本命令：
-
-```bash
-npx praxis-devos@latest update --agent codex
-```
-
 ## `setup` 会改什么
 
 执行 `npx praxis-devos@latest setup ...` 时，Praxis 既可能改项目，也可能改本机用户环境。
