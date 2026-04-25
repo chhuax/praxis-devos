@@ -16,33 +16,39 @@
 
 `praxis-devos` 的定位是薄脚手架和编排层，不是内容生成器。
 
-## 安装与升级
+## 快速开始
 
-### 全局 npm 安装
-
-```bash
-npm install -g praxis-devos
-```
-
-升级全局 CLI：
-
-```bash
-npm install -g praxis-devos@latest
-```
-
-### `npx` 一次性使用
+推荐直接用 `npx`，每次都拿到你指定的版本：
 
 ```bash
 npx praxis-devos@latest setup --agent codex
+npx praxis-devos@latest doctor --strict
 ```
 
-一次性执行最新版本命令：
+按你实际使用的 agent 选择：
 
 ```bash
-npx praxis-devos@latest update --agent codex
+# Codex
+npx praxis-devos@latest setup --agent codex
+
+# Claude Code
+npx praxis-devos@latest setup --agent claude
+
+# OpenCode
+npx praxis-devos@latest setup --agent opencode
+
+# GitHub Copilot
+npx praxis-devos@latest setup --agent copilot
 ```
 
-## `setup` 会改什么
+如果一个项目会同时给多个 agent 使用：
+
+```bash
+npx praxis-devos@latest setup --agents opencode,codex,claude,copilot
+npx praxis-devos@latest doctor --strict
+```
+
+## `setup` 会做什么
 
 执行 `npx praxis-devos@latest setup ...` 时，Praxis 既可能改项目，也可能改本机用户环境。
 
@@ -67,94 +73,15 @@ your-project/
 - 安装或校验 OpenSpec 运行时
 - 安装或校验各 agent 所需的 SuperPowers 依赖
 
-## 快速开始
+## 核心命令
 
-### Codex
-
-```bash
-npx praxis-devos@latest setup --agent codex
-npx praxis-devos@latest doctor --strict
-```
-
-### Claude Code
-
-```bash
-npx praxis-devos@latest setup --agent claude
-npx praxis-devos@latest doctor --strict
-```
-
-### OpenCode
-
-```bash
-npx praxis-devos@latest setup --agent opencode
-npx praxis-devos@latest doctor --strict
-```
-
-### GitHub Copilot
-
-```bash
-npx praxis-devos@latest setup --agent copilot
-npx praxis-devos@latest doctor --strict
-```
-
-### 多 Agent 项目
-
-```bash
-npx praxis-devos@latest setup --agents opencode,codex,claude,copilot
-npx praxis-devos@latest doctor --strict
-```
-
-## 命令
+大多数用户只需要这几个入口：
 
 | 命令 | 用途 |
 |---|---|
 | `setup` | 主 onboarding / 修复入口 |
-| `init` | 初始化项目骨架和托管 adapter |
-| `update` | 刷新托管 adapter 与原生投放 |
-| `install-pack <path-or-git-url>` | 安装本地或 git-backed 的扩展包到用户级支持资产中 |
-| `status` | 查看当前项目与依赖状态 |
 | `doctor` | 检查 OpenSpec、agent 依赖和投放情况 |
-| `bootstrap` | 打印或执行依赖 bootstrap 指引 |
-
-## 文档工作流
-
-Praxis 也把 codemap 和 API 文档视为 harnessed workflow，而不是硬编码在 JS 里的内容生成。JS 脚手架负责路由、投放、校验和约束这些工作流，但不负责生成最终给人阅读的正文内容。
-
-### 项目级文档
-
-项目范围的 codemap 和 surface 文档通过 `devos-docs` skill 在 `setup` 后使用：
-
-| 模式 | 产出 |
-|---|---|
-| `init` | `docs/surfaces.yaml`、`docs/codemaps/project-overview.md` 以及相关 codemap 文件 |
-| `refresh` | 根据当前代码库状态刷新已有 codemap 文件 |
-
-通过 agent 的 skill 系统调用，例如 `/devos-docs-init` 或 `/devos-docs-refresh`。
-
-### 变更级文档
-
-在 OpenSpec change 中，使用 `devos-change-docs` skill 生成变更范围的文档：
-
-| 模式 | 产出 |
-|---|---|
-| `change-blackbox` | `openspec/changes/<change>/blackbox-test.md`，从外部可观察行为描述变更 |
-| `change-api` | `openspec/changes/<change>/api-doc.md`，记录该变更的 API 合同变化 |
-| `project-api-sync` | 变更落地后同步更新 `docs/reference/api.md` 中的稳定 API 内容 |
-
-公司 schema 现在会把 `blackbox-test.md` 作为正式变更工件输出。条件性的 API 文档和 project API sync 仍通过 `devos-change-docs` 路由，archive 检查也仍会验证 API sync 证据，或者要求明确的 API 影响豁免。
-
-## 各 Agent 的接入方式
-
-Praxis 对外给用户的是统一契约，但每个 agent 的底层接入方式不同：
-
-- OpenSpec workflow assets 会先由项目内的 `openspec init` 生成，再被 adopt 到各 agent 的用户级发现目录；Praxis 不再回退到仓库内 upstream workflow snapshot
-- 对仍需要 `/opsx:*` command surface 的宿主，Praxis 只投放薄入口 adapter；workflow 的 canonical guidance 保留在 adopt 后的 skill/schema 内容里，不再在 command 正文里重复一份
-- OpenCode：向用户 OpenCode 配置合并必须的插件声明，并投放内置资产
-- Codex：校验或安装 `~/.codex/` 下的 SuperPowers clone/link 布局
-- Claude Code：通过 Claude CLI 校验或安装官方 SuperPowers 插件
-- GitHub Copilot：作为独立 agent 接入，但默认只把 skills 投放到共享的 Claude 兼容发现面 `~/.claude/skills/`；暂不投放 command
-
-如果你只想做依赖修复或查看指导而不执行完整 setup，可以使用 `bootstrap`。
+| `install-pack <path-or-git-url>` | 安装本地或 git-backed 的扩展包到用户级支持资产中 |
 
 ## 扩展包
 
@@ -163,7 +90,7 @@ Praxis 应该保持在框架层尽量轻。企业 rules、skills、hooks、stack
 这样职责会比较清楚：
 
 - `praxis-devos`：负责 OpenSpec harness、SuperPowers 集成、adapter 管理、projection 和统一工作流入口
-- extension pack：负责企业规则、stack-specific skills、hooks 和额外投放内容
+- extension pack：负责企业规则、stack-specific skills、commands、hooks 和额外投放内容
 
 ### 直接安装扩展包
 
@@ -180,17 +107,9 @@ npx praxis-devos@latest install-pack git+https://example.com/company/devos-pack.
 npx praxis-devos@latest install-pack ../company-devos-pack --stacks java,golang --agents codex,claude
 ```
 
-重复安装是可升级安全的：
-
-- git 扩展包会先刷新缓存 checkout，再进行 projection
-- 仍然存在的资源会在它们属于 Praxis 管理时被覆盖更新
-- 新资源会被安装
-- 同一个扩展包里已删除的资源会从选定 agent 上被清理
-- 其他扩展包、Praxis 内置资源，以及用户自有文件不会被误删
-
 ### 项目声明的扩展包
 
-项目也可以在 `package.json` 里声明扩展包，这样 `setup`、`update` 和 `doctor` 会在正常的项目 projection 流程里一起处理：
+项目也可以在 `package.json` 里声明扩展包，这样 `setup` 和 `doctor` 会在正常的项目 projection 流程里一起处理：
 
 ```json
 {
@@ -206,52 +125,29 @@ npx praxis-devos@latest install-pack ../company-devos-pack --stacks java,golang 
 }
 ```
 
-`install-pack` 不会写入这段配置。当扩展包本身属于项目契约时，使用项目声明方式；如果只是显式做一次用户级安装，则使用 `install-pack`。
+当扩展包本身属于项目契约时，使用项目声明方式；如果只是显式做一次用户级安装，则使用 `install-pack`。
 
-### 扩展包布局规范
+## 进阶信息
 
-Praxis 只消费那些被已注册 resource projector 认领的资源目录。当前支持的资源类型是 `skills` 和 `commands`。
+### 文档工作流
 
-平铺型扩展包：
+Praxis 也把 codemap 和 API 文档视为 harnessed workflow，而不是硬编码在 JS 里的内容生成。脚手架负责路由、投放、校验和约束这些工作流，但不负责生成最终给人阅读的正文内容。
 
-```text
-company-devos-pack/
-├── package.json
-├── skills/
-│   └── enterprise-standards/
-│       ├── SKILL.md
-│       └── references/
-└── commands/
-    └── devos-check.md
-```
+- `devos-docs`：项目级 codemap 和 surface 文档，例如 `docs/surfaces.yaml` 与 `docs/codemaps/project-overview.md`
+- `devos-change-docs`：change 级文档，例如 `openspec/changes/<change>/blackbox-test.md` 和 `api-doc.md`
+- `project-api-sync`：稳定 API 变更落地后更新 `docs/reference/api.md`
 
-`common` 加 `stack` 的扩展包：
+### 各 Agent 的接入方式
 
-```text
-company-devos-pack/
-├── package.json
-├── common/
-│   ├── skills/
-│   │   └── enterprise-standards/
-│   │       └── SKILL.md
-│   └── commands/
-│       └── enterprise-check.md
-└── stacks/
-    └── java/
-        ├── skills/
-        │   └── spring-delivery/
-        │       └── SKILL.md
-        └── commands/
-            └── spring-check.md
-```
+- OpenSpec workflow assets 会先在项目内生成，再 adopt 到各 agent 的用户级发现目录
+- OpenCode 会投放内置 skills 和 commands，并清理 runtime config 中的旧 Praxis 插件项
+- Codex 会校验或安装 `~/.codex/` 下的 SuperPowers clone/link 布局
+- Claude Code 会通过 Claude CLI 校验或安装官方 SuperPowers 插件
+- GitHub Copilot 会把内置 skills 投放到共享的 `~/.claude/skills/` 发现面
 
-Rules 和 hooks 可以存在于扩展包仓库里，但在有对应 resource projector 之前，Praxis 会忽略 `rules/`、`hooks/`、`src/`、`bin/` 以及其他未注册目录。
+### 仓库结构
 
-同一种资源类型下，资源名必须唯一。扩展包中的 skill 或 command 不能静默覆盖另一个扩展包或 Praxis 内置资源中同名的内容。
-
-## 仓库结构
-
-如果你是在维护这个包本身，当前最重要的目录是：
+如果你是在维护这个包本身，主要目录是：
 
 ```text
 assets/              # 内置 skills、commands、overlays 和公司 schema 资产
@@ -263,20 +159,10 @@ src/templates/       # 托管模板
 test/                # 单测与 smoke 脚本
 ```
 
-## 开发
-
-本地运行测试：
+### 开发
 
 ```bash
 node --test
-```
-
-对打包产物执行安装 smoke：
-
-```bash
-npm pack
-node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario opencode
-node test/install-smoke-cli.mjs --package ./praxis-devos-<version>.tgz --scenario claude
 ```
 
 ## License
