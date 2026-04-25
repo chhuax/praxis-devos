@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-04-25
+
+### Added
+- First-class enterprise pack projection through project config and `install-pack`, including local path and git-backed pack sources
+- Resource-oriented projection plumbing for `skills` and `commands`, with external pack discovery, stack-aware layouts, and agent-native projection support
+
+### Changed
+- README, surfaces docs, codemap docs, and OpenSpec change artifacts now describe extension pack capabilities, supported layouts, and the no-global-install CLI guidance
+- Release-safe workflow assertions and managed asset tracking were updated to match the current workflow contracts and typed projection manifest model
+
+### Fixed
+- Reinstalling the same pack now prunes only resources removed from that pack without deleting assets still owned by other project or pack scopes
+- `install-pack` now normalizes duplicate and whitespace-padded stack selections before collecting resources
+- `doctor` now treats git-backed pack inspection as read-only and warns about a missing cache instead of cloning or fetching during health checks
+- Pack layout detection now ignores unregistered `stacks/*` content such as future `rules/` directories
+
 ## [0.6.8] - 2026-04-22
 
 ### Changed
