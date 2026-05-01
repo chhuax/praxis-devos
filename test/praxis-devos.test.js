@@ -798,6 +798,12 @@ test('syncProject refreshes adapters and preserves user-owned content', () => {
   assert.match(output, /Synced adapters: codex, claude, opencode, copilot/);
   assert.match(agentsMd, /PRAXIS_DEVOS_START/);
   assert.match(agentsMd, /Keep this section\./);
+  const managedBlock = agentsMd.match(/<!-- PRAXIS_DEVOS_START -->\n([\s\S]*?)\n<!-- PRAXIS_DEVOS_END -->/)?.[1] || '';
+  assert.ok(managedBlock.split('\n').length <= 18);
+  assert.match(agentsMd, /`karpathy-guidelines`/);
+  assert.match(agentsMd, /implementation \/ bug fix \/ refactor \/ review-preparation/i);
+  assert.doesNotMatch(agentsMd, /## Coding Guidelines Activation/);
+  assert.doesNotMatch(agentsMd, /Clarification before commitment/);
   assert.doesNotMatch(agentsMd, /\/opsx:/);
   assert.doesNotMatch(agentsMd, /opsx-propose|opsx-apply|opsx-explore|opsx-archive/);
   assert.match(claudeMd, /PRAXIS_DEVOS_START/);
@@ -1832,14 +1838,17 @@ test('devos-change-docs bundled skill declares supported modes', () => {
 
 test('collectBundledSkillSources discovers unified skill bundles by sourceDir', () => {
   const skillSources = collectBundledSkillSources();
+  const karpathyGuidelines = skillSources.find((entry) => entry.name === 'karpathy-guidelines');
   const docs = skillSources.find((entry) => entry.name === 'devos-docs');
   const changeDocs = skillSources.find((entry) => entry.name === 'devos-change-docs');
 
+  assert.ok(karpathyGuidelines);
   assert.ok(docs);
   assert.ok(changeDocs);
+  assert.match(normalizeSlashes(karpathyGuidelines.sourceDir), /assets\/skills\/karpathy-guidelines$/);
   assert.match(normalizeSlashes(docs.sourceDir), /assets\/skills\/devos-docs$/);
   assert.match(normalizeSlashes(changeDocs.sourceDir), /assets\/skills\/devos-change-docs$/);
-  assert.deepEqual(skillSources.map((entry) => entry.name).sort(), ['devos-change-docs', 'devos-docs']);
+  assert.deepEqual(skillSources.map((entry) => entry.name).sort(), ['devos-change-docs', 'devos-docs', 'karpathy-guidelines']);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-verify'), false);
   assert.equal(skillSources.some((entry) => entry.name === 'opsx-sync'), false);
 });
@@ -1925,6 +1934,10 @@ test('projectNativeSkills projects canonical OpenSpec workflow skills alongside 
       path.join(fakeHome, '.codex', 'skills', 'devos-docs', 'SKILL.md'),
       'utf8',
     ));
+    const projectedCodexGuidelinesSkill = normalizeEol(fs.readFileSync(
+      path.join(fakeHome, '.codex', 'skills', 'karpathy-guidelines', 'SKILL.md'),
+      'utf8',
+    ));
     const projectedClaudeDocsSkill = normalizeEol(fs.readFileSync(
       path.join(fakeHome, '.claude', 'skills', 'devos-docs', 'SKILL.md'),
       'utf8',
@@ -1938,6 +1951,13 @@ test('projectNativeSkills projects canonical OpenSpec workflow skills alongside 
       'utf8',
     ));
     assert.match(projectedCodexDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedCodexGuidelinesSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
+    assert.match(projectedCodexGuidelinesSkill, /^name: karpathy-guidelines$/m);
+    assert.match(projectedCodexGuidelinesSkill, /^# Karpathy Guidelines$/m);
+    assert.match(projectedCodexGuidelinesSkill, /Think Before Coding/);
+    assert.match(projectedCodexGuidelinesSkill, /Simplicity First/);
+    assert.match(projectedCodexGuidelinesSkill, /Surgical Changes/);
+    assert.match(projectedCodexGuidelinesSkill, /Goal-Driven Execution/);
     assert.match(projectedClaudeDocsSkill, /^---\n[\s\S]*?\n---\n<!-- PRAXIS_PROJECTION /);
     assert.match(projectedCodexWorkflowSkill, /^---\nname: openspec-propose\n/m);
     assert.match(projectedClaudeWorkflowSkill, /^---\nname: openspec-propose\n/m);
@@ -1963,6 +1983,7 @@ test('projectNativeSkills projects canonical OpenSpec workflow skills alongside 
   });
 
   assert.match(logs.join('\n'), /Codex: projected devos-docs/);
+  assert.match(logs.join('\n'), /Codex: projected karpathy-guidelines/);
   assert.match(logs.join('\n'), /Codex: projected OpenSpec workflow skill openspec-propose/);
   assert.match(logs.join('\n'), /Claude: projected devos-docs/);
   assert.match(logs.join('\n'), /Claude: projected OpenSpec workflow skill openspec-propose/);
