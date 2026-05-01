@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-05-01
+
+### Added
+- Bundled the official `karpathy-guidelines` skill and activated it from the compact Praxis managed block for coding, bug fix, refactor, and review-preparation tasks.
+
+### Changed
+- Compressed the Praxis managed entry template to concise routing and contract guidance while preserving OpenSpec flow gates.
+
 ## [0.6.9] - 2026-04-25
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "praxis-devos",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "description": "AI-Native Development Framework — OpenSpec Governance + SuperPowers Execution",
   "type": "module",
   "bin": {
